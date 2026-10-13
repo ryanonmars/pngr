@@ -40,6 +40,12 @@ public partial class MainWindow : Window
     public MainWindow(string[] args, TraceEngine? engine = null)
     {
         InitializeComponent();
+        if (OperatingSystem.IsMacOS())
+        {
+            SettingsButton.IsVisible = false;
+            SummaryButton.IsVisible = AlertsButton.IsVisible = WorkspaceButton.IsVisible = false;
+            NetworkButton.IsVisible = WebButton.IsVisible = HistoryButton.IsVisible = ExportButton.IsVisible = false;
+        }
         if (OperatingSystem.IsWindows())
         {
             using var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://TraceScope/Assets/Icons/tracescope-windows.png"));

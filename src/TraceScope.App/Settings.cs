@@ -36,6 +36,24 @@ public partial class MainWindow
         _settingsWindow.Show(this);
     }
 
+    internal void OpenSettingsFromMenu() => OpenSettings(null, new RoutedEventArgs());
+
+    internal void ExecuteAppMenuCommand(string header)
+    {
+        var args = new RoutedEventArgs();
+        switch (header)
+        {
+            case "Open History…": OpenHistory(null, args); break;
+            case "Export CSV…": ExportCsv(null, args); break;
+            case "All Targets": OpenAllTargets(null, args); break;
+            case "Summary": OpenSummary(null, args); break;
+            case "Network": OpenNetwork(null, args); break;
+            case "Web": OpenWeb(null, args); break;
+            case "Alerts": OpenAlerts(null, args); break;
+            case "Workspace": OpenWorkspace(null, args); break;
+        }
+    }
+
     private void SettingsShortcut(object? sender, KeyEventArgs e)
     {
         var modifier = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;

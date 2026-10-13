@@ -7,11 +7,11 @@
         <TextBlock Grid.Column="2" x:Name="TargetSubtitle" Text="Continuous route monitoring" FontSize="10" Foreground="#999DA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
           <Button x:Name="SettingsButton" Content="Settings" Click="OpenSettings" ToolTip.Tip="Settings (⌘, on macOS / Ctrl+, on Windows)"/>
-          <Button Content="Summary" Click="OpenSummary"/>
-          <Button Content="Alerts" Click="OpenAlerts"/>
-          <Button Content="Workspace" Click="OpenWorkspace"/>
-          <Button Content="Network" Click="OpenNetwork"/>
-          <Button Content="Web" Click="OpenWeb"/>
+          <Button x:Name="SummaryButton" Content="Summary" Click="OpenSummary"/>
+          <Button x:Name="AlertsButton" Content="Alerts" Click="OpenAlerts"/>
+          <Button x:Name="WorkspaceButton" Content="Workspace" Click="OpenWorkspace"/>
+          <Button x:Name="NetworkButton" Content="Network" Click="OpenNetwork"/>
+          <Button x:Name="WebButton" Content="Web" Click="OpenWeb"/>
           <Button x:Name="HistoryButton" Content="Open history" Click="OpenHistory"/>
           <Button x:Name="ExportButton" Content="Export CSV" Click="ExportCsv"/>
           <Button x:Name="StopButton" Content="Stop" IsEnabled="False" Click="StopTrace"/>
