@@ -107,6 +107,7 @@ public partial class MainWindow
             if (saved is not null)
             {
                 _configuration = saved;
+                ApplyHistoryPanelFraction(saved.HistoryLayout.PanelFraction);
                 ApplyPreferenceControls();
                 ReloadProfiles();
                 if (saved.RestoreOnStartup && !_args.Contains("--target")) await ApplyWorkspaceAsync(saved);
@@ -121,6 +122,7 @@ public partial class MainWindow
 
     private WorkspaceConfiguration CaptureWorkspace() => _configuration with
     {
+        HistoryLayout = CaptureHistoryLayout(),
         Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
             .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused, x.TcpPort, x.UdpPort, x.ProfileName)).ToArray()
     };
@@ -150,7 +152,7 @@ public partial class MainWindow
             foreach (var item in _targets.ToArray()) if (item.Session is not null)
             { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
             _targets.Clear(); TargetList.SelectedItem = null; TargetCount.Text = "0";
-            _configuration = workspace; ApplyPreferenceControls(); ReloadProfiles();
+            _configuration = workspace; _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
             foreach (var target in workspace.Targets)
             {
                 try

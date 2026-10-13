@@ -111,6 +111,33 @@ public sealed class SettingsGraphTests
         Assert.Equal(450, Assert.Single(timeline.Samples).Latency);
     }
 
+    [AvaloniaFact]
+    public void CompactGraphsStillRenderMeasuredLatencyLossAndSelection()
+    {
+        var end = new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero);
+        var viewport = new TimelineViewport { Last = end, Horizon = TimeSpan.FromMinutes(1) };
+        viewport.SelectRange(end.AddSeconds(-20), end.AddSeconds(-10));
+        var graph = new LatencyTimeline
+        {
+            Viewport = viewport,
+            Samples = [new(end.AddSeconds(-30), 15, false), new(end.AddSeconds(-20), null, true, 100), new(end.AddSeconds(-10), 20, false)],
+            Markers = [new(end.AddSeconds(-10), "RouteChange", "Route changed")]
+        };
+        graph.Measure(new Size(600, 62));
+        graph.Arrange(new Rect(0, 0, 600, 62));
+        var drawing = new DrawingGroup();
+        using (var context = drawing.Open()) graph.Render(context);
+        Assert.Single(Filled(drawing, "#3B5E36"));
+        var loss = Assert.Single(Filled(drawing, "#AED44843"));
+        Assert.InRange(loss.Geometry!.Bounds.Height, 35, 37);
+        Assert.Single(Filled(drawing, "#354DA4D8"));
+        Assert.NotEmpty(Stroked(drawing, "#E7B95D"));
+        Assert.Empty(Filled(drawing, "#3D3F40"));
+        Assert.True(graph.ShowJitter);
+        Assert.Equal(end.AddSeconds(-20), viewport.SelectionStart);
+        Assert.Equal(TimeSpan.FromMinutes(1), graph.Horizon);
+    }
+
     private static DrawingGroup Record(Control control)
     {
         control.Measure(new Size(600, 300));

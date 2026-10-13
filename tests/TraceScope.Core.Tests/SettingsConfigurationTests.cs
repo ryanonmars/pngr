@@ -13,6 +13,8 @@ public sealed class SettingsConfigurationTests
         var configuration = await WorkspaceStore.ImportAsync(stream);
         Assert.Equal(new ProbeOptions(), configuration.DefaultProbeOptions);
         Assert.Equal(new DisplayConfiguration(), configuration.Display);
+        Assert.Equal(.6, configuration.HistoryLayout.PanelFraction);
+        Assert.Empty(configuration.HistoryLayout.Targets);
         Assert.False(configuration.WebEnabled);
         Assert.False(configuration.Actions.NativeNotificationsEnabled);
     }
@@ -34,6 +36,42 @@ public sealed class SettingsConfigurationTests
         Assert.Equal(configuration.DefaultProbeOptions, restored.DefaultProbeOptions);
         Assert.Equal(configuration.Display, restored.Display);
         Assert.True(restored.Display.ShowPacketLoss);
+    }
+
+    [Fact]
+    public async Task HistoricalLayoutRoundTripsWithoutChangingMonitoringOptions()
+    {
+        var options = new ProbeOptions { Protocol = ProbeProtocol.Udp, DestinationPort = 33434 };
+        var configuration = new WorkspaceConfiguration
+        {
+            Targets = [new("1.1.1.1", options)],
+            HistoryLayout = new()
+            {
+                PanelFraction = .7,
+                Targets = [new("1.1.1.1", 0, true, [1, 5], new Dictionary<int, double> { [0] = .3, [1] = .2, [5] = .5 })]
+            }
+        };
+        using var stream = new MemoryStream();
+        await System.Text.Json.JsonSerializer.SerializeAsync(stream, configuration, WorkspaceStore.JsonOptions);
+        stream.Position = 0;
+        var restored = await WorkspaceStore.ImportAsync(stream);
+        Assert.Equal(.7, restored.HistoryLayout.PanelFraction);
+        var layout = Assert.Single(restored.HistoryLayout.Targets);
+        Assert.Equal(new[] { 1, 5 }, layout.PinnedHops);
+        Assert.Equal(.5, layout.GraphWeights![5]);
+        Assert.Equal(options, Assert.Single(restored.Targets).Options);
+        Assert.False(restored.WebEnabled);
+    }
+
+    [Theory]
+    [InlineData("{\"HistoryLayout\":null}")]
+    [InlineData("{\"HistoryLayout\":{\"PanelFraction\":0}}")]
+    [InlineData("{\"HistoryLayout\":{\"Targets\":[{\"Target\":\"1.1.1.1\",\"GraphWeights\":{\"1\":0}}]}}")]
+    [InlineData("{\"HistoryLayout\":{\"Targets\":[{\"Target\":\"1.1.1.1\",\"PinnedHops\":[-1]}]}}")]
+    public async Task InvalidLayoutIsRejectedBeforeItCanBreakRendering(string json)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        await Assert.ThrowsAsync<InvalidDataException>(() => WorkspaceStore.ImportAsync(stream));
     }
 
     [Theory]

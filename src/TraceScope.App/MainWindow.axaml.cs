@@ -321,7 +321,9 @@ public partial class MainWindow : Window
             while (_rows.Count > hops.Count) _rows.RemoveAt(_rows.Count - 1);
             for (var i = 0; i < hops.Count; i++)
             {
-                if (i < _rows.Count) _rows[i] = new HopItem(hops[i]) { GraphVisible = IsHistoryGraphVisible(hops[i].Hop) };
+                if (i < _rows.Count && _rows[i].Hop.Hop == hops[i].Hop && _rows[i].Hop.Address == hops[i].Address)
+                    _rows[i].Update(hops[i], IsHistoryGraphVisible(hops[i].Hop));
+                else if (i < _rows.Count) _rows[i] = new HopItem(hops[i]) { GraphVisible = IsHistoryGraphVisible(hops[i].Hop) };
                 else _rows.Add(new HopItem(hops[i]) { GraphVisible = IsHistoryGraphVisible(hops[i].Hop) });
             }
             var chosen = selectedNumber.HasValue ? _rows.FirstOrDefault(x => x.Hop.Hop == selectedNumber) : _rows.LastOrDefault(x => x.Hop.IsDestination);
@@ -631,15 +633,21 @@ public sealed class TargetItem : INotifyPropertyChanged
     public void Refresh() { PropertyChanged?.Invoke(this, new(nameof(StateLabel))); PropertyChanged?.Invoke(this, new(nameof(Summary))); PropertyChanged?.Invoke(this, new(nameof(StatusBrush))); }
 }
 
-public sealed record HopItem(HopSnapshot Hop) : INotifyPropertyChanged
+public sealed class HopItem(HopSnapshot hop) : INotifyPropertyChanged
 {
-    public bool Equals(HopItem? other) => other is not null && EqualityComparer<HopSnapshot>.Default.Equals(Hop, other.Hop);
-    public override int GetHashCode() => Hop.GetHashCode();
+    public HopSnapshot Hop { get; private set; } = hop;
+    public void Update(HopSnapshot hop, bool graphVisible)
+    {
+        Hop = hop;
+        GraphVisible = graphVisible;
+        // An empty property name refreshes every measurement-derived binding.
+        PropertyChanged?.Invoke(this, new(string.Empty));
+    }
     private bool _graphVisible;
     public bool GraphVisible
     {
         get => _graphVisible;
-        set { if (_graphVisible == value) return; _graphVisible = value; PropertyChanged?.Invoke(this, new(nameof(GraphBrush))); }
+        set { if (_graphVisible == value) return; _graphVisible = value; PropertyChanged?.Invoke(this, new(nameof(GraphVisible))); PropertyChanged?.Invoke(this, new(nameof(GraphBrush))); }
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public IBrush GraphBrush => Brush.Parse(GraphVisible ? "#9FD5FF" : "#646C77");

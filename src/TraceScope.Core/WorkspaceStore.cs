@@ -24,6 +24,7 @@ public sealed record WorkspaceConfiguration
     public int LastUdpPort { get; init; } = 33434;
     public string? LastUsedProfile { get; init; }
     public DisplayConfiguration Display { get; init; } = new();
+    public HistoryLayoutPreferences HistoryLayout { get; init; } = new();
     public IReadOnlyList<WorkspaceTarget> Targets { get; init; } = [];
     public IReadOnlyList<MonitoringProfile> Profiles { get; init; } = [];
     public IReadOnlyList<AlertRule> Alerts { get; init; } = [];
@@ -42,6 +43,8 @@ public sealed record WorkspaceConfiguration
         if (LastTcpPort is < 1 or > 65535 || LastUdpPort is < 1 or > 65535)
             throw new InvalidDataException("Invalid remembered destination port.");
         Display.Validate();
+        if (HistoryLayout is null) throw new InvalidDataException("History layout is required.");
+        HistoryLayout.Validate();
         if (Targets is null || Profiles is null || Alerts is null || SummaryViews is null || Actions is null)
             throw new InvalidDataException("Targets, profiles and alerts must be lists.");
         if (Targets.Count > 500 || Profiles.Count > 100 || Alerts.Count > 200)

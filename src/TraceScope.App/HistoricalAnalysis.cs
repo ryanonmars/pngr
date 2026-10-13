@@ -19,6 +19,7 @@ public partial class MainWindow
         public HashSet<int> PinnedHops { get; } = [];
         public int PrimaryHop { get; set; }
         public bool PrimaryVisible { get; set; } = true;
+        public Dictionary<int, double> GraphWeights { get; } = [];
         public Dictionary<int, HistoricalGraphWindow> Windows { get; } = [];
         public Dictionary<int, (HistoricalGraphWindow Window, GraphPoint[] Points)> Points { get; } = [];
         public IReadOnlyList<HopSnapshot>? Statistics { get; set; }
@@ -38,9 +39,15 @@ public partial class MainWindow
 
     private HistoryViewState GetHistoryView(Guid id)
     {
-        if (_historyViews.TryGetValue(id, out var view)) return view;
+        if (_historyViews.TryGetValue(id, out var view))
+        {
+            NormalizeHistoryGraphIdentities(view);
+            return view;
+        }
         view = new HistoryViewState();
         _historyViews[id] = view;
+        RestoreTargetHistoryLayout(id, view);
+        NormalizeHistoryGraphIdentities(view);
         view.Viewport.Horizon = TimeSpan.FromMinutes(_configuration.Display.DefaultTimeRangeMinutes);
         view.Viewport.Changed += () => { if (_selected?.Id == id) HistoryViewportChanged(); };
         return view;
@@ -49,6 +56,7 @@ public partial class MainWindow
     private void InitializeHistoricalAnalysis()
     {
         Timeline.Viewport = _emptyHistoryView.Viewport;
+        InitializeHistoryLayout();
         _historyRefreshTimer.Tick += async (_, _) =>
         {
             _historyRefreshTimer.Stop();
@@ -79,6 +87,24 @@ public partial class MainWindow
     }
 
     private int GraphHop(int hop) => hop > 0 && _selected?.Snapshot?.Hops.FirstOrDefault(h => h.Hop == hop)?.IsDestination == true ? 0 : hop;
+    private void NormalizeHistoryGraphIdentities(HistoryViewState view)
+    {
+        // A restored layout may precede route discovery. Once the destination hop is
+        // known, its numbered alias and endpoint ID (0) must share one graph slot.
+        var primary = GraphHop(view.PrimaryHop);
+        var pinned = view.PinnedHops.Select(GraphHop).ToHashSet();
+        var changed = primary != view.PrimaryHop || !view.PinnedHops.SetEquals(pinned);
+        view.PrimaryHop = primary;
+        if (changed) { view.PinnedHops.Clear(); view.PinnedHops.UnionWith(pinned); }
+        foreach (var (hop, weight) in view.GraphWeights.Where(p => GraphHop(p.Key) != p.Key).ToArray())
+        {
+            view.GraphWeights.TryAdd(GraphHop(hop), weight);
+            view.GraphWeights.Remove(hop);
+            changed = true;
+        }
+        if (changed) view.LoadedKey = null;
+    }
+
     private IEnumerable<int> VisibleHistoryHops(HistoryViewState view) => view.PinnedHops
         .Concat(view.PrimaryVisible ? [view.PrimaryHop] : Array.Empty<int>()).Distinct().OrderBy(h => h);
     private bool IsHistoryGraphVisible(int hop) => VisibleHistoryHops(CurrentHistoryView).Contains(GraphHop(hop));
@@ -90,13 +116,18 @@ public partial class MainWindow
         view.PrimaryVisible = true;
         view.LoadedKey = null;
         foreach (var row in _rows) row.GraphVisible = IsHistoryGraphVisible(row.Hop.Hop);
+        RememberHistoryLayout();
         RefreshGraph();
     }
 
     private void ToggleHopGraph(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (sender is Button { DataContext: HopItem item }) ToggleHistoryGraph(item.Hop.Hop);
+        if (sender is Button { DataContext: HopItem item })
+        {
+            ToggleHistoryGraph(item.Hop.Hop);
+            item.GraphVisible = IsHistoryGraphVisible(item.Hop.Hop);
+        }
     }
     private void GraphIndicatorPressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
     private void ToggleHistoryGraph(int hop)
@@ -112,6 +143,7 @@ public partial class MainWindow
         else view.PinnedHops.Add(hop);
         view.LoadedKey = null;
         foreach (var row in _rows) row.GraphVisible = IsHistoryGraphVisible(row.Hop.Hop);
+        RememberHistoryLayout();
         RefreshGraph();
     }
     private void ClosePrimaryHistoryGraph(object? sender, RoutedEventArgs e) => HideHistoryGraph(CurrentHistoryView.PrimaryHop);
@@ -122,6 +154,7 @@ public partial class MainWindow
         if (view.PrimaryHop == hop) view.PrimaryVisible = false;
         view.LoadedKey = null;
         foreach (var row in _rows) row.GraphVisible = IsHistoryGraphVisible(row.Hop.Hop);
+        RememberHistoryLayout();
         RefreshGraph();
     }
     private void ClearHistorySelection(object? sender, RoutedEventArgs e)
@@ -212,8 +245,9 @@ public partial class MainWindow
             _heldEnd = view.Viewport.EndTime;
             var visible = VisibleHistoryHops(view).ToHashSet();
             PrimaryGraphFrame.IsVisible = visible.Contains(view.PrimaryHop);
-            // A pinned graph matching the selected graph is rendered only once.
-            var extras = visible.Where(h => h != view.PrimaryHop || !view.PrimaryVisible).ToHashSet();
+            // The reusable primary frame also hosts a pinned primary hop, even if
+            // the default graph was previously closed. Never create a second frame.
+            var extras = visible.Where(h => h != view.PrimaryHop).ToHashSet();
             foreach (var hop in _additionalGraphs.Keys.Where(h => !extras.Contains(h)).ToArray())
             {
                 var graph = _additionalGraphs[hop];
@@ -225,10 +259,11 @@ public partial class MainWindow
             {
                 if (_additionalGraphs.ContainsKey(hop)) continue;
                 var graph = new LatencyTimeline { Viewport = view.Viewport };
-                var frame = new Grid { RowDefinitions = new RowDefinitions("23,*"), Height = 250 };
+                var frame = new Grid { RowDefinitions = new RowDefinitions("18,*") };
                 var heading = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Background = Brush.Parse("#24262A") };
-                var label = new TextBlock { Text = GraphHeader(hop), Margin = new Thickness(7, 3) };
+                var label = new TextBlock { Text = GraphHeader(hop), Margin = new Thickness(7, 1) };
                 var close = new Button { Content = "×" };
+                close.Classes.Add("close-target");
                 Avalonia.Automation.AutomationProperties.SetName(close, "Close history graph");
                 close.Click += (_, _) => HideHistoryGraph(hop);
                 heading.Children.Add(label); Grid.SetColumn(close, 1); heading.Children.Add(close);
@@ -251,6 +286,7 @@ public partial class MainWindow
                 ? $"Selection: {selectedStart.ToLocalTime():yyyy-MM-dd HH:mm:ss.fff}–{selectedEnd.ToLocalTime():yyyy-MM-dd HH:mm:ss.fff}"
                 : $"Focus: {(view.Viewport.EndTime.HasValue || _selected.IsHistorical ? "Historical" : "Live")} · {(end - view.Viewport.Horizon).ToLocalTime():HH:mm:ss.fff}–{end.ToLocalTime():HH:mm:ss.fff}";
             HistoryPosition.Text = view.Viewport.EndTime.HasValue ? end.ToLocalTime().ToString("HH:mm:ss.fff") : _selected.IsHistorical ? "SAVED" : "LIVE";
+            ArrangeHistoryGraphFrames();
             SizeHistoryGraphs();
             if (view.LoadedKey != HistoryKey(view)) ScheduleHistoryLoad();
         }
@@ -270,16 +306,6 @@ public partial class MainWindow
             addresses = window.IsAggregated ? window.AggregatedSamples.Select(s => s.Address ?? "no response").Distinct().ToArray()
                 : window.RawSamples.Select(s => s.Address ?? "no response").Distinct().ToArray();
         return $"Hop {hop} — {(addresses is { Length: > 0 } ? string.Join(" / ", addresses.Take(3)) + (addresses.Length > 3 ? " / …" : "") : _selected?.Snapshot?.Hops.FirstOrDefault(h => h.Hop == hop)?.Address ?? "no response")}";
-    }
-    private void SizeHistoryGraphs()
-    {
-        if (HistoryGraphsScroll is null) return;
-        var count = _additionalGraphs.Count + (PrimaryGraphFrame.IsVisible ? 1 : 0);
-        var height = count <= 1 ? Math.Max(230, HistoryGraphsScroll.Bounds.Height)
-            : Math.Max(220, (HistoryGraphsScroll.Bounds.Height - (count - 1) * 4) / count);
-        PrimaryGraphFrame.Height = height;
-        foreach (var graph in _additionalGraphs.Values)
-            if (graph.Parent is Grid frame) frame.Height = height;
     }
     private void PopulateGraph(LatencyTimeline graph, int hop, HistoryViewState view)
     {

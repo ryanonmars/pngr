@@ -48,18 +48,113 @@ public sealed class V06HistoryWorkflowTests
         fixture.Window.MouseUp(rowPoint, MouseButton.Left);
         Assert.Equal(3, Assert.IsType<HopItem>(table.SelectedItem).Hop.Hop);
         var selected = Assert.IsType<HopItem>(table.SelectedItem).Hop.Hop;
+        fixture.Window.UpdateLayout();
         var indicator = table.GetVisualDescendants().OfType<Button>()
             .Single(b => b.Classes.Contains("graph-toggle") && b.DataContext is HopItem { Hop.Hop: 1 });
         var point = indicator.TranslatePoint(new Point(indicator.Bounds.Width / 2, indicator.Bounds.Height / 2), fixture.Window)!.Value;
+        fixture.Window.MouseMove(point);
         fixture.Window.MouseDown(point, MouseButton.Left);
         fixture.Window.MouseUp(point, MouseButton.Left);
         Assert.Single(Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs"));
+        Assert.True(Assert.IsType<HopItem>(indicator.DataContext).GraphVisible);
+        Assert.Equal("#ff9fd5ff", indicator.Foreground!.ToString());
         Assert.Equal(selected, Assert.IsType<HopItem>(table.SelectedItem).Hop.Hop);
         fixture.Window.UpdateLayout();
+        fixture.Window.MouseMove(point);
         fixture.Window.MouseDown(point, MouseButton.Left);
         fixture.Window.MouseUp(point, MouseButton.Left);
         Assert.Empty(Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs"));
+        Assert.False(Assert.IsType<HopItem>(indicator.DataContext).GraphVisible);
+        Assert.Equal("#ff646c77", indicator.Foreground!.ToString());
         Assert.Equal(selected, Assert.IsType<HopItem>(table.SelectedItem).Hop.Hop);
+        // Rapid input must update the current indicator without waiting for the next probe or query.
+        for (var index = 0; index < 8; index++)
+        {
+            fixture.Window.MouseMove(point);
+            fixture.Window.MouseDown(point, MouseButton.Left);
+            fixture.Window.MouseUp(point, MouseButton.Left);
+            var visible = index % 2 == 0;
+            Assert.Equal(visible, Assert.IsType<HopItem>(indicator.DataContext).GraphVisible);
+            Assert.Equal(visible ? "#ff9fd5ff" : "#ff646c77", indicator.Foreground!.ToString());
+            Assert.Equal(visible ? 1 : 0, Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs").Count);
+            Assert.Equal(selected, Assert.IsType<HopItem>(table.SelectedItem).Hop.Hop);
+            fixture.Window.UpdateLayout();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task DestinationIndicatorReopensHiddenDefaultGraphOnlyOnce()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var target = await fixture.AddTarget("127.0.0.1");
+        var before = await fixture.Engine.Storage.LoadSamplesAsync(target.Id);
+        var panel = Find<StackPanel>(fixture.Window, "HistoryGraphsPanel");
+        LatencyTimeline[] VisibleGraphs() => panel.GetVisualDescendants().OfType<LatencyTimeline>()
+            .Where(g => g.IsEffectivelyVisible).ToArray();
+        Assert.Single(VisibleGraphs());
+        Invoke(fixture.Window, "ClosePrimaryHistoryGraph", null, new RoutedEventArgs(Button.ClickEvent));
+        Assert.Empty(VisibleGraphs());
+        fixture.Window.UpdateLayout();
+        var indicator = Find<DataGrid>(fixture.Window, "HopTable").GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Classes.Contains("graph-toggle") && b.DataContext is HopItem { Hop.IsDestination: true });
+        void ClickIndicator()
+        {
+            var point = indicator.TranslatePoint(new Point(indicator.Bounds.Width / 2, indicator.Bounds.Height / 2), fixture.Window)!.Value;
+            fixture.Window.MouseMove(point);
+            fixture.Window.MouseDown(point, MouseButton.Left);
+            fixture.Window.MouseUp(point, MouseButton.Left);
+            fixture.Window.UpdateLayout();
+        }
+        ClickIndicator();
+        Assert.Same(fixture.Timeline, Assert.Single(VisibleGraphs()));
+        Assert.True(Assert.IsType<HopItem>(indicator.DataContext).GraphVisible);
+        Assert.Empty(Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs"));
+        // Row selection and refreshed history must reuse the same graph identity.
+        Invoke(fixture.Window, "SelectPrimaryHistoryGraph", 3);
+        await fixture.LoadGraph();
+        Assert.Single(VisibleGraphs());
+        ClickIndicator();
+        Assert.Empty(VisibleGraphs());
+        ClickIndicator();
+        Assert.Single(VisibleGraphs());
+        Invoke(fixture.Window, "ToggleHistoryGraph", 1);
+        fixture.Window.UpdateLayout();
+        Assert.Equal(2, VisibleGraphs().Length);
+        var other = Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs")[1];
+        Assert.Same(fixture.Timeline.Viewport, other.Viewport);
+        fixture.Timeline.Viewport!.Zoom(.5, .4);
+        Assert.Equal(fixture.Timeline.Horizon, other.Horizon);
+        Invoke(fixture.Window, "ResizeHistoryGraphPair", 0, 1, 10d);
+        Assert.Equal(2, VisibleGraphs().Length);
+        Assert.Equal(SessionState.Running, target.Session!.State);
+        Assert.True((await fixture.Engine.Storage.LoadSamplesAsync(target.Id)).Count >= before.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task RestoredDestinationHopAliasUsesOneSessionGraphAndKeepsSizingPreference()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        typeof(MainWindow).GetField("_configuration", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(fixture.Window,
+            new WorkspaceConfiguration
+            {
+                HistoryLayout = new() { Targets = [new("127.0.0.1", 3, true, [0, 3], new Dictionary<int, double> { [3] = 1.5 })] }
+            });
+        var first = await fixture.AddTarget("127.0.0.1");
+        fixture.Window.UpdateLayout();
+        var panel = Find<StackPanel>(fixture.Window, "HistoryGraphsPanel");
+        Assert.Single(panel.GetVisualDescendants().OfType<LatencyTimeline>(), g => g.IsEffectivelyVisible);
+        var saved = Assert.IsType<WorkspaceConfiguration>(Invoke(fixture.Window, "CaptureWorkspace"));
+        var layout = Assert.Single(saved.HistoryLayout.Targets);
+        Assert.Equal(0, layout.PrimaryHop);
+        Assert.Equal(new[] { 0 }, layout.PinnedHops);
+        Assert.Equal(1.5, layout.GraphWeights![0]);
+        var second = await fixture.AddTarget("127.0.0.2");
+        Assert.Single(panel.GetVisualDescendants().OfType<LatencyTimeline>(), g => g.IsEffectivelyVisible);
+        Find<ListBox>(fixture.Window, "TargetList").SelectedItem = first;
+        Assert.Single(panel.GetVisualDescendants().OfType<LatencyTimeline>(), g => g.IsEffectivelyVisible);
+        Assert.All(fixture.Engine.Sessions, session => Assert.Equal(SessionState.Running, session.State));
+        Invoke(fixture.Window, "ToggleHistoryGraph", 3);
+        Assert.DoesNotContain(panel.GetVisualDescendants().OfType<LatencyTimeline>(), g => g.IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

@@ -63,7 +63,7 @@ public sealed class LatencyTimeline : Control
 
     public LatencyTimeline()
     {
-        ClipToBounds = true; MinHeight = 180; Focusable = true;
+        ClipToBounds = true; MinHeight = 54; Focusable = true;
         GestureRecognizers.Add(new Avalonia.Input.PinchGestureRecognizer());
         AddHandler(Gestures.PinchEvent, (_, e) =>
         {
@@ -73,6 +73,17 @@ public sealed class LatencyTimeline : Control
             e.Handled = true;
         });
         AddHandler(Gestures.PinchEndedEvent, (_, _) => _pinchScale = 1);
+        // macOS trackpads deliver native magnification deltas, not the two touch
+        // contacts consumed by PinchGestureRecognizer. Both use the shared viewport.
+        AddHandler(Gestures.PointerTouchPadGestureMagnifyEvent, (_, e) =>
+        {
+            var position = e.GetPosition(this);
+            var magnification = e.Delta.Y;
+            if (!new Rect(Bounds.Size).Contains(position) || !double.IsFinite(magnification)
+                || magnification <= -1 || magnification == 0) return;
+            Navigation().Zoom(1 / (1 + magnification), Math.Clamp((position.X - PlotBounds().Left) / PlotBounds().Width, 0, 1));
+            e.Handled = true;
+        });
     }
     public IReadOnlyList<GraphPoint> Samples { get => _samples; set { _samples = value ?? Array.Empty<GraphPoint>(); InvalidateVisual(); } }
     public TimeSpan Horizon { get => Viewport?.Horizon ?? _horizon; set { if (Viewport is { } v) v.Horizon = value; else _horizon = value < TimelineViewport.MinimumHorizon ? TimelineViewport.MinimumHorizon : value > TimelineViewport.MaximumHorizon ? TimelineViewport.MaximumHorizon : value; InvalidateVisual(); } }
@@ -93,7 +104,9 @@ public sealed class LatencyTimeline : Control
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        if (Bounds.Width < 100 || Bounds.Height < 100) return;
+        if (Bounds.Width < 100 || Bounds.Height < 45) return;
+        var compact = Bounds.Height < 140;
+        var showJitterPlot = ShowJitter && !compact;
         context.DrawRectangle(Brush("#202226"), null, new Rect(Bounds.Size));
         var plot = PlotBounds();
         var jitterPlot = new Rect(plot.Left, 27, plot.Width, 25);
@@ -104,17 +117,17 @@ public sealed class LatencyTimeline : Control
         var ceiling = FixedMaximumMs > 0 ? FixedMaximumMs : AxisMaximum(maxValue);
         var critical = Math.Max(WarningLatencyMs, CriticalLatencyMs);
         var latest = visible.LastOrDefault();
-        Text(context, Title, new Point(10, 7), 11, Ink);
+        if (!compact) Text(context, Title, new Point(10, 7), 11, Ink);
         var latestLabel = latest is null ? "Waiting for measurements" : !IsResponse(latest) ? "Latest: no reply" : $"{(latest.IsAggregated ? "Latest bin mean" : "Latest")} {latest.Latency:0.0} ms";
         var latestText = Label(latestLabel, 10, Muted);
-        context.DrawText(latestText, new Point(Math.Max(170, Bounds.Width - latestText.Width - 12), 8));
+        if (!compact) context.DrawText(latestText, new Point(Math.Max(170, Bounds.Width - latestText.Width - 12), 8));
         double X(DateTimeOffset time) => plot.Left + (time - start).TotalSeconds / Horizon.TotalSeconds * plot.Width;
         double Y(double value) => plot.Bottom - Math.Clamp(value / ceiling, 0, 1) * plot.Height;
 
         Band(0, Math.Min(WarningLatencyMs, ceiling), "#3B5E36");
         Band(WarningLatencyMs, Math.Min(critical, ceiling), "#695C32");
         Band(critical, ceiling, "#663B37");
-        if (ShowJitter) context.DrawRectangle(Brush("#3D3F40"), null, jitterPlot);
+        if (showJitterPlot) context.DrawRectangle(Brush("#3D3F40"), null, jitterPlot);
         var intervalSeconds = visible.Length > 1 ? MedianInterval(visible) : 1;
         // An empty part of a capture stays visibly dim, rather than implying recorded zero latency.
         if (Samples.Count > 0)
@@ -123,31 +136,34 @@ public sealed class LatencyTimeline : Control
             var beforeWidth = Math.Clamp(X(first) - plot.Left, 0, plot.Width);
             context.DrawRectangle(Brush("#66000000"), null, new Rect(plot.Left, plot.Top, beforeWidth, plot.Height));
         }
-        for (var i = 0; i <= 4; i++)
+        var divisions = compact ? 1 : 4;
+        for (var i = 0; i <= divisions; i++)
         {
-            var y = plot.Bottom - plot.Height * i / 4;
+            var y = plot.Bottom - plot.Height * i / divisions;
             context.DrawLine(Grid, new Point(plot.Left, y), new Point(plot.Right, y));
-            var label = Label($"{ceiling * i / 4:0}", 10, Muted);
+            var label = Label($"{ceiling * i / divisions:0}" + (compact && i == divisions ? " ms" : ""), compact ? 9 : 10, Muted);
             context.DrawText(label, new Point(plot.Left - label.Width - 7, y - label.Height / 2));
             if (ShowPacketLoss)
             {
-                var lossLabel = Label($"{i * 25}", 9, Brush("#DE7772"));
+                var lossLabel = Label($"{i * 100 / divisions}" + (compact && i == divisions ? "%" : ""), 9, Brush("#DE7772"));
                 context.DrawText(lossLabel, new Point(plot.Right + 5, y - lossLabel.Height / 2));
             }
         }
         var latencyAxis = Label("Latency (ms)", 9, Muted);
         var lossAxis = Label("Loss %", 9, Brush("#DE7772"));
-        Text(context, "ms", new Point(10, plot.Top - 15), 9, Muted);
-        using (context.PushTransform(Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(10, plot.Top + (plot.Height + latencyAxis.Width) / 2)))
-            context.DrawText(latencyAxis, new Point(0, 0));
-        // Keep the right axis readable even on short graphs.
-        if (ShowPacketLoss) Text(context, "Loss %", new Point(Math.Max(plot.Left, plot.Right - lossAxis.Width), plot.Top - 15), 9, Brush("#DE7772"));
+        if (!compact)
+        {
+            Text(context, "ms", new Point(10, plot.Top - 15), 9, Muted);
+            using (context.PushTransform(Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(10, plot.Top + (plot.Height + latencyAxis.Width) / 2)))
+                context.DrawText(latencyAxis, new Point(0, 0));
+            if (ShowPacketLoss) Text(context, "Loss %", new Point(Math.Max(plot.Left, plot.Right - lossAxis.Width), plot.Top - 15), 9, Brush("#DE7772"));
+        }
         foreach (var time in AxisTicks(start, end, plot.Width))
         {
             var x = X(time);
             context.DrawLine(new Pen(Brush("#13FFFFFF"), 1), new Point(x, plot.Top), new Point(x, plot.Bottom));
-            var label = Label(FormatTimestamp(time, Horizon), 10, Ink);
-            context.DrawText(label, new Point(Math.Clamp(x - label.Width / 2, plot.Left - 8, Bounds.Width - label.Width - 5), plot.Bottom + 7));
+            var label = Label(FormatTimestamp(time, Horizon), compact ? 9 : 10, Ink);
+            context.DrawText(label, new Point(Math.Clamp(x - label.Width / 2, plot.Left - 8, Bounds.Width - label.Width - 5), plot.Bottom + (compact ? 3 : 7)));
         }
 
         using (context.PushClip(plot))
@@ -196,7 +212,7 @@ public sealed class LatencyTimeline : Control
                 context.DrawLine(selectionPen, new Point(right, plot.Top), new Point(right, plot.Bottom));
             }
         }
-        if (ShowJitter) DrawJitter(context, jitterPlot, visible, intervalSeconds, X);
+        if (showJitterPlot) DrawJitter(context, jitterPlot, visible, intervalSeconds, X);
         if (visible.Length == 0)
         {
             var message = Label(Samples.Count == 0 && Viewport?.First is null ? "Start a target to collect latency and packet loss" : "No measurements in this time range", 11, Muted);
@@ -209,7 +225,7 @@ public sealed class LatencyTimeline : Control
         {
             var x = X(cursor);
             context.DrawRectangle(Brush("#15FFFFFF"), null, new Rect(x - 3, plot.Top, 6, plot.Height));
-            context.DrawLine(new Pen(Brush("#ABB5A9"), 1), new Point(x, ShowJitter ? jitterPlot.Top : plot.Top), new Point(x, plot.Bottom));
+            context.DrawLine(new Pen(Brush("#ABB5A9"), 1), new Point(x, showJitterPlot ? jitterPlot.Top : plot.Top), new Point(x, plot.Bottom));
             var nearest = visible.MinBy(s => Math.Abs((s.Time - cursor).TotalMilliseconds));
             if (nearest is not null)
             {
@@ -232,7 +248,7 @@ public sealed class LatencyTimeline : Control
             }
         }
         context.DrawRectangle(null, new Pen(Brush("#747A70"), 1), plot);
-        if (ShowJitter) context.DrawRectangle(null, new Pen(Brush("#626567"), 1), jitterPlot);
+        if (showJitterPlot) context.DrawRectangle(null, new Pen(Brush("#626567"), 1), jitterPlot);
         void Band(double from, double to, string color)
         {
             if (to <= from || from >= ceiling) return;
@@ -385,9 +401,10 @@ public sealed class LatencyTimeline : Control
     }
     private Rect PlotBounds()
     {
-        var top = ShowJitter ? 64 : 37;
+        var compact = Bounds.Height < 140;
+        var top = compact ? 8 : ShowJitter ? 64 : 37;
         var rightMargin = ShowPacketLoss ? 36 : 12;
-        return new Rect(46, top, Math.Max(1, Bounds.Width - 46 - rightMargin), Math.Max(1, Bounds.Height - top - 30));
+        return new Rect(46, top, Math.Max(1, Bounds.Width - 46 - rightMargin), Math.Max(1, Bounds.Height - top - (compact ? 18 : 30)));
     }
     private DateTimeOffset EffectiveEnd() => Viewport?.EffectiveEnd ?? EndTime ?? (Samples.Count > 0 ? Samples.Max(s => s.Time) : DateTimeOffset.UtcNow);
     private static bool SameAddress(GraphPoint first, GraphPoint second)
