@@ -67,24 +67,18 @@ public sealed partial class HistoryStore
     public async Task<IReadOnlyList<MonitoringEvent>> LoadEventsAsync(Guid sessionId,
         DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default)
     {
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            await using var connection = await OpenAsync(cancellationToken);
-            await EnsureProfessionalAsync(connection, cancellationToken);
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT e.id,e.session_id,e.timestamp,e.kind,e.message,e.alert_rule_id,a.acknowledged_at,a.note FROM monitoring_events e LEFT JOIN event_acknowledgments a ON a.event_id=e.id WHERE e.session_id=$id AND e.timestamp >= $from AND e.timestamp <= $to ORDER BY e.timestamp LIMIT 10000";
-            AddRange(command, sessionId, from, to);
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var result = new List<MonitoringEvent>();
-            while (await reader.ReadAsync(cancellationToken)) result.Add(new(Guid.Parse(reader.GetString(0)),
-                Guid.Parse(reader.GetString(1)), DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture),
-                reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5))
-                { AcknowledgedAt = reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
-                    AcknowledgmentNote = reader.IsDBNull(7) ? null : reader.GetString(7) });
-            return result;
-        }
-        finally { _gate.Release(); }
+        await using var connection = await OpenHistoryReadAsync(cancellationToken);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT e.id,e.session_id,e.timestamp,e.kind,e.message,e.alert_rule_id,a.acknowledged_at,a.note FROM monitoring_events e LEFT JOIN event_acknowledgments a ON a.event_id=e.id WHERE e.session_id=$id AND e.timestamp >= $from AND e.timestamp <= $to ORDER BY e.timestamp LIMIT 10000";
+        AddRange(command, sessionId, from, to);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<MonitoringEvent>();
+        while (await reader.ReadAsync(cancellationToken)) result.Add(new(Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)), DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture),
+            reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5))
+            { AcknowledgedAt = reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
+                AcknowledgmentNote = reader.IsDBNull(7) ? null : reader.GetString(7) });
+        return result;
     }
 
     private static void AddRange(SqliteCommand command, Guid sessionId, DateTimeOffset? from, DateTimeOffset? to)
@@ -99,25 +93,19 @@ public sealed partial class HistoryStore
         CancellationToken cancellationToken = default)
     {
         if (limit is < 1 or > 1_000_000) throw new ArgumentOutOfRangeException(nameof(limit));
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            await using var connection = await OpenAsync(cancellationToken);
-            await EnsureProfessionalAsync(connection, cancellationToken);
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT session_id,round,hop,address,is_destination,timestamp,latency_ms,status FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to ORDER BY timestamp LIMIT $limit";
-            AddRange(command, sessionId, from, to);
-            command.Parameters.AddWithValue("$hop", hop);
-            command.Parameters.AddWithValue("$limit", limit);
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var result = new List<StoredSample>();
-            while (await reader.ReadAsync(cancellationToken)) result.Add(new(Guid.Parse(reader.GetString(0)),
-                reader.GetInt64(1), reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.GetInt32(4) != 0, DateTimeOffset.Parse(reader.GetString(5), CultureInfo.InvariantCulture),
-                reader.IsDBNull(6) ? null : reader.GetDouble(6), (ProbeStatus)reader.GetInt32(7)));
-            return result;
-        }
-        finally { _gate.Release(); }
+        await using var connection = await OpenHistoryReadAsync(cancellationToken);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT session_id,round,hop,address,is_destination,timestamp,latency_ms,status FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to ORDER BY timestamp,id LIMIT $limit";
+        AddRange(command, sessionId, from, to);
+        command.Parameters.AddWithValue("$hop", hop);
+        command.Parameters.AddWithValue("$limit", limit);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<StoredSample>();
+        while (await reader.ReadAsync(cancellationToken)) result.Add(new(Guid.Parse(reader.GetString(0)),
+            reader.GetInt64(1), reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetInt32(4) != 0, DateTimeOffset.Parse(reader.GetString(5), CultureInfo.InvariantCulture),
+            reader.IsDBNull(6) ? null : reader.GetDouble(6), (ProbeStatus)reader.GetInt32(7)));
+        return result;
     }
 
     /// <summary>Aggregates in SQLite rather than materializing a long monitoring session in memory.
@@ -128,46 +116,41 @@ public sealed partial class HistoryStore
         if (maxPoints is < 1 or > 100_000) throw new ArgumentOutOfRangeException(nameof(maxPoints));
         if (to < from) throw new ArgumentOutOfRangeException(nameof(to));
         var bucketSeconds = Math.Max(0.001, ((to - from).TotalSeconds + 0.001) / maxPoints);
-        await _gate.WaitAsync(cancellationToken);
-        try
+        await using var connection = await OpenHistoryReadAsync(cancellationToken);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH filtered AS (
+              SELECT *, CASE WHEN status IN (0,2) AND latency_ms >= 0 THEN latency_ms ELSE NULL END AS response,
+                MIN($maxBucket,MAX(0,CAST((unixepoch(timestamp,'subsec')-$origin)/$bucket AS INTEGER))) AS bucket
+              FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to
+            ), sequenced AS (
+              SELECT *,LAG(response) OVER (ORDER BY timestamp,id) AS previous_response,
+                LAG(address) OVER (ORDER BY timestamp,id) AS previous_address FROM filtered
+            )
+            SELECT MIN(timestamp),AVG(response),MIN(response),MAX(response),
+              SUM(CASE WHEN status<>4 THEN 1 ELSE 0 END) AS sent,COUNT(response) AS received,
+              AVG(CASE WHEN address IS previous_address AND response IS NOT NULL AND previous_response IS NOT NULL THEN ABS(response-previous_response) END),
+              MAX(address),SUM(CASE WHEN status=4 THEN 1 ELSE 0 END)
+            FROM sequenced GROUP BY bucket ORDER BY bucket
+            """;
+        AddRange(command, sessionId, from, to);
+        command.Parameters.AddWithValue("$hop", hop);
+        command.Parameters.AddWithValue("$origin", (from - DateTimeOffset.UnixEpoch).TotalSeconds);
+        command.Parameters.AddWithValue("$bucket", bucketSeconds);
+        command.Parameters.AddWithValue("$maxBucket", maxPoints - 1);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<AggregatedSample>();
+        while (await reader.ReadAsync(cancellationToken))
         {
-            await using var connection = await OpenAsync(cancellationToken);
-            await EnsureProfessionalAsync(connection, cancellationToken);
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                WITH filtered AS (
-                  SELECT *, CASE WHEN status IN (0,2) AND latency_ms >= 0 THEN latency_ms ELSE NULL END AS response,
-                    MIN($maxBucket,MAX(0,CAST((unixepoch(timestamp,'subsec')-$origin)/$bucket AS INTEGER))) AS bucket
-                  FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to
-                ), sequenced AS (
-                  SELECT *,LAG(response) OVER (ORDER BY timestamp,id) AS previous_response FROM filtered
-                )
-                SELECT MIN(timestamp),AVG(response),MIN(response),MAX(response),
-                  SUM(CASE WHEN status<>4 THEN 1 ELSE 0 END) AS sent,COUNT(response) AS received,
-                  AVG(CASE WHEN response IS NOT NULL AND previous_response IS NOT NULL THEN ABS(response-previous_response) END),
-                  MAX(address),SUM(CASE WHEN status=4 THEN 1 ELSE 0 END)
-                FROM sequenced GROUP BY bucket ORDER BY bucket
-                """;
-            AddRange(command, sessionId, from, to);
-            command.Parameters.AddWithValue("$hop", hop);
-            command.Parameters.AddWithValue("$origin", (from - DateTimeOffset.UnixEpoch).TotalSeconds);
-            command.Parameters.AddWithValue("$bucket", bucketSeconds);
-            command.Parameters.AddWithValue("$maxBucket", maxPoints - 1);
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var result = new List<AggregatedSample>();
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var sent = reader.GetInt64(4);
-                var received = reader.GetInt64(5);
-                result.Add(new(DateTimeOffset.Parse(reader.GetString(0), CultureInfo.InvariantCulture),
-                    reader.IsDBNull(1) ? null : reader.GetDouble(1), reader.IsDBNull(2) ? null : reader.GetDouble(2),
-                    reader.IsDBNull(3) ? null : reader.GetDouble(3), sent == 0 ? 0 : 100.0 * (sent - received) / sent,
-                    reader.IsDBNull(6) ? received == 0 ? null : 0 : reader.GetDouble(6), sent,
-                    reader.IsDBNull(7) ? null : reader.GetString(7)) { Received = received, Errors = reader.GetInt64(8) });
-            }
-            return result;
+            var sent = reader.GetInt64(4);
+            var received = reader.GetInt64(5);
+            result.Add(new(DateTimeOffset.Parse(reader.GetString(0), CultureInfo.InvariantCulture),
+                reader.IsDBNull(1) ? null : reader.GetDouble(1), reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                reader.IsDBNull(3) ? null : reader.GetDouble(3), sent == 0 ? 0 : 100.0 * (sent - received) / sent,
+                reader.IsDBNull(6) ? received == 0 ? null : 0 : reader.GetDouble(6), sent,
+                reader.IsDBNull(7) ? null : reader.GetString(7)) { Received = received, Errors = reader.GetInt64(8) });
         }
-        finally { _gate.Release(); }
+        return result;
     }
 
     public async Task<int> RetainAsync(TimeSpan retention, CancellationToken cancellationToken = default)

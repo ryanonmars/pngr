@@ -79,12 +79,6 @@ public partial class MainWindow : Window
         {
             HopTable.SelectedItem = _rows.FirstOrDefault(x => x.Hop.Hop == hop);
         };
-        Timeline.TimeSelected = time =>
-        {
-            _heldEnd = Timeline.EndTime;
-            FocusInput.SelectedIndex = 2;
-            HistoryPosition.Text = time.ToLocalTime().ToString("HH:mm:ss");
-        };
         _clock.Tick += (_, _) =>
         {
             foreach (var item in _targets) item.Refresh();
@@ -98,6 +92,7 @@ public partial class MainWindow : Window
         };
         InitializeProfessional(dataDirectory, engine is null);
         InitializeAllTargets();
+        InitializeHistoricalAnalysis();
         KeyDown += SettingsShortcut;
         _clock.Start();
         Opened += OnOpened;
@@ -179,7 +174,7 @@ public partial class MainWindow : Window
         {
             _engine.UpdateOptions(session.Id, options);
             RememberTargetPort(_selected, options);
-            _diskPoints = null; _lastHistoryQuery = null;
+            CurrentHistoryView.LoadedKey = null;
             StatusText.Text = $"Settings updated for {session.Target}; changes apply to the next measurement round.";
         }
         ScheduleWorkspaceSave();
@@ -265,9 +260,10 @@ public partial class MainWindow : Window
         _selected = TargetList.SelectedItem as TargetItem;
         _creatingTarget = false;
         _selectedHop = null;
-        _heldEnd = null;
+        ActivateHistoryView();
+        _heldEnd = Timeline.Viewport?.EndTime;
         _settingFocus = true;
-        FocusInput.SelectedIndex = 0;
+        FocusInput.SelectedIndex = _heldEnd.HasValue ? 2 : 0;
         _settingFocus = false;
         if (_selected?.Session is { } session)
         {
@@ -320,13 +316,13 @@ public partial class MainWindow : Window
         _refreshing = true;
         try
         {
-            var hops = _selected.Snapshot?.Hops ?? [];
+            var hops = _selectionStatistics?.Where(h => h.Hop > 0).ToArray() ?? _selected.Snapshot?.Hops ?? [];
             var selectedNumber = _selectedHop;
             while (_rows.Count > hops.Count) _rows.RemoveAt(_rows.Count - 1);
             for (var i = 0; i < hops.Count; i++)
             {
-                if (i < _rows.Count) _rows[i] = new HopItem(hops[i]);
-                else _rows.Add(new HopItem(hops[i]));
+                if (i < _rows.Count) _rows[i] = new HopItem(hops[i]) { GraphVisible = IsHistoryGraphVisible(hops[i].Hop) };
+                else _rows.Add(new HopItem(hops[i]) { GraphVisible = IsHistoryGraphVisible(hops[i].Hop) });
             }
             var chosen = selectedNumber.HasValue ? _rows.FirstOrDefault(x => x.Hop.Hop == selectedNumber) : _rows.LastOrDefault(x => x.Hop.IsDestination);
             HopTable.SelectedItem = chosen;
@@ -334,7 +330,7 @@ public partial class MainWindow : Window
             RoutePlot.SelectedHop = chosen?.Hop.Hop;
         }
         finally { _refreshing = false; }
-        var destination = _selected.Snapshot?.Destination;
+        var destination = _selectionStatistics?.FirstOrDefault(h => h.Hop == 0) ?? (_selectionStatistics is null ? _selected.Snapshot?.Destination : null);
         FooterCount.Text = destination?.Sent.ToString(CultureInfo.InvariantCulture) ?? "—";
         FooterAverage.Text = Number(destination?.AverageMs);
         FooterMinimum.Text = Number(destination?.MinimumMs);
@@ -345,11 +341,20 @@ public partial class MainWindow : Window
         var now = _selected.IsHistorical ? _selected.Snapshot?.Timestamp ?? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow;
         var shortStats = MonitoringStatistics.Calculate(destination?.History ?? [], TimeSpan.FromSeconds(30), now);
         var longStats = MonitoringStatistics.Calculate(destination?.History ?? [], TimeSpan.FromMinutes(5), now);
-        JitterValue.Text = Number(shortStats.JitterMs, " ms");
+        JitterValue.Text = Number(_selectionStatistics is null ? shortStats.JitterMs : destination?.JitterMs, " ms");
         MosValue.Text = Number(shortStats.Mos);
         ShortAverageValue.Text = Number(shortStats.AverageMs);
         LongAverageValue.Text = Number(longStats.AverageMs);
-        if (_selected.Snapshot is { } s)
+        if (_selectionStatistics is not null)
+        {
+            var viewport = CurrentHistoryView.Viewport;
+            var loaded = viewport.SelectionStart is { } start && viewport.SelectionEnd is { } end
+                && CurrentHistoryView.StatisticsRange == (start, end);
+            StatusText.Text = !loaded ? "Loading selected interval from stored measurements…"
+                : _selectionStatistics.Count == 0 ? "No stored measurements in the selected interval"
+                : "Selected interval · exact raw statistics · route addresses shown separately";
+        }
+        else if (_selected.Snapshot is { } s)
             StatusText.Text = s.Warning ?? $"{s.Timestamp.ToLocalTime():HH:mm:ss} · round {s.Round} took {s.RoundDuration.TotalSeconds:0.##} s · statistics cover this session · saved locally";
         RefreshGraph();
         UpdateButtons();
@@ -369,77 +374,57 @@ public partial class MainWindow : Window
 
     private void HopChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_refreshing) return;
-        _diskPoints = null; _lastHistoryQuery = null;
-        _selectedHop = (HopTable.SelectedItem as HopItem)?.Hop.Hop;
+        if (_refreshing || HopTable.SelectedItem is not HopItem item) return;
+        CurrentHistoryView.LoadedKey = null;
+        _selectedHop = item.Hop.Hop;
         RoutePlot.SelectedHop = _selectedHop;
+        SelectPrimaryHistoryGraph(_selectedHop ?? 0);
         RefreshGraph();
     }
 
     private void RefreshGraph()
     {
+        RefreshHistoryGraphs();
         RefreshAllTargets();
-        if (_selected is null || Timeline is null) return;
-        var hop = _selectedHop.HasValue ? _selected.Snapshot?.Hops.FirstOrDefault(x => x.Hop == _selectedHop) : _selected.Snapshot?.Destination;
-        var points = hop?.History.Select(x => new GraphPoint(x.Timestamp, x.LatencyMs, !x.LatencyMs.HasValue && x.Status != ProbeStatus.Error, IsError: x.Status == ProbeStatus.Error)).ToArray() ?? [];
-        Timeline.Samples = _diskPoints ?? points;
-        Timeline.Horizon = TimeSpan.FromMinutes(new[] { 1, 5, 10, 15, 60, 360, 1440, 10080 }[Math.Clamp(HorizonInput.SelectedIndex, 0, 7)]);
-        var latest = (_selected.IsHistorical || FocusInput.SelectedIndex == 1 || _selected.Session?.State != SessionState.Running) && points.Length > 0 ? points[^1].Time : DateTimeOffset.UtcNow;
-        if (FocusInput.SelectedIndex == 2 && _heldEnd.HasValue)
-        {
-            Timeline.EndTime = _heldEnd;
-            HistoryPosition.Text = _heldEnd.Value.ToLocalTime().ToString("HH:mm:ss");
-        }
-        else if (HistorySlider.Value < 99.9 && (points.Length > 1 || _historyFirst.HasValue))
-        {
-            var first = _historyFirst ?? points[0].Time;
-            var last = _historyLast ?? points[^1].Time;
-            Timeline.EndTime = first + TimeSpan.FromTicks((long)((last - first).Ticks * HistorySlider.Value / 100));
-            HistoryPosition.Text = Timeline.EndTime.Value.ToLocalTime().ToString("HH:mm:ss");
-        }
-        else { Timeline.EndTime = latest; HistoryPosition.Text = _selected.IsHistorical ? "SAVED" : "LIVE"; }
-        if (FocusInput.SelectedIndex == 2) _heldEnd ??= Timeline.EndTime;
-        if (Timeline.EndTime is { } end)
-            FocusRange.Text = $"Focus: {(end - Timeline.Horizon).ToLocalTime():HH:mm:ss}–{end.ToLocalTime():HH:mm:ss}";
-        GraphHeading.Text = _selectedHop.HasValue ? $"Hop {_selectedHop} · {hop?.Address ?? "no response"}" : $"Destination · {_selected.Target}";
-        if (_diskPoints is null) Timeline.Title = hop is null ? "Waiting for measured samples" : $"{hop.Sent:N0} probes · {hop.LossPercent:0.#}% no response";
-        if (_runtimeFeatures && (_selected.IsHistorical || _heldEnd.HasValue || Timeline.Horizon.TotalMinutes > 15))
-            _ = LoadDiskGraphAsync();
     }
 
-    private void ViewChanged(object? sender, SelectionChangedEventArgs e) { if (_engine is not null) { _diskPoints = null; _lastHistoryQuery = null; RefreshGraph(); } }
+    private void ViewChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_engine is null || _settingHistoryViewport) return;
+        var index = HorizonInput.SelectedIndex;
+        if (index is >= 0 and < 8) CurrentHistoryView.Viewport.Horizon = TimeSpan.FromMinutes(new[] { 1, 5, 10, 15, 60, 360, 1440, 10080 }[index]);
+        RefreshGraph();
+    }
+
     private void HistoryPositionChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
-        if (_engine is null) return;
-        _diskPoints = null; _lastHistoryQuery = null;
-        _heldEnd = null;
-        if (HistorySlider.Value < 99.9)
-        {
-            _settingFocus = true;
-            FocusInput.SelectedIndex = 2;
-            _settingFocus = false;
-        }
-        RefreshGraph();
-        if (FocusInput.SelectedIndex == 2) _heldEnd = Timeline.EndTime;
+        if (_engine is null || _settingHistoryViewport) return;
+        var view = CurrentHistoryView;
+        if (HistorySlider.Value >= 99.9) { GoLive(sender, new RoutedEventArgs()); return; }
+        var first = view.Viewport.First ?? _selected?.Snapshot?.Destination.History.FirstOrDefault()?.Timestamp;
+        var last = view.Viewport.Last ?? _selected?.Snapshot?.Timestamp;
+        if (first.HasValue && last.HasValue)
+            view.Viewport.EndTime = first.Value + TimeSpan.FromTicks((long)((last.Value - first.Value).Ticks * HistorySlider.Value / 100));
     }
 
     private void FocusChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_engine is null || _settingFocus) return;
-        _diskPoints = null; _lastHistoryQuery = null; _historyQuery?.Cancel();
-        if (FocusInput.SelectedIndex == 2) _heldEnd ??= Timeline.EndTime;
-        else { _heldEnd = null; HistorySlider.Value = 100; Timeline.SelectedTime = null; }
+        if (FocusInput.SelectedIndex == 2) CurrentHistoryView.Viewport.EndTime ??= Timeline.EndTime ?? DateTimeOffset.UtcNow;
+        else CurrentHistoryView.Viewport.GoLive();
         RefreshGraph();
     }
 
     private void GoLive(object? sender, RoutedEventArgs e)
     {
-        _diskPoints = null; _lastHistoryQuery = null; _historyQuery?.Cancel();
+        CurrentHistoryView.Viewport.GoLive();
         _heldEnd = null;
-        _settingFocus = true;
-        FocusInput.SelectedIndex = 0;
-        _settingFocus = false;
-        HistorySlider.Value = 100; Timeline.SelectedTime = null; RefreshGraph();
+        _selectionStatistics = null;
+        CurrentHistoryView.LoadedKey = null;
+        _settingHistoryViewport = _settingFocus = true;
+        try { HistorySlider.Value = 100; FocusInput.SelectedIndex = 0; }
+        finally { _settingHistoryViewport = _settingFocus = false; }
+        RefreshSelected();
     }
 
     private void UpdateButtons()
@@ -571,8 +556,10 @@ public partial class MainWindow : Window
         var warning = samples.Count < session.SampleCount ? $"Hop table covers the latest 15 minutes. Navigate the graph to query older saved measurements; CSV exports the entire session." : null;
         var item = new TargetItem(session) { Snapshot = new RoundSnapshot(session.Id, session.Target, session.DestinationAddress, samples.Max(x => x.Timestamp), samples.Max(x => x.Round), hops.Any(x => x.IsDestination), hops, destination, TimeSpan.Zero, warning) };
         item.Refresh(); _targets.Add(item); TargetList.SelectedItem = item; TargetCount.Text = _targets.Count.ToString();
-        _historyFirst = range?.First; _historyLast = range?.Last;
-        if (_runtimeFeatures) await LoadDiskGraphAsync(true);
+        _settingHistoryViewport = true;
+        try { CurrentHistoryView.Viewport.First = range?.First; CurrentHistoryView.Viewport.Last = range?.Last; }
+        finally { _settingHistoryViewport = false; }
+        await LoadDiskGraphAsync(true);
     }
 
     private static HopSnapshot Aggregate(int hop, string? address, IEnumerable<StoredSample> source)
@@ -600,7 +587,7 @@ public partial class MainWindow : Window
 
     private async Task ShutdownAsync()
     {
-        _clock.Stop(); _workspaceSaveTimer.Stop(); _historyQuery?.Cancel();
+        _clock.Stop(); _workspaceSaveTimer.Stop(); _historyQuery?.Cancel(); _historyRefreshTimer.Stop();
         _maintenanceClock.Stop();
         await _applicationCancellation.CancelAsync();
         // Each step must run even when an earlier operation fails (e.g. an unwritable workspace).
@@ -644,8 +631,18 @@ public sealed class TargetItem : INotifyPropertyChanged
     public void Refresh() { PropertyChanged?.Invoke(this, new(nameof(StateLabel))); PropertyChanged?.Invoke(this, new(nameof(Summary))); PropertyChanged?.Invoke(this, new(nameof(StatusBrush))); }
 }
 
-public sealed record HopItem(HopSnapshot Hop)
+public sealed record HopItem(HopSnapshot Hop) : INotifyPropertyChanged
 {
+    public bool Equals(HopItem? other) => other is not null && EqualityComparer<HopSnapshot>.Default.Equals(Hop, other.Hop);
+    public override int GetHashCode() => Hop.GetHashCode();
+    private bool _graphVisible;
+    public bool GraphVisible
+    {
+        get => _graphVisible;
+        set { if (_graphVisible == value) return; _graphVisible = value; PropertyChanged?.Invoke(this, new(nameof(GraphBrush))); }
+    }
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public IBrush GraphBrush => Brush.Parse(GraphVisible ? "#9FD5FF" : "#646C77");
     public string HopLabel => Hop.Hop.ToString();
     public string AddressLabel => Hop.Address is null ? "*  No response" : !string.IsNullOrWhiteSpace(Hop.Hostname) && Hop.Hostname != Hop.Address ? $"{Hop.Address}  {Hop.Hostname}" : Hop.Address;
     public string IpLabel => Hop.Address ?? "*";
@@ -657,6 +654,7 @@ public sealed record HopItem(HopSnapshot Hop)
     public string MinimumLabel => MainWindow.Number(Hop.MinimumMs);
     public string MaximumLabel => MainWindow.Number(Hop.MaximumMs);
     public string CurrentLabel => MainWindow.Number(Hop.LastMs);
+    public string JitterLabel => MainWindow.Number(Hop.JitterMs);
 }
 
 public sealed record HistoryEntry(StoredSession Session)

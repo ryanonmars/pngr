@@ -213,7 +213,7 @@ public sealed class MainWindowTests
         table.ItemsSource = new[] { named };
         fixture.Window.UpdateLayout();
 
-        Assert.Equal(new[] { "Hop", "Count", "IP", "Name", "Avg", "Min", "Cur", "PL%" },
+        Assert.Equal(new[] { "Hop", "Count", "IP", "Name", "Avg", "Min", "Cur", "Jit", "PL%" },
             table.Columns.Select(column => column.Header?.ToString()).ToArray());
         var cells = table.GetVisualDescendants().OfType<DataGridCell>()
             .SelectMany(cell => cell.GetVisualDescendants().OfType<TextBlock>())
@@ -237,8 +237,8 @@ public sealed class MainWindowTests
 
         focus.SelectedIndex = 2;
         var heldEnd = timeline.EndTime;
-        var initialCount = timeline.Samples.Count;
-        await Until(() => timeline.Samples.Count >= initialCount + 3);
+        var initialRound = Assert.Single(fixture.Engine.Sessions).LatestSnapshot!.Round;
+        await Until(() => Assert.Single(fixture.Engine.Sessions).LatestSnapshot!.Round >= initialRound + 3);
         Assert.Equal(heldEnd, timeline.EndTime);
         Assert.Equal(SessionState.Running, Assert.Single(fixture.Engine.Sessions).State);
         Control<ComboBox>(window, "HorizonInput").SelectedIndex = 3;
@@ -251,8 +251,8 @@ public sealed class MainWindowTests
         Assert.Equal(2, focus.SelectedIndex);
         var browsedEnd = timeline.EndTime;
         Assert.True(browsedEnd < timeline.Samples[^1].Time);
-        initialCount = timeline.Samples.Count;
-        await Until(() => timeline.Samples.Count >= initialCount + 3);
+        initialRound = Assert.Single(fixture.Engine.Sessions).LatestSnapshot!.Round;
+        await Until(() => Assert.Single(fixture.Engine.Sessions).LatestSnapshot!.Round >= initialRound + 3);
         Assert.Equal(browsedEnd, timeline.EndTime);
 
         Click(window.GetVisualDescendants().OfType<Button>().Single(button => button.Content?.ToString() == "Live"));

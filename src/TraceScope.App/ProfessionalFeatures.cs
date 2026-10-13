@@ -31,11 +31,7 @@ public partial class MainWindow
     private WindowNotificationManager? _notifications;
     private readonly ObservableCollection<MonitoringEvent> _monitoringEvents = [];
     private readonly DispatcherTimer _workspaceSaveTimer = new() { Interval = TimeSpan.FromMilliseconds(700) };
-    private IReadOnlyList<GraphPoint>? _diskPoints;
-    private DateTimeOffset? _historyFirst;
-    private DateTimeOffset? _historyLast;
     private CancellationTokenSource? _historyQuery;
-    private string? _lastHistoryQuery;
     private ProbeOptions _draftOptions = new();
 
     private void InitializeProfessional(string directory, bool runtime)
@@ -184,7 +180,7 @@ public partial class MainWindow
 
     private void UpdateProfessionalSelection()
     {
-        _diskPoints = null; _historyFirst = _historyLast = null; _lastHistoryQuery = null;
+        CurrentHistoryView.LoadedKey = null;
         _historyQuery?.Cancel();
         if (_selected is null) return;
         SynchronizeProbeControls(_selected.Session?.Options ?? _draftOptions);
@@ -275,7 +271,7 @@ public partial class MainWindow
                     RetentionDays = (int)(retention.Value ?? 30), AggregationSeconds = (int)(aggregation.Value ?? 5) };
                 await SaveWorkspaceNowAsync();
                 var deleted = await Task.Run(() => _engine.Storage.RetainAsync(TimeSpan.FromDays(_configuration.RetentionDays)));
-                _lastHistoryQuery = null;
+                CurrentHistoryView.LoadedKey = null;
                 status.Text = $"Workspace saved. Removed {deleted:N0} samples older than retention.";
             }
             catch (Exception ex) { status.Text = ex.Message; }
@@ -460,49 +456,6 @@ public partial class MainWindow
         };
         dialog.Content = ToolPanel(enabled, FormRow("Port", port), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { apply, browser } }, status);
         await dialog.ShowDialog(this);
-    }
-
-    private async void ShiftHistory(object? sender, RoutedEventArgs e)
-    {
-        if (_selected is null || sender is not Button button) return;
-        var direction = button.Tag?.ToString() == "back" ? -1 : 1;
-        var shifted = (Timeline.EndTime ?? DateTimeOffset.UtcNow) + TimeSpan.FromTicks(Timeline.Horizon.Ticks / 2 * direction);
-        _settingFocus = true; FocusInput.SelectedIndex = 2; _settingFocus = false;
-        HistorySlider.Value = 100;
-        _heldEnd = shifted; _diskPoints = null;
-        RefreshGraph();
-        await LoadDiskGraphAsync(true);
-    }
-
-    private async Task LoadDiskGraphAsync(bool force = false)
-    {
-        if (_selected is null || Timeline.EndTime is not { } end) return;
-        var item = _selected;
-        var hop = _selectedHop ?? 0;
-        var horizon = Timeline.Horizon;
-        var key = $"{item.Id}:{hop}:{end.UtcTicks}:{horizon.Ticks}:{_configuration.AggregationSeconds}";
-        if (!force && key == _lastHistoryQuery) return;
-        _lastHistoryQuery = key;
-        _historyQuery?.Cancel(); _historyQuery?.Dispose(); _historyQuery = new CancellationTokenSource();
-        var token = _historyQuery.Token;
-        try
-        {
-            var range = await Task.Run(() => _engine.Storage.LoadTimeRangeAsync(item.Id, hop, token), token);
-            if (token.IsCancellationRequested || _selected?.Id != item.Id || (_selectedHop ?? 0) != hop) return;
-            if (range is { } bounds) { _historyFirst = bounds.First; _historyLast = bounds.Last; }
-            var maxPoints = Math.Clamp((int)Math.Ceiling(horizon.TotalSeconds / _configuration.AggregationSeconds), 1, 2000);
-            var samples = await Task.Run(() => _engine.Storage.LoadAggregatedSamplesAsync(item.Id, hop, end - horizon, end, maxPoints, token), token);
-            if (token.IsCancellationRequested || _selected?.Id != item.Id || (_selectedHop ?? 0) != hop) return;
-            _diskPoints = samples.Select(s => new GraphPoint(s.Timestamp, s.AverageMs, s.AverageMs is null && s.Count > 0,
-                s.LossPercent, s.JitterMs, s.Count == 0 && s.Errors > 0)).ToArray();
-            Timeline.Samples = _diskPoints;
-            Timeline.Title = $"{samples.Sum(s => s.Count):N0} probes · aggregated history · {_configuration.AggregationSeconds}s minimum bins";
-            var events = await Task.Run(() => _engine.Storage.LoadEventsAsync(item.Id, end - horizon, end, token), token);
-            if (token.IsCancellationRequested || _selected?.Id != item.Id || (_selectedHop ?? 0) != hop) return;
-            Timeline.Markers = events.Select(m => new GraphEvent(m.Timestamp, m.Kind, m.Message)).ToArray();
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) { StatusText.Text = "History query failed: " + ex.Message; }
     }
 
     private static Window ToolWindow(string title, double width, double height) => new()

@@ -4,7 +4,7 @@ namespace TraceScope.App.Controls;
 
 /// <summary>A measured latency sample. Missing replies are represented explicitly.</summary>
 public sealed record GraphPoint(DateTimeOffset Time, double? Latency, bool Lost,
-    double? LossPercent = null, double? JitterMs = null, bool IsError = false);
+    double? LossPercent = null, double? JitterMs = null, bool IsError = false, bool IsAggregated = false, long SampleCount = 1, string? Address = null);
 
 public sealed record GraphEvent(DateTimeOffset Time, string Kind, string Message);
 

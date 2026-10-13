@@ -137,9 +137,9 @@ public partial class MainWindow
             if (_selected?.Session?.Id == sessionId && options is not null)
             {
                 SynchronizeProbeControls(options);
-                _diskPoints = null; _lastHistoryQuery = null;
+                CurrentHistoryView.LoadedKey = null;
             }
-            _diskPoints = null; _lastHistoryQuery = null; _historyQuery?.Cancel();
+            CurrentHistoryView.LoadedKey = null; _historyQuery?.Cancel();
             RefreshGraph();
         }
         finally

@@ -41,7 +41,7 @@ public partial class MainWindow
     {
         SetAllTargetsVisible(true);
         _selectedHop = null;
-        _diskPoints = null; _lastHistoryQuery = null;
+        CurrentHistoryView.LoadedKey = null;
         // The overview is a tab, while its selected row supplies the graph/toolbar context.
         _clearingOverviewTab = true;
         try { TargetList.SelectedItem = null; }
@@ -52,7 +52,8 @@ public partial class MainWindow
 
     private void PreviewOverviewTarget(TargetItem item)
     {
-        var heldEnd = _heldEnd;
+        var heldEnd = CurrentHistoryView.Viewport.EndTime;
+        var horizon = CurrentHistoryView.Viewport.Horizon;
         var focus = FocusInput.SelectedIndex;
         var position = HistorySlider.Value;
         _previewingOverviewTarget = true;
@@ -68,7 +69,9 @@ public partial class MainWindow
         try { FocusInput.SelectedIndex = focus; }
         finally { _settingFocus = false; }
         HistorySlider.Value = position;
-        _heldEnd = heldEnd;
+        if (heldEnd.HasValue) CurrentHistoryView.Viewport.EndTime = heldEnd;
+        CurrentHistoryView.Viewport.Horizon = horizon;
+        _heldEnd = CurrentHistoryView.Viewport.EndTime;
         RefreshGraph();
     }
 
@@ -89,10 +92,14 @@ public partial class MainWindow
     private void RefreshAllTargets()
     {
         if (!_allTargetsVisible || AllTargetsPane is null) return;
-        var horizon = TimeSpan.FromMinutes(new[] { 1, 5, 10, 15, 60, 360, 1440, 10080 }[Math.Clamp(HorizonInput.SelectedIndex, 0, 7)]);
-        var end = FocusInput.SelectedIndex == 2 ? _heldEnd ?? Timeline.EndTime ?? DateTimeOffset.UtcNow
+        foreach (var item in _targets)
+            if (item.Session?.LatestSnapshot is { } latest && latest.Round > (item.Snapshot?.Round ?? 0))
+            { item.Snapshot = latest; item.Refresh(); }
+        var horizon = CurrentHistoryView.Viewport.Horizon;
+        var end = CurrentHistoryView.Viewport.SelectionEnd ?? (FocusInput.SelectedIndex == 2 ? _heldEnd ?? Timeline.EndTime ?? DateTimeOffset.UtcNow
             : FocusInput.SelectedIndex == 1 ? _targets.Select(t => t.Snapshot?.Timestamp).Max() ?? DateTimeOffset.UtcNow
-            : DateTimeOffset.UtcNow;
+            : DateTimeOffset.UtcNow);
+        if (CurrentHistoryView.Viewport.SelectionStart is { } start) horizon = end - start > TimeSpan.Zero ? end - start : TimeSpan.FromTicks(1);
         AllTargetsPane.Refresh(_targets, _selected?.Id, end, horizon, _configuration.Profiles, _configuration.Display);
     }
 }

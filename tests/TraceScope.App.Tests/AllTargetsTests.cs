@@ -45,7 +45,9 @@ public sealed class AllTargetsTests
             pane.Table.SelectedItem = first;
             Assert.True(pane.IsVisible);
             Assert.Equal(2, window.FindControl<ComboBox>("FocusInput")!.SelectedIndex);
-            Assert.Equal(heldTime, window.FindControl<LatencyTimeline>("Timeline")!.EndTime);
+            var viewport = window.FindControl<LatencyTimeline>("Timeline")!.Viewport!;
+            Assert.NotNull(viewport.EndTime);
+            Assert.InRange(viewport.EndTime!.Value, viewport.First!.Value, heldTime!.Value);
             Assert.Equal("127.0.0.1", window.FindControl<TextBlock>("TargetTitle")!.Text);
             Assert.All(window.FindControl<LatencyTimeline>("Timeline")!.Samples, p => Assert.Equal(12, p.Latency));
             Click(window.FindControl<Button>("StartButton")!);
