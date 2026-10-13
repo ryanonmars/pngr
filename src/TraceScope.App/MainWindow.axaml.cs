@@ -40,6 +40,11 @@ public partial class MainWindow : Window
     public MainWindow(string[] args, TraceEngine? engine = null)
     {
         InitializeComponent();
+        if (OperatingSystem.IsWindows())
+        {
+            using var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://TraceScope/Assets/Icons/tracescope-windows.png"));
+            Icon = new WindowIcon(icon);
+        }
         _args = args;
         var dataDirectory = ArgumentValue("--data-dir") ?? DefaultDataDirectory();
         Directory.CreateDirectory(dataDirectory);

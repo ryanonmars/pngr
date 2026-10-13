@@ -7,9 +7,11 @@
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>TraceScope</AssemblyName>
     <Version>0.4.0</Version>
+    <ApplicationIcon>Assets/Icons/tracescope.ico</ApplicationIcon>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
   </PropertyGroup>
   <ItemGroup>
+    <AvaloniaResource Include="Assets/Icons/*.png" />
     <PackageReference Include="Avalonia" Version="11.3.20" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />

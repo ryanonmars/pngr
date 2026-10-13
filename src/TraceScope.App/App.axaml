@@ -1,4 +1,4 @@
-<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="TraceScope.App.App" RequestedThemeVariant="Dark">
+<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="TraceScope.App.App" Name="TraceScope" RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme><FluentTheme.Palettes><ColorPaletteResources x:Key="Dark" Accent="#637664"/></FluentTheme.Palettes></FluentTheme>
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
