@@ -1,0 +1,80 @@
+# Local SDK, package caches, tools, and generated artifacts
+.tools/
+artifacts/
+packages/
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+.avalonia-build-tasks/
+
+# Local monitoring databases and SQLite journals
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+**/test-data/
+
+# Logs, temporary files, and editor recovery files
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Generated application binaries and distribution packages
+*.dll
+*.exe
+*.pdb
+*.dylib
+*.so
+*.o
+*.obj
+*.app/
+# Git matches case-insensitively on this Mac; retain the .NET application source project.
+!src/TraceScope.App/
+*.dSYM/
+*.dmg
+*.pkg
+*.msi
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.nupkg
+*.snupkg
+*.zip
+
+# IDE/user settings and local secrets
+.vs/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.DotSettings.user
+.env
+.env.*
+!.env.example
+
+# Development notes and agent/tool state (kept locally)
+docs/
+.codex/
+.agents/
+.rea/
+
+# Operating-system metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini

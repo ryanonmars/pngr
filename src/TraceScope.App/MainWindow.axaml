@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:TraceScope.App.Controls" x:Class="TraceScope.App.MainWindow" Title="TraceScope — Network diagnostics" Width="1180" Height="790" MinWidth="980" MinHeight="640" Background="#191A1D">
+  <Grid RowDefinitions="28,28,38,28,*,20" Background="#191A1D">
+    <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Text="TraceScope" FontSize="12" FontWeight="SemiBold" Foreground="#F0F1F3" VerticalAlignment="Center"/>
+        <TextBlock Grid.Column="1" x:Name="TargetTitle" Text="Ready to trace" FontSize="11" Foreground="#DBDDE1" VerticalAlignment="Center"/>
+        <TextBlock Grid.Column="2" x:Name="TargetSubtitle" Text="Continuous route monitoring" FontSize="10" Foreground="#999DA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+          <Button Content="Summary" Click="OpenSummary"/>
+          <Button Content="Alerts" Click="OpenAlerts"/>
+          <Button Content="Workspace" Click="OpenWorkspace"/>
+          <Button Content="Network" Click="OpenNetwork"/>
+          <Button Content="Web" Click="OpenWeb"/>
+          <Button x:Name="HistoryButton" Content="Open history" Click="OpenHistory"/>
+          <Button x:Name="ExportButton" Content="Export CSV" Click="ExportCsv"/>
+          <Button x:Name="StopButton" Content="Stop" IsEnabled="False" Click="StopTrace"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Border Grid.Row="1" Background="#1D1F23" BorderBrush="#36383E" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="Auto,*">
+        <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,0,10,0" VerticalAlignment="Center"><TextBlock Text="Targets" FontSize="10" Foreground="#AFB3BD"/><TextBlock x:Name="TargetCount" Text="0" FontSize="10" Foreground="#747A84"/></StackPanel>
+        <ListBox Grid.Column="1" x:Name="TargetList" Background="Transparent" SelectionChanged="TargetChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.ItemTemplate><DataTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="●" Foreground="{Binding StatusBrush}" FontSize="8" VerticalAlignment="Center"/><TextBlock Text="{Binding Target}" FontSize="11" VerticalAlignment="Center"/><TextBlock Text="{Binding StateLabel}" FontSize="9" Foreground="#898F9A" VerticalAlignment="Center"/><Button Classes="close-target" Content="×" Click="CloseTarget" ToolTip.Tip="Close target (saved history is kept)" AutomationProperties.Name="Close target"/></StackPanel>
+          </DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+    <Border Grid.Row="2" Background="#26282D" BorderBrush="#41444A" BorderThickness="0,0,0,1" Padding="6,5">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+        <TextBox x:Name="TargetInput" Watermark="Hostname or IP address" Text="1.1.1.1" KeyDown="TargetKeyDown"/>
+        <Button Grid.Column="1" Classes="primary" x:Name="StartButton" Content="▶ Trace" Click="StartTrace"/>
+        <Button Grid.Column="2" x:Name="PauseButton" Content="Pause" IsEnabled="False" Click="PauseTrace"/>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4"><TextBlock Text="Interval" VerticalAlignment="Center"/><ComboBox x:Name="IntervalInput" Width="112" SelectedIndex="1"><ComboBoxItem Content="1 second"/><ComboBoxItem Content="2.5 seconds"/><ComboBoxItem Content="5 seconds"/><ComboBoxItem Content="10 seconds"/></ComboBox></StackPanel>
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4"><TextBlock Text="Focus" VerticalAlignment="Center"/><ComboBox x:Name="FocusInput" Width="104" SelectedIndex="0" SelectionChanged="FocusChanged"><ComboBoxItem Content="Auto"/><ComboBoxItem Content="Latest sample"/><ComboBoxItem Content="Held"/></ComboBox></StackPanel>
+        <ComboBox Grid.Column="5" x:Name="TimeoutInput" Width="108" SelectedIndex="1" ToolTip.Tip="Probe timeout"><ComboBoxItem Content="500 ms"/><ComboBoxItem Content="1 s timeout"/><ComboBoxItem Content="2 s timeout"/></ComboBox>
+        <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4"><TextBlock Text="Hops" VerticalAlignment="Center"/><NumericUpDown x:Name="MaxHopsInput" Value="30" Minimum="1" Maximum="64" Width="112" FormatString="0"/></StackPanel>
+        <StackPanel Grid.Column="7" Spacing="2" VerticalAlignment="Center" Margin="6,0,0,0"><TextBlock Text="100 ms   200 ms" FontSize="9" Foreground="#B9BDC3"/><Grid Width="82" Height="4" ColumnDefinitions="*,*,*"><Border Background="#528447"/><Border Grid.Column="1" Background="#B29953"/><Border Grid.Column="2" Background="#B85858"/></Grid></StackPanel>
+      </Grid>
+    </Border>
+    <Border Grid.Row="3" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,0,0,1" Padding="6,1">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="6">
+        <TextBlock Text="Probe" VerticalAlignment="Center" Foreground="#999FA9"/>
+        <ComboBox Grid.Column="1" x:Name="ProtocolInput" Width="78"/>
+        <NumericUpDown Grid.Column="2" x:Name="PortInput" Minimum="1" Maximum="65535" Value="443" Width="108" FormatString="0" ToolTip.Tip="TCP or UDP destination port"/>
+        <ComboBox Grid.Column="3" x:Name="SourceInput" Width="210" ToolTip.Tip="Source interface / address"/>
+        <TextBox Grid.Column="4" x:Name="GroupInput" Watermark="Target group" Text="Default" MaxLength="80" MinWidth="90"/>
+        <ComboBox Grid.Column="5" x:Name="ProfileInput" Width="160" PlaceholderText="Probing profile" SelectionChanged="ApplyProfile"/>
+        <Button Grid.Column="6" Content="Save profile" Click="SaveProfile"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="4" RowDefinitions="1*,5,28,1*,23">
+      <Grid Grid.Row="0" RowDefinitions="*,22">
+        <Grid ColumnDefinitions="*,285" Background="#191A1D">
+          <DataGrid x:Name="HopTable" ColumnHeaderHeight="24" RowHeight="22" FontSize="11" IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" SelectionMode="Single" SelectionChanged="HopChanged" GridLinesVisibility="None" Background="#191A1D">
+            <DataGrid.Columns>
+              <DataGridTemplateColumn Header="Hop" Width="36"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Width="16" Height="16" CornerRadius="8" Background="{Binding StatusBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="{Binding HopLabel}" FontSize="10" Foreground="#141C15" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+              <DataGridTextColumn Header="Count" Binding="{Binding Sent}" Width="52"/>
+              <DataGridTextColumn Header="IP" Binding="{Binding IpLabel}" Width="142"/>
+              <DataGridTextColumn Header="Name" Binding="{Binding NameLabel}" Width="*" MinWidth="115"/>
+              <DataGridTextColumn Header="Avg" Binding="{Binding AverageLabel}" Width="48"/>
+              <DataGridTextColumn Header="Min" Binding="{Binding MinimumLabel}" Width="48"/>
+              <DataGridTextColumn Header="Cur" Binding="{Binding CurrentLabel}" Width="48"/>
+              <DataGridTextColumn Header="PL%" Binding="{Binding LossLabel}" Width="46"/>
+            </DataGrid.Columns>
+          </DataGrid>
+          <controls:HopLatencyPlot Grid.Column="1" x:Name="RoutePlot" RowHeight="22" HeaderHeight="24"/>
+        </Grid>
+        <Border Grid.Row="1" Background="#202227" BorderBrush="#35383E" BorderThickness="0,1,0,0" Padding="7,2">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="Round trip (ms)" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LatencyValue" Text="—" FontSize="11"/><TextBlock Text="Loss" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LossValue" Text="—" FontSize="11"/><TextBlock Text="Jitter" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="JitterValue" Text="—" FontSize="11"/><TextBlock Text="MOS est." FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="MosValue" Text="—" FontSize="11"/><TextBlock Text="Avg 30s / 5m" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="ShortAverageValue" Text="—" FontSize="11"/><TextBlock x:Name="LongAverageValue" Text="—" FontSize="11"/></StackPanel><TextBlock Grid.Column="1" x:Name="FocusRange" Text="Focus: Auto" FontSize="10" Foreground="#A5ABB6"/></Grid>
+        </Border>
+      </Grid>
+      <GridSplitter Grid.Row="1" ResizeDirection="Rows" Background="#373A40"/>
+      <Border Grid.Row="2" Background="#24262A" Padding="7,2" BorderBrush="#3A3D43" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6"><TextBlock x:Name="GraphHeading" Text="Latency history" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/><ComboBox Grid.Column="1" x:Name="HorizonInput" Width="120" SelectedIndex="2" SelectionChanged="ViewChanged"><ComboBoxItem Content="1 minute"/><ComboBoxItem Content="5 minutes"/><ComboBoxItem Content="10 minutes"/><ComboBoxItem Content="15 minutes"/><ComboBoxItem Content="1 hour"/><ComboBoxItem Content="6 hours"/><ComboBoxItem Content="24 hours"/><ComboBoxItem Content="7 days"/></ComboBox><Button Grid.Column="2" Content="◀" Tag="back" Click="ShiftHistory" ToolTip.Tip="Scroll back half a view"/><Button Grid.Column="3" Content="▶" Tag="forward" Click="ShiftHistory" ToolTip.Tip="Scroll forward half a view"/><Button Grid.Column="4" Content="Live" Click="GoLive"/></Grid>
+      </Border>
+      <controls:LatencyTimeline Grid.Row="3" x:Name="Timeline"/>
+      <Grid Grid.Row="4" Margin="8,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8"><TextBlock Text="History" Foreground="#8C929C" FontSize="10" VerticalAlignment="Center"/><Slider Grid.Column="1" x:Name="HistorySlider" Height="18" MinHeight="18" Minimum="0" Maximum="100" Value="100" ValueChanged="HistoryPositionChanged"/><TextBlock Grid.Column="2" x:Name="HistoryPosition" Text="LIVE" FontSize="9" Foreground="#91C898" VerticalAlignment="Center"/></Grid>
+    </Grid>
+    <Border Grid.Row="5" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,1,0,0" Padding="7,2"><Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatusText" Text="Ready · ICMP · saved locally" Foreground="#8F95A0" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="TraceScope 0.4 · Professional experiment" FontSize="9" Foreground="#737A86"/></Grid></Border>
+  </Grid>
+</Window>

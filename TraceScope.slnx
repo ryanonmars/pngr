@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TraceScope.App/TraceScope.App.csproj" />
+    <Project Path="src/TraceScope.Core/TraceScope.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TraceScope.App.Tests/TraceScope.App.Tests.csproj" />
+    <Project Path="tests/TraceScope.Core.Tests/TraceScope.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>TraceScope</AssemblyName>
+    <Version>0.4.0</Version>
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.7" />
+    <ProjectReference Include="../TraceScope.Core/TraceScope.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) And '$(RuntimeIdentifier)' != 'win-x64'">
+    <Content Include="../../artifacts/native/libTraceScopeNotifications.dylib" Link="libTraceScopeNotifications.dylib"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../artifacts/native/tracescope-tcp-hop" Link="tracescope-tcp-hop"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildMacNotificationBridge" BeforeTargets="PrepareForBuild"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) And '$(RuntimeIdentifier)' != 'win-x64'"
+          Inputs="../TraceScope.Core/Native/mac_notifications.m" Outputs="../../artifacts/native/libTraceScopeNotifications.dylib">
+    <MakeDir Directories="../../artifacts/native" />
+    <Exec Command="xcrun clang -fobjc-arc -dynamiclib -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -framework Foundation -framework UserNotifications &quot;../TraceScope.Core/Native/mac_notifications.m&quot; -o &quot;../../artifacts/native/libTraceScopeNotifications.dylib&quot;" />
+  </Target>
+  <Target Name="BuildMacTcpHop" BeforeTargets="PrepareForBuild"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) And '$(RuntimeIdentifier)' != 'win-x64'"
+          Inputs="../TraceScope.Native/tcp-hop.c" Outputs="../../artifacts/native/tracescope-tcp-hop">
+    <MakeDir Directories="../../artifacts/native" />
+    <Exec Command="xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 &quot;../TraceScope.Native/tcp-hop.c&quot; -o &quot;../../artifacts/native/tracescope-tcp-hop&quot;" />
+  </Target>
+</Project>

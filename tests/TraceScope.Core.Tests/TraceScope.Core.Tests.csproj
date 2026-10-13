@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <ProjectReference Include="../../src/TraceScope.Core/TraceScope.Core.csproj" />
+  </ItemGroup>
+  <Target Name="BuildMacTcpProbeForTests" BeforeTargets="PrepareForBuild"
+          Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Inputs="../../src/TraceScope.Native/tcp-hop.c" Outputs="../../artifacts/native/tracescope-tcp-hop">
+    <MakeDir Directories="../../artifacts/native" />
+    <Exec Command="xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 &quot;../../src/TraceScope.Native/tcp-hop.c&quot; -o &quot;../../artifacts/native/tracescope-tcp-hop&quot;" />
+  </Target>
+</Project>
