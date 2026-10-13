@@ -79,6 +79,89 @@ public sealed class ProfessionalEngineTests
     }
 
     [Fact]
+    public async Task ResetStatisticsPreservesSettingsHistoryAndRoundIdsWithoutAffectingOtherTargets()
+    {
+        await using var engine = new TraceEngine(Database(), Options(), new ConfiguredTransport());
+        var paused = new ConcurrentDictionary<Guid, byte>();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.SnapshotUpdated += (_, snapshot) =>
+        {
+            if (snapshot.Round != 2) return;
+            engine.Pause(snapshot.SessionId);
+            paused.TryAdd(snapshot.SessionId, 0);
+            if (paused.Count == 2) ready.TrySetResult();
+        };
+        var options = Options() with { Protocol = ProbeProtocol.Udp, DestinationPort = 33434,
+            SourceAddress = "127.0.0.1", InterfaceId = "lo0" };
+        var first = await engine.StartTargetAsync("127.0.0.1", options);
+        var second = await engine.StartTargetAsync("127.0.0.2");
+        await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var saved = await engine.Storage.LoadSamplesAsync(first.Id);
+        var otherSnapshot = second.LatestSnapshot;
+        engine.ResetStatistics(first.Id);
+        Assert.Equal(SessionState.Paused, first.State);
+        Assert.Equal(options, first.Options);
+        Assert.Equal(0, first.LatestSnapshot!.Destination.Sent);
+        Assert.Null(first.LatestSnapshot.Destination.AverageMs);
+        Assert.Equal(2, first.LatestSnapshot.Destination.History.Count);
+        Assert.All(first.LatestSnapshot.Hops, hop => Assert.Equal(0, hop.Sent));
+        Assert.Same(otherSnapshot, second.LatestSnapshot);
+        Assert.Equal(saved, await engine.Storage.LoadSamplesAsync(first.Id));
+
+        var resumed = new TaskCompletionSource<RoundSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.SnapshotUpdated += (_, snapshot) =>
+        {
+            if (snapshot.SessionId != first.Id || snapshot.Round != 3) return;
+            engine.Pause(first.Id);
+            resumed.TrySetResult(snapshot);
+        };
+        engine.Resume(first.Id);
+        var next = await resumed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, next.Destination.Sent);
+        Assert.Equal(1, next.Destination.Received);
+        Assert.Equal(3, next.Destination.History.Count);
+        Assert.All(next.Hops, hop => Assert.Equal(1, hop.Sent));
+        Assert.False(next.RouteChanged);
+        var persisted = await engine.Storage.LoadSamplesAsync(first.Id);
+        Assert.Equal(new long[] { 1, 2, 3 }, persisted.Select(s => s.Round).Distinct().Order().ToArray());
+        Assert.All(saved, sample => Assert.Contains(sample, persisted));
+        Assert.Equal(SessionState.Paused, second.State);
+
+        await engine.StopAsync(first.Id);
+        Assert.True(engine.ForgetSession(first.Id));
+        Assert.Same(second, Assert.Single(engine.Sessions));
+        Assert.Same(otherSnapshot, second.LatestSnapshot);
+        Assert.Equal(2, (await engine.Storage.LoadSessionsAsync()).Count);
+        Assert.Equal(persisted, await engine.Storage.LoadSamplesAsync(first.Id));
+    }
+
+    [Fact]
+    public async Task ResetDuringRunningProbeKeepsWorkerAndCountsNextResponseAsFirstSample()
+    {
+        var transport = new GatedTransport();
+        await using var engine = new TraceEngine(Database(), Options(), transport);
+        var session = await engine.StartTargetAsync("127.0.0.1");
+        await transport.SecondEndpointStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, session.LatestSnapshot!.Destination.Sent);
+        var ready = new TaskCompletionSource<RoundSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        engine.SnapshotUpdated += (_, snapshot) =>
+        {
+            if (snapshot.Round != 2) return;
+            engine.Pause(snapshot.SessionId);
+            ready.TrySetResult(snapshot);
+        };
+        engine.ResetStatistics(session.Id);
+        Assert.Equal(SessionState.Running, session.State);
+        Assert.Equal(0, session.LatestSnapshot!.Destination.Sent);
+        transport.Release.TrySetResult();
+        var next = await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, next.Destination.Sent);
+        Assert.Equal(2, next.Destination.History.Count);
+        Assert.Equal(new long[] { 1, 2 }, (await engine.Storage.LoadSamplesAsync(session.Id))
+            .Select(s => s.Round).Distinct().Order().ToArray());
+    }
+
+    [Fact]
     public async Task ConfirmedRouterChangeEmitsOnceAndPersistsEventInSqlite()
     {
         var database = Database();
@@ -158,6 +241,23 @@ public sealed class ProfessionalEngineTests
             await Task.Delay(5, cancellationToken);
             return ttl == 1 ? new("192.0.2.1", 5, ProbeStatus.TimeExceeded)
                 : new(destination.ToString(), 10, ProbeStatus.Success);
+        }
+    }
+
+    private sealed class GatedTransport : IProbeTransport
+    {
+        private int _endpoints;
+        public TaskCompletionSource SecondEndpointStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async Task<ProbeResult> ProbeAsync(IPAddress destination, int ttl, TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            if (ttl == 255 && Interlocked.Increment(ref _endpoints) == 2)
+            {
+                SecondEndpointStarted.TrySetResult();
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+            return new(destination.ToString(), 10, ProbeStatus.Success);
         }
     }
 

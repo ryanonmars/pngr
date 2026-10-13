@@ -27,6 +27,7 @@ public sealed class HopLatencyPlot : Control
     private double _warningLatencyMs = 100;
     private double _criticalLatencyMs = 200;
     private double _fixedMaximumMs;
+    private bool _showPacketLoss = true;
 
     public HopLatencyPlot() { ClipToBounds = true; MinWidth = 180; }
     public IReadOnlyList<HopPlotRow> Rows
@@ -41,6 +42,8 @@ public sealed class HopLatencyPlot : Control
     public double CriticalLatencyMs { get => _criticalLatencyMs; set { _criticalLatencyMs = Nonnegative(value, _criticalLatencyMs); InvalidateVisual(); } }
     /// <summary>Zero scales automatically to the measured latency range.</summary>
     public double FixedMaximumMs { get => _fixedMaximumMs; set { _fixedMaximumMs = Nonnegative(value, _fixedMaximumMs); InvalidateVisual(); } }
+    /// <summary>A separate thin strip encodes loss from zero to 100 percent across each row.</summary>
+    public bool ShowPacketLoss { get => _showPacketLoss; set { _showPacketLoss = value; InvalidateVisual(); } }
     /// <summary>Table scroll offset; the axis remains fixed above the rows.</summary>
     public double VerticalOffset
     {
@@ -103,10 +106,12 @@ public sealed class HopLatencyPlot : Control
                     if (previous is { } before) context.DrawLine(Route, before, p);
                     context.DrawEllipse(Brush("#3B5E36"), Marker, p, 2.4, 2.4);
                 }
-                else if (row.LossPercent > 0)
+                if (ShowPacketLoss && double.IsFinite(row.LossPercent) && row.LossPercent > 0)
                 {
-                    context.DrawLine(Marker, new Point(right - 5, y - 3), new Point(right, y + 3));
-                    context.DrawLine(Marker, new Point(right - 5, y + 3), new Point(right, y - 3));
+                    // The row's bottom edge is a percent scale, independent of the latency axis.
+                    // Keep whiskers and markers visible even when some probes receive no reply.
+                    var width = (right - left) * Math.Clamp(row.LossPercent / 100, 0, 1);
+                    context.DrawRectangle(Brush("#F57161"), null, new Rect(right - width, top + RowHeight - 4, width, 3));
                 }
                 previous = point;
             }

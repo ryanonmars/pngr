@@ -12,7 +12,8 @@ public sealed record ProbeSourceChoice(string Label, string? Interface, string? 
     public override string ToString() => Label;
 }
 
-public sealed record SettingsChange(WorkspaceConfiguration Configuration, ProbeOptions? SelectedTargetOptions);
+public sealed record SettingsChange(WorkspaceConfiguration Configuration, ProbeOptions? SelectedTargetOptions,
+    int? SelectedTcpPort = null, int? SelectedUdpPort = null);
 
 /// <summary>Edits a private draft. Only Apply/OK can change running monitoring or saved preferences.</summary>
 public sealed class SettingsWindow : Window
@@ -65,13 +66,18 @@ public sealed class SettingsWindow : Window
     private int _editingScope;
     private bool _loading;
     private bool _busy;
+    private ProbeProtocol _portProtocol;
+    private readonly Dictionary<int, (int Tcp, int Udp)> _ports = [];
 
     public SettingsWindow(WorkspaceConfiguration configuration, ProbeOptions? selectedOptions, string? selectedTarget,
         IReadOnlyList<ProbeSourceChoice> sources, string dataDirectory, Func<SettingsChange, Task> apply,
-        Func<Task<NotificationResult>> permission, Action<string> openTool)
+        Func<Task<NotificationResult>> permission, Action<string> openTool,
+        int selectedTcpPort = 443, int selectedUdpPort = 33434)
     {
         _original = configuration;
         _defaults = configuration.DefaultProbeOptions;
+        _ports[0] = (configuration.LastTcpPort, configuration.LastUdpPort);
+        _ports[1] = (selectedTcpPort, selectedUdpPort);
         _selected = selectedOptions;
         _initialSelected = selectedOptions;
         _profileDraft = configuration.Profiles.ToList();
@@ -104,7 +110,7 @@ public sealed class SettingsWindow : Window
             ToolButton("Apply & manage workspaces…", "workspace"),
             Heading("Local files"), Note(dataDirectory), Note("Settings: workspace.json   ·   Measurements: tracescope.db"));
         _pages["Monitoring"] = Page("Monitoring engine", "Edit defaults or the selected target. Existing targets keep their own settings.",
-            _useDefaults, Note("When unchecked, new targets use the toolbar's current settings. Saved defaults initialize the toolbar when no target is selected."),
+            _useDefaults, Note("When unchecked, new targets inherit the last-used probing configuration."),
             Row("Configuration scope", _scope), Row("Packet type", _protocol), Row("Destination port", _port),
             Row("Network source", _source), Row("Interval (seconds)", _interval), Row("Timeout (seconds)", _timeout),
             Row("Maximum hops", _hops), Row("Concurrent hop probes", _concurrency), Row("In-memory samples / hop", _memory), _resolve,
@@ -158,7 +164,16 @@ public sealed class SettingsWindow : Window
             try { CaptureProbe(); _editingScope = _scope.SelectedIndex; LoadProbe(_editingScope == 0 ? _defaults : _selected!); }
             catch (Exception ex) { _status.Text = ex.Message; _loading = true; _scope.SelectedIndex = _editingScope; _loading = false; }
         };
-        _protocol.SelectionChanged += (_, _) => { if (!_loading) _port.Value = _protocol.SelectedItem is ProbeProtocol.Udp ? 33434 : 443; };
+        _protocol.SelectionChanged += (_, _) =>
+        {
+            if (_loading) return;
+            RememberPort();
+            var ports = _ports[_editingScope];
+            var next = (ProbeProtocol)_protocol.SelectedItem!;
+            _port.Value = next == ProbeProtocol.Udp ? ports.Udp : next == ProbeProtocol.Tcp ? ports.Tcp : _port.Value;
+            _portProtocol = next;
+            _port.IsEnabled = next != ProbeProtocol.Icmp;
+        };
         _profiles.SelectionChanged += (_, _) =>
         {
             if (!_loading && _profiles.SelectedItem is string name && _profileDraft.FirstOrDefault(p => p.Name == name) is { } profile)
@@ -176,10 +191,18 @@ public sealed class SettingsWindow : Window
 
     private void CaptureProbe()
     {
+        RememberPort();
         var options = ReadProbe();
         // Reuse the same validation as workspace import and the monitoring engine.
         (_original with { DefaultProbeOptions = options }).Validate();
         if (_editingScope == 0) _defaults = options; else _selected = options;
+    }
+    private void RememberPort()
+    {
+        var ports = _ports[_editingScope];
+        var port = (int)(_port.Value ?? 443);
+        _ports[_editingScope] = _portProtocol == ProbeProtocol.Tcp ? (port, ports.Udp)
+            : _portProtocol == ProbeProtocol.Udp ? (ports.Tcp, port) : ports;
     }
     private ProbeOptions ReadProbe()
     {
@@ -199,6 +222,9 @@ public sealed class SettingsWindow : Window
         try
         {
             _protocol.SelectedItem = options.Protocol; _port.Value = options.DestinationPort;
+            _portProtocol = options.Protocol;
+            _port.IsEnabled = options.Protocol != ProbeProtocol.Icmp;
+            RememberPort();
             var sources = _source.ItemsSource!.Cast<ProbeSourceChoice>().ToList();
             var source = sources.FirstOrDefault(s => s.Address == options.SourceAddress && s.Interface == options.InterfaceId);
             if (source is null)
@@ -232,7 +258,9 @@ public sealed class SettingsWindow : Window
             };
             configuration.Validate();
             _busy = true; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = false;
-            await _apply(new SettingsChange(configuration, _selected != _initialSelected ? _selected : null));
+            await _apply(new SettingsChange(configuration, _selected != _initialSelected ? _selected : null,
+                _selected != _initialSelected ? _ports[1].Tcp : null,
+                _selected != _initialSelected ? _ports[1].Udp : null));
             _status.Text = "Settings saved. Changes apply immediately; monitoring continues.";
             _busy = false;
             if (close) Close();

@@ -74,8 +74,16 @@ public partial class MainWindow
 
     private void NewTargetFromOverview(object? sender, RoutedEventArgs e)
     {
+        _creatingTarget = true;
+        _newTargetOverride = false;
+        _draftOptions = NewTargetOptions();
+        SynchronizeProbeControls(_draftOptions);
+        _settingOptions = true;
+        try { ProfileInput.SelectedItem = _configuration.LastUsedProfile; }
+        finally { _settingOptions = false; }
         TargetInput.Text = "";
         TargetInput.Focus();
+        UpdateButtons();
     }
 
     private void RefreshAllTargets()

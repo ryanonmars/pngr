@@ -62,12 +62,8 @@ public partial class MainWindow
         SourceInput.ItemsSource = sources;
         SourceInput.SelectedIndex = 0;
         ReloadProfiles();
-        ProtocolInput.SelectionChanged += (_, _) =>
-        {
-            if (_settingOptions) return;
-            PortInput.Value = ProtocolInput.SelectedItem is ProbeProtocol.Udp ? 33434 : 443;
-            ApplySelectedOptions();
-        };
+        ProtocolInput.SelectionChanged += (_, _) => ProtocolChanged();
+        UpdateProtocolControls();
         PortInput.ValueChanged += (_, _) => ApplySelectedOptions();
         SourceInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         GroupInput.TextChanged += (_, _) =>
@@ -130,7 +126,7 @@ public partial class MainWindow
     private WorkspaceConfiguration CaptureWorkspace() => _configuration with
     {
         Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
-            .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused)).ToArray()
+            .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused, x.TcpPort, x.UdpPort, x.ProfileName)).ToArray()
     };
     private Task SaveWorkspaceNowAsync() => _workspaceStore.SaveAsync(CaptureWorkspace());
     private void ScheduleWorkspaceSave()
@@ -161,7 +157,20 @@ public partial class MainWindow
             _configuration = workspace; ApplyPreferenceControls(); ReloadProfiles();
             foreach (var target in workspace.Targets)
             {
-                try { await AddTarget(target.Target, target.Options, target.Group, target.Paused); }
+                try
+                {
+                    var previousCount = _targets.Count;
+                    await AddTarget(target.Target, target.Options, target.Group, target.Paused);
+                    var restored = _targets.Count > previousCount ? _targets.Last()
+                        : _targets.FirstOrDefault(t => t.Target.Equals(target.Target, StringComparison.OrdinalIgnoreCase));
+                    if (restored is not null)
+                    {
+                        restored.TcpPort = target.TcpPort; restored.UdpPort = target.UdpPort;
+                        restored.ProfileName = target.ProfileName;
+                        RememberTargetPort(restored, target.Options);
+                        if (ReferenceEquals(restored, _selected)) UpdateProfessionalSelection();
+                    }
+                }
                 catch (Exception ex) { StatusText.Text = $"Could not restore {target.Target}: {ex.Message}"; }
             }
         }
@@ -178,16 +187,12 @@ public partial class MainWindow
         _diskPoints = null; _historyFirst = _historyLast = null; _lastHistoryQuery = null;
         _historyQuery?.Cancel();
         if (_selected is null) return;
+        SynchronizeProbeControls(_selected.Session?.Options ?? _draftOptions);
         _settingOptions = true;
         try
         {
-            var options = _selected.Session?.Options ?? _draftOptions;
-            ProtocolInput.SelectedItem = options.Protocol;
-            PortInput.Value = options.DestinationPort;
-            SourceInput.SelectedItem = SourceInput.ItemsSource!.Cast<SourceChoice>()
-                .FirstOrDefault(x => x.Source == options.SourceAddress && x.Interface == options.InterfaceId)
-                ?? SourceInput.ItemsSource!.Cast<SourceChoice>().First();
             GroupInput.Text = _selected.Group;
+            ProfileInput.SelectedItem = _selected.ProfileName;
         }
         finally { _settingOptions = false; }
         RefreshEventMarkers();
@@ -203,7 +208,7 @@ public partial class MainWindow
     private void ReloadProfiles()
     {
         _settingOptions = true;
-        try { ProfileInput.ItemsSource = _configuration.Profiles.Select(p => p.Name).ToArray(); ProfileInput.SelectedIndex = -1; }
+        try { ProfileInput.ItemsSource = _configuration.Profiles.Select(p => p.Name).ToArray(); ProfileInput.SelectedItem = !_creatingTarget && _selected is not null ? _selected.ProfileName : _configuration.LastUsedProfile; }
         finally { _settingOptions = false; }
     }
 
@@ -212,19 +217,10 @@ public partial class MainWindow
         if (_settingOptions || ProfileInput.SelectedItem is not string name) return;
         var profile = _configuration.Profiles.FirstOrDefault(p => p.Name == name);
         if (profile is null) return;
+        if (!_creatingTarget && _selected is not null) _selected.ProfileName = name;
         _draftOptions = profile.Options;
-        _settingOptions = true;
-        try
-        {
-            ProtocolInput.SelectedItem = profile.Options.Protocol; PortInput.Value = profile.Options.DestinationPort;
-            IntervalInput.SelectedIndex = Array.IndexOf(new[] { 1d, 2.5, 5, 10 }, profile.Options.Interval.TotalSeconds);
-            TimeoutInput.SelectedIndex = Array.IndexOf(new[] { 500d, 1000, 2000 }, profile.Options.Timeout.TotalMilliseconds);
-            MaxHopsInput.Value = profile.Options.MaxHops;
-            SourceInput.SelectedItem = SourceInput.ItemsSource!.Cast<SourceChoice>().FirstOrDefault(x => x.Source == profile.Options.SourceAddress)
-                ?? SourceInput.ItemsSource!.Cast<SourceChoice>().First();
-        }
-        finally { _settingOptions = false; }
-        if (_selected?.Session is { } session) _engine.UpdateOptions(session.Id, profile.Options);
+        SynchronizeProbeControls(profile.Options);
+        if (!_creatingTarget && _selected?.Session is { } session) _engine.UpdateOptions(session.Id, profile.Options);
         ApplySelectedOptions();
     }
 

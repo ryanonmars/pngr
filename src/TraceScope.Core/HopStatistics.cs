@@ -10,6 +10,15 @@ public sealed class HopStatistics
     public long Sent { get; private set; }
     public long Received { get; private set; }
 
+    public void ResetCounters()
+    {
+        Sent = Received = _jitterCount = 0;
+        _sum = _max = _jitterSum = 0;
+        _min = double.PositiveInfinity;
+        _previous = null;
+        _last = null;
+    }
+
     public void Add(DateTimeOffset timestamp, ProbeResult result, int historyLimit)
     {
         if (result.Status != ProbeStatus.Error) Sent++;

@@ -56,6 +56,12 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(dataDirectory);
         _engine = engine ?? new TraceEngine(Path.Combine(dataDirectory, "tracescope.db"));
         _engine.SnapshotUpdated += (_, snapshot) => Dispatcher.UIThread.Post(() => ReceiveSnapshot(snapshot));
+        _engine.SessionChanged += (_, session) => Dispatcher.UIThread.Post(() =>
+        {
+            var item = _targets.FirstOrDefault(t => t.Id == session.Id);
+            item?.Refresh();
+            if (_selected?.Id == session.Id) { UpdateButtons(); RefreshSelected(); }
+        });
         TargetList.ItemsSource = _targets;
         HopTable.ItemsSource = _rows;
         HopTable.LayoutUpdated += (_, _) => SynchronizeRouteScroll();
@@ -65,7 +71,7 @@ public partial class MainWindow : Window
             ToolTip.SetTip(TimeoutInput, "The macOS traceroute tool has a minimum timeout of one second.");
         }
         ToolTip.SetTip(HopTable, "Intermediate routers may limit ICMP replies while forwarding traffic normally. Use destination loss to assess end-to-end delivery. Latency values are milliseconds.");
-        ToolTip.SetTip(RoutePlot, "Markers show mean latency; whiskers show minimum and maximum latency.");
+        ToolTip.SetTip(RoutePlot, "Markers show mean latency; whiskers show minimum and maximum latency. Thin red strips show the proportion of probes without a response.");
         IntervalInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         TimeoutInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         MaxHopsInput.ValueChanged += (_, _) => ApplySelectedOptions();
@@ -150,7 +156,7 @@ public partial class MainWindow : Window
 
     private ProbeOptions ReadOptions()
     {
-        var basis = _selected?.Session?.Options ?? _draftOptions;
+        var basis = !_creatingTarget ? _selected?.Session?.Options ?? _draftOptions : _draftOptions;
         var source = SourceInput.SelectedItem as SourceChoice;
         return basis with
         {
@@ -165,14 +171,31 @@ public partial class MainWindow : Window
 
     private void ApplySelectedOptions()
     {
-        if (_settingOptions || _selected?.Session is not { } session || session.State is SessionState.Stopped or SessionState.Error) return;
-        _engine.UpdateOptions(session.Id, ReadOptions());
-        _diskPoints = null; _lastHistoryQuery = null;
+        if (_settingOptions || _engine is null) return;
+        var options = ReadOptions();
+        if (_creatingTarget || _selected is null) _newTargetOverride = true;
+        RememberProbeOptions(options);
+        if (!_creatingTarget && _selected?.Session is { } session)
+        {
+            _engine.UpdateOptions(session.Id, options);
+            RememberTargetPort(_selected, options);
+            _diskPoints = null; _lastHistoryQuery = null;
+            StatusText.Text = $"Settings updated for {session.Target}; changes apply to the next measurement round.";
+        }
         ScheduleWorkspaceSave();
-        StatusText.Text = $"Settings updated for {session.Target}; changes apply to the next measurement round.";
     }
 
-    private async void StartTrace(object? sender, RoutedEventArgs e) => await AddTarget(TargetInput.Text ?? "");
+    private async void StartTrace(object? sender, RoutedEventArgs e)
+    {
+        if (_addingTarget || _closing) return;
+        if (!string.IsNullOrWhiteSpace(TargetInput.Text) || _creatingTarget || _selected is null)
+            await AddTarget(TargetInput.Text ?? "");
+        else if (_selected.Session?.State is SessionState.Running or SessionState.Paused)
+            PauseTrace(sender, e);
+        else if (_selected.Session is not null)
+            await RestartTargetAsync(_selected);
+    }
+
     private async void TargetKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter) { e.Handled = true; await AddTarget(TargetInput.Text ?? ""); }
@@ -180,10 +203,14 @@ public partial class MainWindow : Window
 
     private async Task AddTarget(string text, ProbeOptions? options = null, string? group = null, bool paused = false)
     {
-        if (_closing) return;
+        if (_closing || _addingTarget) return;
         if (string.IsNullOrWhiteSpace(text)) { StatusText.Text = "Enter a hostname or IP address."; return; }
         var returnToAllTargets = _allTargetsVisible;
-        StartButton.IsEnabled = false;
+        var newOptions = options ?? (_configuration.UseDefaultProbeOptionsForNewTargets && !_newTargetOverride
+            ? _configuration.DefaultProbeOptions : ReadOptions());
+        var profileName = options is null ? ProfileInput.SelectedItem as string : null;
+        _addingTarget = true;
+        UpdateButtons();
         try
         {
             foreach (var target in text.Split([',', ';', ' ', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
@@ -191,9 +218,10 @@ public partial class MainWindow : Window
                 var existing = _targets.FirstOrDefault(x => x.Target.Equals(target, StringComparison.OrdinalIgnoreCase) && x.Session?.State is SessionState.Running or SessionState.Paused);
                 if (existing is not null) { TargetList.SelectedItem = existing; continue; }
                 StatusText.Text = $"Resolving {target}…";
-                var session = await _engine.StartTargetAsync(target, options ?? (_configuration.UseDefaultProbeOptionsForNewTargets ? _configuration.DefaultProbeOptions : ReadOptions()), _applicationCancellation.Token);
+                var session = await _engine.StartTargetAsync(target, newOptions, _applicationCancellation.Token);
                 if (_closing) { await _engine.StopAsync(session.Id); return; }
-                var item = new TargetItem(session) { Group = group ?? (string.IsNullOrWhiteSpace(GroupInput.Text) ? "Default" : GroupInput.Text.Trim()) };
+                var item = new TargetItem(session) { TcpPort = _configuration.LastTcpPort, UdpPort = _configuration.LastUdpPort, ProfileName = profileName, Group = group ?? (string.IsNullOrWhiteSpace(GroupInput.Text) ? "Default" : GroupInput.Text.Trim()) };
+                RememberTargetPort(item, session.Options);
                 session.Group = item.Group;
                 AssignAlerts(item);
                 if (paused) _engine.Pause(session.Id);
@@ -202,13 +230,21 @@ public partial class MainWindow : Window
                 if (session.LatestSnapshot is { } snapshot) ReceiveSnapshot(snapshot);
                 StatusText.Text = $"Tracing {target} · {session.Options.Protocol} · interval {session.Options.Interval.TotalSeconds:g} s";
             }
+            if (!_restoringWorkspace)
+            {
+                RememberProbeOptions(newOptions, profileName);
+                TargetInput.Text = "";
+                TargetInput.Focus();
+            }
+            _creatingTarget = false;
+            _newTargetOverride = false;
             TargetCount.Text = _targets.Count.ToString(CultureInfo.InvariantCulture);
             ScheduleWorkspaceSave();
         }
         catch (Exception ex) { StatusText.Text = $"Could not start trace: {ex.Message}"; }
         finally
         {
-            StartButton.IsEnabled = true; UpdateButtons();
+            _addingTarget = false; UpdateButtons();
             if (returnToAllTargets) OpenAllTargets(null, new RoutedEventArgs());
         }
     }
@@ -227,7 +263,7 @@ public partial class MainWindow : Window
         if (_clearingOverviewTab) return;
         if (!_previewingOverviewTarget) SetAllTargetsVisible(false);
         _selected = TargetList.SelectedItem as TargetItem;
-        if (_selected is not null) TargetInput.Text = _selected.Target;
+        _creatingTarget = false;
         _selectedHop = null;
         _heldEnd = null;
         _settingFocus = true;
@@ -245,7 +281,7 @@ public partial class MainWindow : Window
             finally { _settingOptions = false; }
         }
         UpdateProfessionalSelection();
-        if (_selected is null) SynchronizeProbeControls(_configuration.DefaultProbeOptions);
+        if (_selected is null) SynchronizeProbeControls(NewTargetOptions());
         HistorySlider.Value = 100;
         Timeline.SelectedTime = null;
         RefreshSelected();
@@ -271,6 +307,7 @@ public partial class MainWindow : Window
             FocusRange.Text = "Focus: Auto";
             HistoryPosition.Text = "LIVE";
             LatencyValue.Text = LossValue.Text = JitterValue.Text = MosValue.Text = ShortAverageValue.Text = LongAverageValue.Text = "—";
+            FooterCount.Text = FooterAverage.Text = FooterMinimum.Text = FooterCurrent.Text = "—";
             Timeline.Markers = [];
             LossValue.Foreground = Brush.Parse("#D5D8DE");
             UpdateButtons();
@@ -298,6 +335,10 @@ public partial class MainWindow : Window
         }
         finally { _refreshing = false; }
         var destination = _selected.Snapshot?.Destination;
+        FooterCount.Text = destination?.Sent.ToString(CultureInfo.InvariantCulture) ?? "—";
+        FooterAverage.Text = Number(destination?.AverageMs);
+        FooterMinimum.Text = Number(destination?.MinimumMs);
+        FooterCurrent.Text = Number(destination?.LastMs);
         LatencyValue.Text = Number(destination?.LastMs, " ms");
         LossValue.Text = destination is null ? "—" : $"{destination.LossPercent:0.#}%";
         LossValue.Foreground = destination?.LossPercent > 0 ? Brushes.IndianRed : Brush.Parse("#D5D8DE");
@@ -403,32 +444,56 @@ public partial class MainWindow : Window
 
     private void UpdateButtons()
     {
+        if (_engine is null) return;
         var state = _selected?.Session?.State;
-        PauseButton.IsEnabled = state is SessionState.Running or SessionState.Paused;
-        PauseButton.Content = state == SessionState.Paused ? "Resume" : "Pause";
-        StopButton.IsEnabled = state is SessionState.Running or SessionState.Paused;
+        var busy = _addingTarget || (_selected is not null && (_monitoringOperations.Contains(_selected.Id) || _closingTargets.Contains(_selected.Id)));
+        var adding = _creatingTarget || !string.IsNullOrWhiteSpace(TargetInput.Text) || _selected is null;
+        StartButton.IsEnabled = !busy && !_closing && (adding || _selected?.Session is not null);
+        StartButton.Content = busy ? "…" : !adding && state == SessionState.Running ? "Ⅱ" : "▶";
+        var label = busy ? "Updating monitoring…" : adding ? "Add new target" : state == SessionState.Running ? "Pause monitoring" : "Start monitoring";
+        ToolTip.SetTip(StartButton, label);
+        Avalonia.Automation.AutomationProperties.SetName(StartButton, label);
+        StopTraceAction.IsEnabled = !busy && state is SessionState.Running or SessionState.Paused;
+        RestartTraceAction.IsEnabled = !busy && _selected?.Session is not null;
+        ResetStatisticsAction.IsEnabled = !busy && _selected?.Session is not null;
+        CloseTargetAction.IsEnabled = !busy && _selected is not null;
+        NewTargetAction.IsEnabled = !_addingTarget && !_closing;
         ExportButton.IsEnabled = _selected?.Snapshot is not null;
     }
 
     private void PauseTrace(object? sender, RoutedEventArgs e)
     {
-        if (_selected?.Session is not { } session) return;
-        if (session.State == SessionState.Paused) _engine.Resume(session.Id); else _engine.Pause(session.Id);
+        if (_selected?.Session is not { } session || _monitoringOperations.Contains(session.Id)) return;
+        if (session.State == SessionState.Paused) _engine.Resume(session.Id);
+        else if (session.State == SessionState.Running) _engine.Pause(session.Id);
         _selected.Refresh(); UpdateButtons(); RefreshSelected(); ScheduleWorkspaceSave();
     }
 
     private async void StopTrace(object? sender, RoutedEventArgs e)
     {
-        if (_selected?.Session is not { } session) return;
-        try { await _engine.StopAsync(session.Id); _selected.Refresh(); RefreshSelected(); ScheduleWorkspaceSave(); }
+        var item = _selected;
+        if (item?.Session is null || !_monitoringOperations.Add(item.Id)) return;
+        UpdateButtons();
+        try { await _engine.StopAsync(item.Id); item.Refresh(); ScheduleWorkspaceSave(); }
         catch (Exception ex) { StatusText.Text = ex.Message; }
+        finally { _monitoringOperations.Remove(item.Id); RefreshSelected(); }
+    }
+
+    private async void CloseSelectedTarget(object? sender, RoutedEventArgs e)
+    {
+        if (_selected is { } item) await CloseTargetAsync(item);
     }
 
     private async void CloseTarget(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        if (sender is not Button { DataContext: TargetItem item } button || !_closingTargets.Add(item.Id)) return;
-        button.IsEnabled = false;
+        if (sender is Button { DataContext: TargetItem item }) await CloseTargetAsync(item);
+    }
+
+    private async Task CloseTargetAsync(TargetItem item)
+    {
+        if (_monitoringOperations.Contains(item.Id) || !_closingTargets.Add(item.Id)) return;
+        UpdateButtons();
         try
         {
             if (item.Session is not null) { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
@@ -440,12 +505,11 @@ public partial class MainWindow : Window
                 ? (_targets.Count > 0 ? _targets[Math.Min(index, _targets.Count - 1)] : null)
                 : selected;
             TargetCount.Text = _targets.Count.ToString(CultureInfo.InvariantCulture);
-            if (_targets.Count == 0) TargetInput.Text = "";
             StatusText.Text = $"Closed {item.Target} · saved history is available in Open history";
             ScheduleWorkspaceSave();
         }
         catch (Exception ex) { StatusText.Text = $"Could not close {item.Target}: {ex.Message}"; }
-        finally { _closingTargets.Remove(item.Id); button.IsEnabled = true; }
+        finally { _closingTargets.Remove(item.Id); UpdateButtons(); }
     }
 
     private async void ExportCsv(object? sender, RoutedEventArgs e)
@@ -565,6 +629,9 @@ public sealed class TargetItem : INotifyPropertyChanged
     public string Address { get; }
     public TargetSession? Session { get; }
     public string Group { get; set; } = "Default";
+    public int TcpPort { get; set; } = 443;
+    public int UdpPort { get; set; } = 33434;
+    public string? ProfileName { get; set; }
     public bool IsHistorical => Session is null;
     public RoundSnapshot? Snapshot { get; set; }
     public string StateLabel => IsHistorical ? "Saved session" : Session!.State.ToString();

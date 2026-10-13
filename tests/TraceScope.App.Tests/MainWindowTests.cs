@@ -51,8 +51,8 @@ public sealed class MainWindowTests
         Assert.Empty(Control<DataGrid>(window, "HopTable").ItemsSource!.Cast<HopItem>());
         Assert.Empty(Control<LatencyTimeline>(window, "Timeline").Samples);
         Assert.Empty(Control<HopLatencyPlot>(window, "RoutePlot").Rows);
-        Assert.False(Control<Button>(window, "PauseButton").IsEnabled);
-        Assert.False(Control<Button>(window, "StopButton").IsEnabled);
+        Assert.True(Control<Button>(window, "StartButton").IsEnabled);
+        Assert.False(Control<MenuItem>(window, "StopTraceAction").IsEnabled);
         Assert.False(Control<Button>(window, "ExportButton").IsEnabled);
         var saved = await fixture.Engine.Storage.LoadSessionsAsync();
         Assert.Equal(2, saved.Count);
@@ -110,12 +110,12 @@ public sealed class MainWindowTests
         await fixture.Start("127.0.0.1");
         var session = Assert.Single(fixture.Engine.Sessions);
         await Until(() => session.LatestSnapshot!.Round >= 2);
-        var pause = Control<Button>(fixture.Window, "PauseButton");
-        var stop = Control<Button>(fixture.Window, "StopButton");
+        var pause = Control<Button>(fixture.Window, "StartButton");
+        var stop = Control<MenuItem>(fixture.Window, "StopTraceAction");
 
         Click(pause);
         Assert.Equal(SessionState.Paused, session.State);
-        Assert.Equal("Resume", pause.Content);
+        Assert.Equal("▶", pause.Content);
         // Allow an already-started round to finish before checking that collection is suspended.
         await Task.Delay(180);
         var pausedRound = session.LatestSnapshot!.Round;
@@ -124,11 +124,12 @@ public sealed class MainWindowTests
 
         Click(pause);
         Assert.Equal(SessionState.Running, session.State);
-        Assert.Equal("Pause", pause.Content);
+        Assert.Equal("Ⅱ", pause.Content);
         await Until(() => session.LatestSnapshot!.Round > pausedRound);
         Click(stop);
-        await Until(() => session.State == SessionState.Stopped && !stop.IsEnabled);
-        Assert.False(pause.IsEnabled);
+        await Until(() => session.State == SessionState.Stopped && !stop.IsEnabled && pause.IsEnabled);
+        Assert.True(pause.IsEnabled);
+        Assert.Equal("▶", pause.Content);
         Assert.NotEmpty(Control<LatencyTimeline>(fixture.Window, "Timeline").Samples);
         var finalRound = session.LatestSnapshot!.Round;
         await Task.Delay(180);
@@ -148,16 +149,16 @@ public sealed class MainWindowTests
         var timeline = Control<LatencyTimeline>(fixture.Window, "Timeline");
         Assert.All(timeline.Samples, sample => Assert.Equal(22d, sample.Latency));
 
-        Click(Control<Button>(fixture.Window, "PauseButton"));
+        Click(Control<Button>(fixture.Window, "StartButton"));
         Assert.Equal(SessionState.Paused, items[1].Session!.State);
         Assert.Equal(SessionState.Running, items[0].Session!.State);
         list.SelectedItem = items[0];
         Assert.Equal("127.0.0.1", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
-        Assert.Equal("Pause", Control<Button>(fixture.Window, "PauseButton").Content);
+        Assert.Equal("Ⅱ", Control<Button>(fixture.Window, "StartButton").Content);
         Assert.All(timeline.Samples, sample => Assert.Equal(12d, sample.Latency));
         list.SelectedItem = items[1];
         Assert.Equal("127.0.0.2", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
-        Assert.Equal("Resume", Control<Button>(fixture.Window, "PauseButton").Content);
+        Assert.Equal("▶", Control<Button>(fixture.Window, "StartButton").Content);
         Assert.All(timeline.Samples, sample => Assert.Equal(22d, sample.Latency));
     }
 
@@ -205,7 +206,7 @@ public sealed class MainWindowTests
     {
         await using var fixture = new WindowFixture();
         await fixture.Start("127.0.0.1");
-        Click(Control<Button>(fixture.Window, "PauseButton"));
+        Click(Control<Button>(fixture.Window, "StartButton"));
         var table = Control<DataGrid>(fixture.Window, "HopTable");
         var original = table.ItemsSource!.Cast<HopItem>().First();
         var named = new HopItem(original.Hop with { Hostname = "test.router.example" });
@@ -270,7 +271,7 @@ public sealed class MainWindowTests
         Assert.Empty(fixture.Engine.Sessions);
         Assert.Contains("Enter a hostname", Control<TextBlock>(fixture.Window, "StatusText").Text);
         Assert.Empty(Control<LatencyTimeline>(fixture.Window, "Timeline").Samples);
-        Assert.False(Control<Button>(fixture.Window, "PauseButton").IsEnabled);
+        Assert.True(Control<Button>(fixture.Window, "StartButton").IsEnabled);
     }
 
     [AvaloniaFact]
@@ -316,7 +317,7 @@ public sealed class MainWindowTests
         await fixture.Start("127.0.0.1");
         var session = Assert.Single(fixture.Engine.Sessions);
         await Until(() => session.LatestSnapshot!.Round >= 3);
-        Click(Control<Button>(fixture.Window, "StopButton"));
+        Click(Control<MenuItem>(fixture.Window, "StopTraceAction"));
         await Until(() => session.State == SessionState.Stopped);
         var saved = Assert.Single(await fixture.Engine.Storage.LoadSessionsAsync());
         Assert.NotNull(saved.StoppedAt);
@@ -339,8 +340,8 @@ public sealed class MainWindowTests
         Assert.Null(item.Session);
         Assert.Equal(saved.Id, item.Id);
         Assert.Equal("127.0.0.1", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
-        Assert.False(Control<Button>(fixture.Window, "PauseButton").IsEnabled);
-        Assert.False(Control<Button>(fixture.Window, "StopButton").IsEnabled);
+        Assert.False(Control<Button>(fixture.Window, "StartButton").IsEnabled);
+        Assert.False(Control<MenuItem>(fixture.Window, "StopTraceAction").IsEnabled);
         Assert.True(Control<Button>(fixture.Window, "ExportButton").IsEnabled);
         Assert.Equal("SAVED", Control<TextBlock>(fixture.Window, "HistoryPosition").Text);
         var table = Control<DataGrid>(fixture.Window, "HopTable");
@@ -377,6 +378,12 @@ public sealed class MainWindowTests
     {
         Assert.True(button.IsEnabled);
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    }
+
+    private static void Click(MenuItem item)
+    {
+        Assert.True(item.IsEnabled);
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }
 
     private static async Task Until(Func<bool> condition)

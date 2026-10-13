@@ -321,6 +321,37 @@ public sealed class SettingsWindowTests
         finally { occupied.Stop(); }
     }
 
+    [AvaloniaFact]
+    public async Task SettingsProtocolSwitchingPreservesSeparatePortsAndPersistsSelectedMetadata()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var dialog = fixture.OpenSettings();
+        dialog.SelectPage("Monitoring");
+        Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
+        var protocol = Find<ComboBox>(dialog, "SettingsProtocol");
+        var port = Find<NumericUpDown>(dialog, "SettingsDestinationPort");
+        Assert.False(port.IsEnabled);
+        protocol.SelectedItem = ProbeProtocol.Udp;
+        port.Value = 33625;
+        protocol.SelectedItem = ProbeProtocol.Tcp;
+        port.Value = 8443;
+        protocol.SelectedItem = ProbeProtocol.Icmp;
+        Assert.False(port.IsEnabled);
+        protocol.SelectedItem = ProbeProtocol.Udp;
+        Assert.Equal(33625m, port.Value);
+        protocol.SelectedItem = ProbeProtocol.Tcp;
+        Assert.Equal(8443m, port.Value);
+        await Apply(dialog);
+        var selected = Assert.IsType<TargetItem>(fixture.Window.FindControl<ListBox>("TargetList")!.SelectedItem);
+        Assert.Equal(33625, selected.UdpPort);
+        Assert.Equal(8443, selected.TcpPort);
+        Assert.Equal(8443, selected.Session!.Options.DestinationPort);
+        var saved = await fixture.LoadWorkspace();
+        Assert.Equal(33625, saved.Targets.Single().UdpPort);
+        Assert.Equal(8443, saved.Targets.Single().TcpPort);
+    }
+
     private static async Task Apply(SettingsWindow dialog, bool expectSuccess = true)
     {
         var status = Find<TextBlock>(dialog, "SettingsStatus");

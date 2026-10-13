@@ -31,7 +31,7 @@ public partial class MainWindow
                     case "actions": OpenAlertActions(null, e); break;
                     case "web": OpenWeb(null, e); break;
                 }
-            });
+            }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show(this);
     }
@@ -82,11 +82,12 @@ public partial class MainWindow
         var selectedOptions = selectedSessionId.HasValue && change.SelectedTargetOptions is { } options
             && _engine.Sessions.Any(s => s.Id == selectedSessionId && s.State is SessionState.Running or SessionState.Paused)
             && _engine.Sessions.First(s => s.Id == selectedSessionId).Options != options ? options : null;
-        await CommitSettingsAsync(configuration, selectedSessionId, selectedOptions);
+        await CommitSettingsAsync(configuration, selectedSessionId, selectedOptions, change.SelectedTcpPort, change.SelectedUdpPort);
         StatusText.Text = "Settings saved · monitoring continues";
     }
 
-    private async Task CommitSettingsAsync(WorkspaceConfiguration configuration, Guid? sessionId = null, ProbeOptions? options = null)
+    private async Task CommitSettingsAsync(WorkspaceConfiguration configuration, Guid? sessionId = null, ProbeOptions? options = null,
+        int? tcpPort = null, int? udpPort = null)
     {
         configuration.Validate();
         await _webLifecycle.WaitAsync(_applicationCancellation.Token);
@@ -102,14 +103,30 @@ public partial class MainWindow
             }
             var saved = configuration with
             {
+                LastUsedProbeOptions = options ?? configuration.LastUsedProbeOptions,
+                LastTcpPort = options?.Protocol == ProbeProtocol.Tcp ? options.DestinationPort : configuration.LastTcpPort,
+                LastUdpPort = options?.Protocol == ProbeProtocol.Udp ? options.DestinationPort : configuration.LastUdpPort,
                 Targets = CaptureWorkspace().Targets.Select(t => t with
                 {
-                    Options = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target) ? options : t.Options
+                    Options = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target) ? options : t.Options,
+                    TcpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target)
+                        ? tcpPort ?? (options.Protocol == ProbeProtocol.Tcp ? options.DestinationPort : t.TcpPort) : t.TcpPort,
+                    UdpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target)
+                        ? udpPort ?? (options.Protocol == ProbeProtocol.Udp ? options.DestinationPort : t.UdpPort) : t.UdpPort
                 }).ToArray()
             };
             // Failure to bind or save leaves the previous settings/listener intact.
             await _workspaceStore.SaveAsync(saved, _applicationCancellation.Token);
-            if (options is not null && sessionId.HasValue) _engine.UpdateOptions(sessionId.Value, options);
+            if (options is not null && sessionId.HasValue)
+            {
+                _engine.UpdateOptions(sessionId.Value, options);
+                if (_targets.FirstOrDefault(t => t.Id == sessionId) is { } item)
+                {
+                    if (tcpPort is { } tcp) item.TcpPort = tcp;
+                    if (udpPort is { } udp) item.UdpPort = udp;
+                    RememberTargetPort(item, options);
+                }
+            }
             var resetTimeRange = _configuration.Display.DefaultTimeRangeMinutes != saved.Display.DefaultTimeRangeMinutes;
             _configuration = saved;
             var previous = _webServer;
@@ -134,11 +151,13 @@ public partial class MainWindow
 
     private void ApplyPreferenceControls(bool resetTimeRange = true)
     {
-        _draftOptions = _configuration.DefaultProbeOptions;
+        _draftOptions = NewTargetOptions();
         var display = _configuration.Display;
         RoutePlot.WarningLatencyMs = Timeline.WarningLatencyMs = display.WarningLatencyMs;
         RoutePlot.CriticalLatencyMs = Timeline.CriticalLatencyMs = display.CriticalLatencyMs;
         RoutePlot.FixedMaximumMs = Timeline.FixedMaximumMs = display.FixedMaximumMs;
+        RoutePlot.ShowPacketLoss = display.ShowPacketLoss;
+        LossStripLegend.IsVisible = display.ShowPacketLoss;
         Timeline.ShowJitter = display.ShowJitter; Timeline.ShowPacketLoss = display.ShowPacketLoss; Timeline.ShowEventMarkers = display.ShowEventMarkers;
         LatencyLegend.Text = $"{display.WarningLatencyMs:0.#} ms   {display.CriticalLatencyMs:0.#} ms";
         if (resetTimeRange) HorizonInput.SelectedIndex = Array.IndexOf(SettingsWindow.TimeRanges, display.DefaultTimeRangeMinutes);
@@ -151,9 +170,17 @@ public partial class MainWindow
         try
         {
             ProtocolInput.SelectedItem = options.Protocol; PortInput.Value = options.DestinationPort;
+            UpdateProtocolControls();
             IntervalInput.SelectedIndex = Array.IndexOf(new[] { 1d, 2.5, 5, 10 }, options.Interval.TotalSeconds);
             TimeoutInput.SelectedIndex = Array.IndexOf(new[] { 500d, 1000, 2000 }, options.Timeout.TotalMilliseconds);
             MaxHopsInput.Value = options.MaxHops;
+            var choices = SourceInput.ItemsSource!.Cast<SourceChoice>().ToList();
+            if ((options.SourceAddress is not null || options.InterfaceId is not null)
+                && !choices.Any(s => s.Source == options.SourceAddress && s.Interface == options.InterfaceId))
+            {
+                choices.Add(new SourceChoice($"{options.InterfaceId ?? "Source"} · {options.SourceAddress ?? "unavailable"}", options.InterfaceId, options.SourceAddress));
+                SourceInput.ItemsSource = choices;
+            }
             SourceInput.SelectedItem = SourceInput.ItemsSource!.Cast<SourceChoice>()
                 .FirstOrDefault(s => s.Source == options.SourceAddress && s.Interface == options.InterfaceId)
                 ?? SourceInput.ItemsSource!.Cast<SourceChoice>().First();

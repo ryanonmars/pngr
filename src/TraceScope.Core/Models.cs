@@ -65,6 +65,8 @@ public sealed class TargetSession
     public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
     internal CancellationTokenSource Cancellation { get; } = new();
     internal Task? Worker { get; set; }
+    internal object StatisticsGate { get; } = new();
+    internal long StatisticsGeneration { get; set; }
 }
 
 public sealed record StoredSession(Guid Id, string Target, string DestinationAddress,

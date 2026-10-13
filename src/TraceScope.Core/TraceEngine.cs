@@ -87,6 +87,28 @@ public sealed class TraceEngine : IAsyncDisposable
         if (_sessions.TryGetValue(sessionId, out var session)) session.Options = options;
     }
 
+    /// <summary>Reset current measurement counters without interrupting probes or changing saved history.</summary>
+    public void ResetStatistics(Guid sessionId)
+    {
+        if (!_sessions.TryGetValue(sessionId, out var session)) return;
+        lock (session.StatisticsGate)
+        {
+            session.StatisticsGeneration++;
+            if (session.LatestSnapshot is not { } snapshot) return;
+            static HopSnapshot Clear(HopSnapshot hop) => hop with
+            {
+                Sent = 0, Received = 0, LossPercent = 0, LastMs = null,
+                AverageMs = null, MinimumMs = null, MaximumMs = null, JitterMs = null
+            };
+            session.LatestSnapshot = snapshot with
+            {
+                Hops = snapshot.Hops.Select(Clear).ToArray(), Destination = Clear(snapshot.Destination),
+                RouteChanged = false, RouteDescription = null
+            };
+            SnapshotUpdated?.Invoke(this, session.LatestSnapshot);
+        }
+    }
+
     public async Task StopAsync(Guid sessionId)
     {
         if (!_sessions.TryGetValue(sessionId, out var session)) return;
@@ -101,6 +123,7 @@ public sealed class TraceEngine : IAsyncDisposable
         var lastAddresses = new Dictionary<int, string>();
         var destinationStatistics = new HopStatistics();
         var round = 0L;
+        var statisticsGeneration = 0L;
         int? destinationHop = null;
         var route = new RouteTracker();
         var probeIdentity = (session.Options.Protocol, session.Options.DestinationPort, session.Options.SourceAddress, session.Options.InterfaceId);
@@ -130,6 +153,17 @@ public sealed class TraceEngine : IAsyncDisposable
                 var destinationTask = ProbeAsync(destination, 255, options, token);
                 var results = await Task.WhenAll(hopTasks);
                 var endpoint = await destinationTask;
+                // Reset only measurement counters: route identity, round IDs and graph history survive.
+                // An in-flight round becomes the first sample after a requested reset.
+                lock (session.StatisticsGate)
+                {
+                    if (statisticsGeneration != session.StatisticsGeneration)
+                    {
+                        foreach (var stats in statistics.Values) stats.ResetCounters();
+                        destinationStatistics.ResetCounters();
+                        statisticsGeneration = session.StatisticsGeneration;
+                    }
+                }
                 var timestamp = DateTimeOffset.UtcNow;
                 round++;
                 var reached = results.Where(r => r.Result.Status == ProbeStatus.Success
@@ -162,7 +196,6 @@ public sealed class TraceEngine : IAsyncDisposable
                     timestamp, round, reached.HasValue, hops, endpointSnapshot, stopwatch.Elapsed, warning);
                 var routeChange = route.Observe(hops);
                 snapshot = snapshot with { RouteChanged = routeChange is not null, RouteDescription = routeChange };
-                session.LatestSnapshot = snapshot;
                 try { await Storage.AppendAsync(snapshot, token); }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 { snapshot = snapshot with { Warning = "History could not be saved: " + ex.Message }; }
@@ -170,8 +203,15 @@ public sealed class TraceEngine : IAsyncDisposable
                     await RecordEventAsync(new MonitoringEvent(Guid.NewGuid(), session.Id, timestamp, "RouteChange", routeChange, null), token);
                 foreach (var alert in _alerts.Evaluate(snapshot, _alertRules.GetValueOrDefault(session.Id) ?? []))
                     await RecordEventAsync(alert, token);
-                session.LatestSnapshot = snapshot;
-                SnapshotUpdated?.Invoke(this, snapshot);
+                lock (session.StatisticsGate)
+                {
+                    // Do not overwrite a reset with a snapshot assembled before the reset request.
+                    if (statisticsGeneration == session.StatisticsGeneration)
+                    {
+                        session.LatestSnapshot = snapshot;
+                        SnapshotUpdated?.Invoke(this, snapshot);
+                    }
+                }
                 var delay = options.Interval - stopwatch.Elapsed;
                 if (delay > TimeSpan.Zero) await Task.Delay(delay, token);
             }

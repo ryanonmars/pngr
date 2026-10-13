@@ -48,13 +48,13 @@ public sealed class AllTargetsTests
             Assert.Equal(heldTime, window.FindControl<LatencyTimeline>("Timeline")!.EndTime);
             Assert.Equal("127.0.0.1", window.FindControl<TextBlock>("TargetTitle")!.Text);
             Assert.All(window.FindControl<LatencyTimeline>("Timeline")!.Samples, p => Assert.Equal(12, p.Latency));
-            Click(window.FindControl<Button>("PauseButton")!);
+            Click(window.FindControl<Button>("StartButton")!);
             Assert.Equal(SessionState.Paused, first.Item.Session!.State);
             Assert.Equal(SessionState.Running, second.Item.Session!.State);
             var round = second.Item.Snapshot!.Round;
             await Until(() => second.Item.Snapshot!.Round > round);
             Assert.True(pane.IsVisible);
-            Click(window.FindControl<Button>("PauseButton")!);
+            Click(window.FindControl<Button>("StartButton")!);
             Assert.Equal(SessionState.Running, first.Item.Session.State);
             window.FindControl<ListBox>("TargetList")!.SelectedItem = second.Item;
             Assert.False(pane.IsVisible);

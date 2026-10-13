@@ -4,7 +4,8 @@ using System.Collections.Concurrent;
 
 namespace TraceScope.Core;
 
-public sealed record WorkspaceTarget(string Target, ProbeOptions Options, string Group = "Default", bool Paused = false);
+public sealed record WorkspaceTarget(string Target, ProbeOptions Options, string Group = "Default", bool Paused = false,
+    int TcpPort = 443, int UdpPort = 33434, string? ProfileName = null);
 public sealed record MonitoringProfile(string Name, ProbeOptions Options);
 public sealed record WorkspaceConfiguration
 {
@@ -18,6 +19,10 @@ public sealed record WorkspaceConfiguration
     public bool DesktopNotifications { get; init; }
     public ProbeOptions DefaultProbeOptions { get; init; } = new();
     public bool UseDefaultProbeOptionsForNewTargets { get; init; }
+    public ProbeOptions? LastUsedProbeOptions { get; init; }
+    public int LastTcpPort { get; init; } = 443;
+    public int LastUdpPort { get; init; } = 33434;
+    public string? LastUsedProfile { get; init; }
     public DisplayConfiguration Display { get; init; } = new();
     public IReadOnlyList<WorkspaceTarget> Targets { get; init; } = [];
     public IReadOnlyList<MonitoringProfile> Profiles { get; init; } = [];
@@ -33,6 +38,9 @@ public sealed record WorkspaceConfiguration
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");
         if (DefaultProbeOptions is null || Display is null) throw new InvalidDataException("Monitoring and display settings are required.");
         DefaultProbeOptions.Validate();
+        LastUsedProbeOptions?.Validate();
+        if (LastTcpPort is < 1 or > 65535 || LastUdpPort is < 1 or > 65535)
+            throw new InvalidDataException("Invalid remembered destination port.");
         Display.Validate();
         if (Targets is null || Profiles is null || Alerts is null || SummaryViews is null || Actions is null)
             throw new InvalidDataException("Targets, profiles and alerts must be lists.");
@@ -43,6 +51,8 @@ public sealed record WorkspaceConfiguration
             if (target is null || target.Options is null || target.Group is null || string.IsNullOrWhiteSpace(target.Target) || target.Target.Length > 253 || target.Group.Length > 80)
                 throw new InvalidDataException("Invalid target or group.");
             target.Options.Validate();
+            if (target.TcpPort is < 1 or > 65535 || target.UdpPort is < 1 or > 65535)
+                throw new InvalidDataException("Invalid target destination port.");
         }
         foreach (var profile in Profiles)
         {

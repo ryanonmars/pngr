@@ -73,9 +73,9 @@ public sealed class AllTargetsView : UserControl
         Grid.SetColumn(_maximum, 2); axis.Children.Add(_maximum);
         _table.Columns.Add(new DataGridTemplateColumn { Header = axis, CanUserSort = false, Width = new DataGridLength(220),
             CellTemplate = new FuncDataTemplate<AllTargetRow>((row, _) => new TargetLatencyRange { DataContext = row }) });
-        _count = new TextBlock { Text = "0 targets", FontWeight = FontWeight.SemiBold, Foreground = Brush.Parse("#A4A9B3") };
+        _count = new TextBlock { Name = "AllTargetsFooterCount", Text = "0 targets", FontWeight = FontWeight.SemiBold, Foreground = Brush.Parse("#A4A9B3") };
         _focus = new TextBlock { Foreground = Brush.Parse("#A4A9B3"), HorizontalAlignment = HorizontalAlignment.Right };
-        var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(112, 2, 7, 2) };
+        var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(64, 2, 7, 2) };
         footer.Children.Add(_count); Grid.SetColumn(_focus, 1); footer.Children.Add(_focus);
         _empty = new TextBlock { Text = "Enter a hostname or IP address above to start monitoring targets.",
             Foreground = Brush.Parse("#969CA8"), Margin = new Thickness(15, 45, 15, 0), HorizontalAlignment = HorizontalAlignment.Center };
@@ -124,7 +124,7 @@ public sealed class AllTargetsView : UserControl
             }
             var high = _rows.Select(r => r.Maximum ?? 0).DefaultIfEmpty(0).Max();
             var ceiling = display.FixedMaximumMs > 0 ? display.FixedMaximumMs : Math.Max(1, Math.Ceiling(high * 1.08));
-            foreach (var row in _rows) row.SetScale(ceiling, display.WarningLatencyMs, display.CriticalLatencyMs);
+            foreach (var row in _rows) row.SetScale(ceiling, display.WarningLatencyMs, display.CriticalLatencyMs, display.ShowPacketLoss);
             _maximum.Text = $"{ceiling:0.#} ms";
             _table.SelectedItem = _rows.FirstOrDefault(r => r.Item.Id == selected);
             _count.Text = $"{_rows.Count} {(_rows.Count == 1 ? "target" : "targets")}";
@@ -153,6 +153,7 @@ public sealed class AllTargetRow(TargetItem item) : INotifyPropertyChanged
     public double Ceiling { get; private set; }
     public double Warning { get; private set; }
     public double Critical { get; private set; }
+    public bool ShowPacketLoss { get; private set; } = true;
     public string AverageLabel => MainWindow.Number(Average);
     public string MinimumLabel => MainWindow.Number(Minimum);
     public string CurrentLabel => MainWindow.Number(Current);
@@ -176,9 +177,9 @@ public sealed class AllTargetRow(TargetItem item) : INotifyPropertyChanged
         Setting = Item.IsHistorical ? "Saved session" : profiles.FirstOrDefault(p => p.Options == options)?.Name ?? "Default Settings";
     }
 
-    public void SetScale(double ceiling, double warning, double critical)
+    public void SetScale(double ceiling, double warning, double critical, bool showPacketLoss = true)
     {
-        Ceiling = ceiling; Warning = warning; Critical = critical;
+        Ceiling = ceiling; Warning = warning; Critical = critical; ShowPacketLoss = showPacketLoss;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
     }
 }
@@ -230,6 +231,11 @@ internal sealed class TargetLatencyRange : Control
             var x = X(current);
             context.DrawLine(cyan, new Point(x - 3, y - 3), new Point(x + 3, y + 3));
             context.DrawLine(cyan, new Point(x - 3, y + 3), new Point(x + 3, y - 3));
+        }
+        if (row.ShowPacketLoss && row.Loss is { } loss && double.IsFinite(loss) && loss > 0)
+        {
+            var width = (Bounds.Width - 12) * Math.Clamp(loss / 100, 0, 1);
+            context.DrawRectangle(Brush.Parse("#F57161"), null, new Rect(Bounds.Width - 6 - width, Bounds.Height - 4, width, 3));
         }
     }
 }

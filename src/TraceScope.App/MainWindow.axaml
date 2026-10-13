@@ -14,7 +14,6 @@
           <Button x:Name="WebButton" Content="Web" Click="OpenWeb"/>
           <Button x:Name="HistoryButton" Content="Open history" Click="OpenHistory"/>
           <Button x:Name="ExportButton" Content="Export CSV" Click="ExportCsv"/>
-          <Button x:Name="StopButton" Content="Stop" IsEnabled="False" Click="StopTrace"/>
         </StackPanel>
       </Grid>
     </Border>
@@ -31,9 +30,18 @@
     </Border>
     <Border Grid.Row="2" Background="#26282D" BorderBrush="#41444A" BorderThickness="0,0,0,1" Padding="6,5">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
-        <TextBox x:Name="TargetInput" Watermark="Hostname or IP address" Text="1.1.1.1" KeyDown="TargetKeyDown"/>
-        <Button Grid.Column="1" Classes="primary" x:Name="StartButton" Content="▶ Trace" Click="StartTrace"/>
-        <Button Grid.Column="2" x:Name="PauseButton" Content="Pause" IsEnabled="False" Click="PauseTrace"/>
+        <TextBox x:Name="TargetInput" Watermark="Hostname or IP address" KeyDown="TargetKeyDown" TextChanged="NewTargetTextChanged"/>
+        <Button Grid.Column="1" Classes="primary" x:Name="StartButton" Content="▶" Width="42" Click="StartTrace" AutomationProperties.Name="Start monitoring"/>
+        <Button Grid.Column="2" x:Name="MonitoringMenuButton" Content="▾" Width="28" ToolTip.Tip="Monitoring actions">
+          <Button.Flyout><MenuFlyout>
+            <MenuItem x:Name="NewTargetAction" Header="New Target" Click="NewTargetFromOverview"/>
+            <MenuItem x:Name="StopTraceAction" Header="Stop Trace" Click="StopTrace"/>
+            <MenuItem x:Name="RestartTraceAction" Header="Restart Trace" Click="RestartTrace"/>
+            <MenuItem x:Name="ResetStatisticsAction" Header="Reset Statistics" Click="ResetStatistics"/>
+            <Separator/>
+            <MenuItem x:Name="CloseTargetAction" Header="Close Target" Click="CloseSelectedTarget"/>
+          </MenuFlyout></Button.Flyout>
+        </Button>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4"><TextBlock Text="Interval" VerticalAlignment="Center"/><ComboBox x:Name="IntervalInput" Width="112" SelectedIndex="1"><ComboBoxItem Content="1 second"/><ComboBoxItem Content="2.5 seconds"/><ComboBoxItem Content="5 seconds"/><ComboBoxItem Content="10 seconds"/></ComboBox></StackPanel>
         <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4"><TextBlock Text="Focus" VerticalAlignment="Center"/><ComboBox x:Name="FocusInput" Width="104" SelectedIndex="0" SelectionChanged="FocusChanged"><ComboBoxItem Content="Auto"/><ComboBoxItem Content="Latest sample"/><ComboBoxItem Content="Held"/></ComboBox></StackPanel>
         <ComboBox Grid.Column="5" x:Name="TimeoutInput" Width="108" SelectedIndex="1" ToolTip.Tip="Probe timeout"><ComboBoxItem Content="500 ms"/><ComboBoxItem Content="1 s timeout"/><ComboBoxItem Content="2 s timeout"/></ComboBox>
@@ -45,7 +53,7 @@
       <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="6">
         <TextBlock Text="Probe" VerticalAlignment="Center" Foreground="#999FA9"/>
         <ComboBox Grid.Column="1" x:Name="ProtocolInput" Width="78"/>
-        <NumericUpDown Grid.Column="2" x:Name="PortInput" Minimum="1" Maximum="65535" Value="443" Width="108" FormatString="0" ToolTip.Tip="TCP or UDP destination port"/>
+        <NumericUpDown Grid.Column="2" x:Name="PortInput" Minimum="1" Maximum="65535" Value="443" Width="128" MinWidth="128" Padding="6,0" FormatString="0" ToolTip.Tip="TCP or UDP destination port"/>
         <ComboBox Grid.Column="3" x:Name="SourceInput" Width="210" ToolTip.Tip="Source interface / address"/>
         <TextBox Grid.Column="4" x:Name="GroupInput" Watermark="Target group" Text="Default" MaxLength="80" MinWidth="90"/>
         <ComboBox Grid.Column="5" x:Name="ProfileInput" Width="160" PlaceholderText="Probing profile" SelectionChanged="ApplyProfile"/>
@@ -53,7 +61,7 @@
       </Grid>
     </Border>
     <Grid Grid.Row="4" RowDefinitions="1*,5,28,1*,23">
-      <Grid Grid.Row="0" x:Name="SingleTargetPane" RowDefinitions="*,22">
+      <Grid Grid.Row="0" x:Name="SingleTargetPane" RowDefinitions="*,22,22">
         <Grid ColumnDefinitions="*,285" Background="#191A1D">
           <DataGrid x:Name="HopTable" ColumnHeaderHeight="24" RowHeight="22" FontSize="11" IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" SelectionMode="Single" SelectionChanged="HopChanged" GridLinesVisibility="None" Background="#191A1D">
             <DataGrid.Columns>
@@ -69,8 +77,20 @@
           </DataGrid>
           <controls:HopLatencyPlot Grid.Column="1" x:Name="RoutePlot" RowHeight="22" HeaderHeight="24"/>
         </Grid>
-        <Border Grid.Row="1" Background="#202227" BorderBrush="#35383E" BorderThickness="0,1,0,0" Padding="7,2">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="Round trip (ms)" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LatencyValue" Text="—" FontSize="11"/><TextBlock Text="Loss" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LossValue" Text="—" FontSize="11"/><TextBlock Text="Jitter" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="JitterValue" Text="—" FontSize="11"/><TextBlock Text="MOS est." FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="MosValue" Text="—" FontSize="11"/><TextBlock Text="Avg 30s / 5m" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="ShortAverageValue" Text="—" FontSize="11"/><TextBlock x:Name="LongAverageValue" Text="—" FontSize="11"/></StackPanel><TextBlock Grid.Column="1" x:Name="FocusRange" Text="Focus: Auto" FontSize="10" Foreground="#A5ABB6"/></Grid>
+        <Border Grid.Row="1" Background="#202227" BorderBrush="#35383E" BorderThickness="0,1,0,0">
+          <Grid ColumnDefinitions="*,285">
+            <Grid ColumnDefinitions="36,52,142,*,48,48,48,46" Margin="0,2">
+              <TextBlock Grid.Column="1" x:Name="FooterCount" Text="—" Margin="4,0" ToolTip.Tip="Destination sample count for this session"/>
+              <TextBlock Grid.Column="2" Grid.ColumnSpan="2" Text="Destination round trip (ms)" Margin="4,0" FontSize="10" Foreground="#979CA6"/>
+              <TextBlock Grid.Column="4" x:Name="FooterAverage" Text="—" Margin="4,0" ToolTip.Tip="Destination average latency"/>
+              <TextBlock Grid.Column="5" x:Name="FooterMinimum" Text="—" Margin="4,0" ToolTip.Tip="Destination minimum latency"/>
+              <TextBlock Grid.Column="6" x:Name="FooterCurrent" Text="—" Margin="4,0" ToolTip.Tip="Destination current latency"/>
+            </Grid>
+            <TextBlock Grid.Column="1" x:Name="LossStripLegend" Text="Red strip: packet loss · 0–100%" Margin="6,2" FontSize="10" Foreground="#D4867E"/>
+          </Grid>
+        </Border>
+        <Border Grid.Row="2" Background="#202227" BorderBrush="#35383E" BorderThickness="0,1,0,0" Padding="7,2">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock x:Name="LatencyValue" Text="—" IsVisible="False"/><TextBlock Text="Loss" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LossValue" Text="—" FontSize="11"/><TextBlock Text="Jitter" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="JitterValue" Text="—" FontSize="11"/><TextBlock Text="MOS est." FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="MosValue" Text="—" FontSize="11"/><TextBlock Text="Avg 30s / 5m" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="ShortAverageValue" Text="—" FontSize="11"/><TextBlock x:Name="LongAverageValue" Text="—" FontSize="11"/></StackPanel><TextBlock Grid.Column="1" x:Name="FocusRange" Text="Focus: Auto" FontSize="10" Foreground="#A5ABB6"/></Grid>
         </Border>
       </Grid>
       <views:AllTargetsView Grid.Row="0" x:Name="AllTargetsPane" IsVisible="False"/>
@@ -81,6 +101,6 @@
       <controls:LatencyTimeline Grid.Row="3" x:Name="Timeline"/>
       <Grid Grid.Row="4" Margin="8,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8"><TextBlock Text="History" Foreground="#8C929C" FontSize="10" VerticalAlignment="Center"/><Slider Grid.Column="1" x:Name="HistorySlider" Height="18" MinHeight="18" Minimum="0" Maximum="100" Value="100" ValueChanged="HistoryPositionChanged"/><TextBlock Grid.Column="2" x:Name="HistoryPosition" Text="LIVE" FontSize="9" Foreground="#91C898" VerticalAlignment="Center"/></Grid>
     </Grid>
-    <Border Grid.Row="5" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,1,0,0" Padding="7,2"><Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatusText" Text="Ready · ICMP · saved locally" Foreground="#8F95A0" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="TraceScope 0.4 · Professional experiment" FontSize="9" Foreground="#737A86"/></Grid></Border>
+    <Border Grid.Row="5" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,1,0,0" Padding="7,2"><Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatusText" Text="Ready · ICMP · saved locally" Foreground="#8F95A0" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="TraceScope 0.5" FontSize="9" Foreground="#737A86"/></Grid></Border>
   </Grid>
 </Window>
