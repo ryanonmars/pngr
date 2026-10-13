@@ -115,6 +115,7 @@ public partial class MainWindow
             if (saved is not null)
             {
                 _configuration = saved;
+                ApplyPreferenceControls();
                 ReloadProfiles();
                 if (saved.RestoreOnStartup && !_args.Contains("--target")) await ApplyWorkspaceAsync(saved);
             }
@@ -157,7 +158,7 @@ public partial class MainWindow
             foreach (var item in _targets.ToArray()) if (item.Session is not null)
             { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
             _targets.Clear(); TargetList.SelectedItem = null; TargetCount.Text = "0";
-            _configuration = workspace; ReloadProfiles();
+            _configuration = workspace; ApplyPreferenceControls(); ReloadProfiles();
             foreach (var target in workspace.Targets)
             {
                 try { await AddTarget(target.Target, target.Options, target.Group, target.Paused); }
@@ -436,22 +437,7 @@ public partial class MainWindow
 
     private async Task ConfigureWebAsync(bool enabled, int port)
     {
-        await _webLifecycle.WaitAsync(_applicationCancellation.Token);
-        try
-        {
-            _applicationCancellation.Token.ThrowIfCancellationRequested();
-            var configuration = _configuration with { WebPort = port, WebEnabled = enabled };
-            configuration.Validate();
-            if (_webServer is not null)
-            {
-                var server = _webServer; _webServer = null;
-                await server.DisposeAsync();
-            }
-            _configuration = configuration;
-            if (enabled) await StartWebServerAsync();
-            await SaveWorkspaceNowAsync();
-        }
-        finally { _webLifecycle.Release(); }
+        await CommitSettingsAsync(_configuration with { WebPort = port, WebEnabled = enabled });
     }
 
     private async void OpenWeb(object? sender, RoutedEventArgs e)

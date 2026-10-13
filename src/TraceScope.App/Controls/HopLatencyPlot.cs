@@ -24,6 +24,9 @@ public sealed class HopLatencyPlot : Control
     private double _rowHeight = 22;
     private double _headerHeight = 24;
     private double _verticalOffset;
+    private double _warningLatencyMs = 100;
+    private double _criticalLatencyMs = 200;
+    private double _fixedMaximumMs;
 
     public HopLatencyPlot() { ClipToBounds = true; MinWidth = 180; }
     public IReadOnlyList<HopPlotRow> Rows
@@ -34,6 +37,10 @@ public sealed class HopLatencyPlot : Control
     public int? SelectedHop { get => _selectedHop; set { _selectedHop = value; InvalidateVisual(); } }
     public double RowHeight { get => _rowHeight; set { _rowHeight = Math.Max(12, value); InvalidateMeasure(); InvalidateVisual(); } }
     public double HeaderHeight { get => _headerHeight; set { _headerHeight = Math.Max(0, value); InvalidateMeasure(); InvalidateVisual(); } }
+    public double WarningLatencyMs { get => _warningLatencyMs; set { _warningLatencyMs = Nonnegative(value, _warningLatencyMs); InvalidateVisual(); } }
+    public double CriticalLatencyMs { get => _criticalLatencyMs; set { _criticalLatencyMs = Nonnegative(value, _criticalLatencyMs); InvalidateVisual(); } }
+    /// <summary>Zero scales automatically to the measured latency range.</summary>
+    public double FixedMaximumMs { get => _fixedMaximumMs; set { _fixedMaximumMs = Nonnegative(value, _fixedMaximumMs); InvalidateVisual(); } }
     /// <summary>Table scroll offset; the axis remains fixed above the rows.</summary>
     public double VerticalOffset
     {
@@ -59,14 +66,15 @@ public sealed class HopLatencyPlot : Control
         const double left = 6;
         var right = Math.Max(left + 1, Bounds.Width - 8);
         var highest = Rows.SelectMany(r => new[] { r.Maximum, r.Average, r.Current }).Where(v => v is >= 0 && double.IsFinite(v.Value)).Select(v => v!.Value).DefaultIfEmpty(0).Max();
-        var ceiling = Math.Max(50, Math.Ceiling(highest * 1.08 / 10) * 10);
+        var ceiling = FixedMaximumMs > 0 ? FixedMaximumMs : Math.Max(50, Math.Ceiling(highest * 1.08 / 10) * 10);
+        var critical = Math.Max(WarningLatencyMs, CriticalLatencyMs);
         double X(double value) => left + Math.Clamp(value / ceiling, 0, 1) * (right - left);
         var rowsBounds = new Rect(0, HeaderHeight, Bounds.Width, Math.Max(0, Bounds.Height - HeaderHeight));
         using (context.PushClip(rowsBounds))
         {
-            Band(0, 100, "#3B5E36");
-            Band(100, 200, "#685C32");
-            Band(200, ceiling, "#653B37");
+            Band(0, WarningLatencyMs, "#3B5E36");
+            Band(WarningLatencyMs, critical, "#685C32");
+            Band(critical, ceiling, "#653B37");
             for (var i = 1; i < 4; i++)
             {
                 var x = left + (right - left) * i / 4;
@@ -138,4 +146,5 @@ public sealed class HopLatencyPlot : Control
         e.Handled = true;
     }
     private static IBrush Brush(string color) => new SolidColorBrush(Color.Parse(color));
+    private static double Nonnegative(double value, double fallback) => double.IsFinite(value) ? Math.Max(0, value) : fallback;
 }

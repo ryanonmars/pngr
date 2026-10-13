@@ -24,6 +24,12 @@ public sealed class LatencyTimeline : Control
     private string _title = "Latency history";
     private Point? _pointer;
     private IReadOnlyList<GraphEvent> _markers = [];
+    private double _warningLatencyMs = 100;
+    private double _criticalLatencyMs = 200;
+    private double _fixedMaximumMs;
+    private bool _showJitter = true;
+    private bool _showPacketLoss = true;
+    private bool _showEventMarkers = true;
 
     public LatencyTimeline() { ClipToBounds = true; MinHeight = 180; }
     public IReadOnlyList<GraphPoint> Samples { get => _samples; set { _samples = value ?? Array.Empty<GraphPoint>(); InvalidateVisual(); } }
@@ -34,6 +40,13 @@ public sealed class LatencyTimeline : Control
     public string Title { get => _title; set { _title = value ?? "Latency history"; InvalidateVisual(); } }
     public Action<DateTimeOffset>? TimeSelected { get; set; }
     public IReadOnlyList<GraphEvent> Markers { get => _markers; set { _markers = value ?? []; InvalidateVisual(); } }
+    public double WarningLatencyMs { get => _warningLatencyMs; set { _warningLatencyMs = Nonnegative(value, _warningLatencyMs); InvalidateVisual(); } }
+    public double CriticalLatencyMs { get => _criticalLatencyMs; set { _criticalLatencyMs = Nonnegative(value, _criticalLatencyMs); InvalidateVisual(); } }
+    /// <summary>Zero scales automatically to the measured latency range.</summary>
+    public double FixedMaximumMs { get => _fixedMaximumMs; set { _fixedMaximumMs = Nonnegative(value, _fixedMaximumMs); InvalidateVisual(); } }
+    public bool ShowJitter { get => _showJitter; set { _showJitter = value; InvalidateVisual(); } }
+    public bool ShowPacketLoss { get => _showPacketLoss; set { _showPacketLoss = value; InvalidateVisual(); } }
+    public bool ShowEventMarkers { get => _showEventMarkers; set { _showEventMarkers = value; InvalidateVisual(); } }
 
     public override void Render(DrawingContext context)
     {
@@ -46,7 +59,8 @@ public sealed class LatencyTimeline : Control
         var start = end - Horizon;
         var visible = Samples.Where(s => s.Time >= start && s.Time <= end).OrderBy(s => s.Time).ToArray();
         var maxValue = visible.Where(IsResponse).Select(s => s.Latency!.Value).DefaultIfEmpty(0).Max();
-        var ceiling = AxisMaximum(maxValue);
+        var ceiling = FixedMaximumMs > 0 ? FixedMaximumMs : AxisMaximum(maxValue);
+        var critical = Math.Max(WarningLatencyMs, CriticalLatencyMs);
         var latest = visible.LastOrDefault();
         Text(context, Title, new Point(10, 7), 11, Ink);
         var latestLabel = latest is null ? "Waiting for measurements" : !IsResponse(latest) ? "Latest: no reply" : $"Latest {latest.Latency:0.0} ms";
@@ -55,10 +69,10 @@ public sealed class LatencyTimeline : Control
         double X(DateTimeOffset time) => plot.Left + (time - start).TotalSeconds / Horizon.TotalSeconds * plot.Width;
         double Y(double value) => plot.Bottom - Math.Clamp(value / ceiling, 0, 1) * plot.Height;
 
-        Band(0, Math.Min(100, ceiling), "#3B5E36");
-        Band(100, Math.Min(200, ceiling), "#695C32");
-        Band(200, ceiling, "#663B37");
-        context.DrawRectangle(Brush("#3D3F40"), null, jitterPlot);
+        Band(0, Math.Min(WarningLatencyMs, ceiling), "#3B5E36");
+        Band(WarningLatencyMs, Math.Min(critical, ceiling), "#695C32");
+        Band(critical, ceiling, "#663B37");
+        if (ShowJitter) context.DrawRectangle(Brush("#3D3F40"), null, jitterPlot);
         var intervalSeconds = visible.Length > 1 ? MedianInterval(visible) : 1;
         // An empty part of a capture stays visibly dim, rather than implying recorded zero latency.
         if (Samples.Count > 0)
@@ -73,8 +87,11 @@ public sealed class LatencyTimeline : Control
             context.DrawLine(Grid, new Point(plot.Left, y), new Point(plot.Right, y));
             var label = Label($"{ceiling * i / 4:0}", 10, Muted);
             context.DrawText(label, new Point(plot.Left - label.Width - 7, y - label.Height / 2));
-            var lossLabel = Label($"{i * 25}", 9, Brush("#DE7772"));
-            context.DrawText(lossLabel, new Point(plot.Right + 5, y - lossLabel.Height / 2));
+            if (ShowPacketLoss)
+            {
+                var lossLabel = Label($"{i * 25}", 9, Brush("#DE7772"));
+                context.DrawText(lossLabel, new Point(plot.Right + 5, y - lossLabel.Height / 2));
+            }
         }
         var latencyAxis = Label("Latency (ms)", 9, Muted);
         var lossAxis = Label("Loss %", 9, Brush("#DE7772"));
@@ -82,7 +99,7 @@ public sealed class LatencyTimeline : Control
         using (context.PushTransform(Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(10, plot.Top + (plot.Height + latencyAxis.Width) / 2)))
             context.DrawText(latencyAxis, new Point(0, 0));
         // Keep the right axis readable even on short graphs.
-        Text(context, "Loss %", new Point(Math.Max(plot.Left, plot.Right - lossAxis.Width), plot.Top - 15), 9, Brush("#DE7772"));
+        if (ShowPacketLoss) Text(context, "Loss %", new Point(Math.Max(plot.Left, plot.Right - lossAxis.Width), plot.Top - 15), 9, Brush("#DE7772"));
         for (var i = 0; i <= 5; i++)
         {
             var x = plot.Left + plot.Width * i / 5;
@@ -99,12 +116,12 @@ public sealed class LatencyTimeline : Control
             var lossWidth = Math.Clamp(intervalSeconds / Horizon.TotalSeconds * plot.Width, 1, Math.Max(1, plot.Width / 6));
             foreach (var sample in visible.Where(s => s.IsError))
                 context.DrawRectangle(Brush("#99777777"), null, new Rect(X(sample.Time) - lossWidth / 2, plot.Top, lossWidth, plot.Height));
-            foreach (var sample in visible.Where(s => !s.IsError && (s.LossPercent > 0 || s.Lost)))
+            foreach (var sample in visible.Where(s => ShowPacketLoss && !s.IsError && (s.LossPercent > 0 || s.Lost)))
             {
                 var height = plot.Height * Math.Clamp((sample.LossPercent ?? 100) / 100, 0, 1);
                 context.DrawRectangle(Brush("#AED44843"), null, new Rect(X(sample.Time) - lossWidth / 2, plot.Bottom - height, lossWidth, height));
             }
-            foreach (var marker in Markers.Where(m => m.Time >= start && m.Time <= end))
+            foreach (var marker in Markers.Where(m => ShowEventMarkers && m.Time >= start && m.Time <= end))
             {
                 var color = marker.Kind == "Recovery" ? "#75D88A" : marker.Kind == "RouteChange" ? "#E7B95D" : "#E5817B";
                 context.DrawLine(new Pen(Brush(color), 1), new Point(X(marker.Time), plot.Top), new Point(X(marker.Time), plot.Bottom));
@@ -126,7 +143,7 @@ public sealed class LatencyTimeline : Control
                 previous = sample;
             }
         }
-        DrawJitter(context, jitterPlot, visible, intervalSeconds, X);
+        if (ShowJitter) DrawJitter(context, jitterPlot, visible, intervalSeconds, X);
         if (visible.Length == 0)
         {
             var message = Label(Samples.Count == 0 ? "Start a target to collect latency and packet loss" : "No measurements in this time range", 11, Muted);
@@ -139,14 +156,14 @@ public sealed class LatencyTimeline : Control
         {
             var x = X(cursor);
             context.DrawRectangle(Brush("#15FFFFFF"), null, new Rect(x - 3, plot.Top, 6, plot.Height));
-            context.DrawLine(new Pen(Brush("#ABB5A9"), 1), new Point(x, jitterPlot.Top), new Point(x, plot.Bottom));
+            context.DrawLine(new Pen(Brush("#ABB5A9"), 1), new Point(x, ShowJitter ? jitterPlot.Top : plot.Top), new Point(x, plot.Bottom));
             var nearest = visible.MinBy(s => Math.Abs((s.Time - cursor).TotalMilliseconds));
             if (nearest is not null)
             {
-                var nearEvent = Markers.FirstOrDefault(m => Math.Abs((m.Time - cursor).TotalSeconds) < Math.Max(1, Horizon.TotalSeconds * 5 / plot.Width));
+                var nearEvent = ShowEventMarkers ? Markers.FirstOrDefault(m => Math.Abs((m.Time - cursor).TotalSeconds) < Math.Max(1, Horizon.TotalSeconds * 5 / plot.Width)) : null;
                 var text = nearEvent is not null ? $"{nearEvent.Time.ToLocalTime():HH:mm:ss} · {nearEvent.Message}"
                     : $"{nearest.Time.ToLocalTime():HH:mm:ss}  ·  " + (nearest.IsError ? "Probe unavailable" : !IsResponse(nearest) ? "No reply" : $"{nearest.Latency:0.0} ms")
-                      + (nearest.LossPercent is { } loss ? $" · {loss:0.#}% loss" : "");
+                      + (ShowPacketLoss && nearest.LossPercent is { } loss ? $" · {loss:0.#}% loss" : "");
                 if (text.Length > 100) text = text[..97] + "…";
                 var label = Label(text, 10, Ink);
                 var boxWidth = label.Width + 16;
@@ -157,7 +174,7 @@ public sealed class LatencyTimeline : Control
             }
         }
         context.DrawRectangle(null, new Pen(Brush("#747A70"), 1), plot);
-        context.DrawRectangle(null, new Pen(Brush("#626567"), 1), jitterPlot);
+        if (ShowJitter) context.DrawRectangle(null, new Pen(Brush("#626567"), 1), jitterPlot);
         void Band(double from, double to, string color)
         {
             if (to <= from || from >= ceiling) return;
@@ -215,7 +232,12 @@ public sealed class LatencyTimeline : Control
         TimeSelected?.Invoke(SelectedTime.Value);
         e.Handled = true;
     }
-    private Rect PlotBounds() => new(46, 64, Math.Max(1, Bounds.Width - 82), Math.Max(1, Bounds.Height - 94));
+    private Rect PlotBounds()
+    {
+        var top = ShowJitter ? 64 : 37;
+        var rightMargin = ShowPacketLoss ? 36 : 12;
+        return new Rect(46, top, Math.Max(1, Bounds.Width - 46 - rightMargin), Math.Max(1, Bounds.Height - top - 30));
+    }
     private DateTimeOffset EffectiveEnd() => EndTime ?? (Samples.Count > 0 ? Samples.Max(s => s.Time) : DateTimeOffset.UtcNow);
     private static bool IsResponse(GraphPoint sample) => !sample.IsError && !sample.Lost && sample.Latency is >= 0 && double.IsFinite(sample.Latency.Value);
     private static double AxisMaximum(double maximum)
@@ -230,6 +252,7 @@ public sealed class LatencyTimeline : Control
         return intervals.Length == 0 ? 1 : intervals[intervals.Length / 2];
     }
     private static IBrush Brush(string color) => new SolidColorBrush(Color.Parse(color));
+    private static double Nonnegative(double value, double fallback) => double.IsFinite(value) ? Math.Max(0, value) : fallback;
     private static FormattedText Label(string text, double size, IBrush color) => new(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Font, size, color);
     private static void Text(DrawingContext context, string text, Point point, double size, IBrush color) => context.DrawText(Label(text, size, color), point);
 }

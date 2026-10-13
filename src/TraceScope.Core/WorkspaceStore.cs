@@ -16,6 +16,9 @@ public sealed record WorkspaceConfiguration
     public int WebPort { get; init; } = 8787;
     public bool WebEnabled { get; init; }
     public bool DesktopNotifications { get; init; }
+    public ProbeOptions DefaultProbeOptions { get; init; } = new();
+    public bool UseDefaultProbeOptionsForNewTargets { get; init; }
+    public DisplayConfiguration Display { get; init; } = new();
     public IReadOnlyList<WorkspaceTarget> Targets { get; init; } = [];
     public IReadOnlyList<MonitoringProfile> Profiles { get; init; } = [];
     public IReadOnlyList<AlertRule> Alerts { get; init; } = [];
@@ -28,6 +31,9 @@ public sealed record WorkspaceConfiguration
         if (RetentionDays is < 1 or > 3650) throw new InvalidDataException("Retention must be between 1 and 3650 days.");
         if (AggregationSeconds is < 1 or > 3600) throw new InvalidDataException("Aggregation must be between 1 and 3600 seconds.");
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");
+        if (DefaultProbeOptions is null || Display is null) throw new InvalidDataException("Monitoring and display settings are required.");
+        DefaultProbeOptions.Validate();
+        Display.Validate();
         if (Targets is null || Profiles is null || Alerts is null || SummaryViews is null || Actions is null)
             throw new InvalidDataException("Targets, profiles and alerts must be lists.");
         if (Targets.Count > 500 || Profiles.Count > 100 || Alerts.Count > 200)

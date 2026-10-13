@@ -80,6 +80,8 @@ public partial class MainWindow : Window
             }
         };
         InitializeProfessional(dataDirectory, engine is null);
+        InitializeAllTargets();
+        KeyDown += SettingsShortcut;
         _clock.Start();
         Opened += OnOpened;
         Closing += OnClosing;
@@ -112,16 +114,22 @@ public partial class MainWindow : Window
             if (_closing) return;
             for (var i = 0; i < _args.Length - 1; i++)
                 if (_args[i] == "--target") await AddTarget(_args[++i]);
+            if (_args.Contains("--all-targets")) OpenAllTargets(null, new RoutedEventArgs());
+            if (ArgumentValue("--settings-page") is { } page)
+            {
+                OpenSettings(null, new RoutedEventArgs());
+                _settingsWindow?.SelectPage(page);
+            }
             if (ArgumentValue("--capture") is { } capture)
             {
                 await Task.Delay(TimeSpan.FromSeconds(int.TryParse(ArgumentValue("--capture-after"), out var secs) ? secs : 15), _applicationCancellation.Token);
-                var visual = (Control)Content!;
+                var visual = (Control)(_settingsWindow?.Content ?? Content!);
                 var size = visual.Bounds.Size;
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height), new Vector(96, 96));
                 bitmap.Render(visual);
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(capture))!);
                 bitmap.Save(capture);
-                var details = new { Targets = _targets.Select(x => new { x.Target, x.StateLabel, x.Summary, Round = x.Snapshot?.Round, HopCount = x.Snapshot?.Hops.Count }), Rows = _rows.Count, Title = TargetTitle.Text };
+                var details = new { Targets = _targets.Select(x => new { x.Target, x.StateLabel, x.Summary, Round = x.Snapshot?.Round, HopCount = x.Snapshot?.Hops.Count }), Rows = _rows.Count, Title = TargetTitle.Text, SettingsWindowOpen = _settingsWindow?.IsVisible == true };
                 await File.WriteAllTextAsync(Path.ChangeExtension(capture, ".json"), System.Text.Json.JsonSerializer.Serialize(details));
                 if (_args.Contains("--exit-after-capture")) Close();
             }
@@ -163,6 +171,7 @@ public partial class MainWindow : Window
     {
         if (_closing) return;
         if (string.IsNullOrWhiteSpace(text)) { StatusText.Text = "Enter a hostname or IP address."; return; }
+        var returnToAllTargets = _allTargetsVisible;
         StartButton.IsEnabled = false;
         try
         {
@@ -171,7 +180,7 @@ public partial class MainWindow : Window
                 var existing = _targets.FirstOrDefault(x => x.Target.Equals(target, StringComparison.OrdinalIgnoreCase) && x.Session?.State is SessionState.Running or SessionState.Paused);
                 if (existing is not null) { TargetList.SelectedItem = existing; continue; }
                 StatusText.Text = $"Resolving {target}…";
-                var session = await _engine.StartTargetAsync(target, options ?? ReadOptions(), _applicationCancellation.Token);
+                var session = await _engine.StartTargetAsync(target, options ?? (_configuration.UseDefaultProbeOptionsForNewTargets ? _configuration.DefaultProbeOptions : ReadOptions()), _applicationCancellation.Token);
                 if (_closing) { await _engine.StopAsync(session.Id); return; }
                 var item = new TargetItem(session) { Group = group ?? (string.IsNullOrWhiteSpace(GroupInput.Text) ? "Default" : GroupInput.Text.Trim()) };
                 session.Group = item.Group;
@@ -186,7 +195,11 @@ public partial class MainWindow : Window
             ScheduleWorkspaceSave();
         }
         catch (Exception ex) { StatusText.Text = $"Could not start trace: {ex.Message}"; }
-        finally { StartButton.IsEnabled = true; UpdateButtons(); }
+        finally
+        {
+            StartButton.IsEnabled = true; UpdateButtons();
+            if (returnToAllTargets) OpenAllTargets(null, new RoutedEventArgs());
+        }
     }
 
     private void ReceiveSnapshot(RoundSnapshot snapshot)
@@ -200,6 +213,8 @@ public partial class MainWindow : Window
 
     private void TargetChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (_clearingOverviewTab) return;
+        if (!_previewingOverviewTarget) SetAllTargetsVisible(false);
         _selected = TargetList.SelectedItem as TargetItem;
         if (_selected is not null) TargetInput.Text = _selected.Target;
         _selectedHop = null;
@@ -219,6 +234,7 @@ public partial class MainWindow : Window
             finally { _settingOptions = false; }
         }
         UpdateProfessionalSelection();
+        if (_selected is null) SynchronizeProbeControls(_configuration.DefaultProbeOptions);
         HistorySlider.Value = 100;
         Timeline.SelectedTime = null;
         RefreshSelected();
@@ -310,6 +326,7 @@ public partial class MainWindow : Window
 
     private void RefreshGraph()
     {
+        RefreshAllTargets();
         if (_selected is null || Timeline is null) return;
         var hop = _selectedHop.HasValue ? _selected.Snapshot?.Hops.FirstOrDefault(x => x.Hop == _selectedHop) : _selected.Snapshot?.Destination;
         var points = hop?.History.Select(x => new GraphPoint(x.Timestamp, x.LatencyMs, !x.LatencyMs.HasValue && x.Status != ProbeStatus.Error, IsError: x.Status == ProbeStatus.Error)).ToArray() ?? [];

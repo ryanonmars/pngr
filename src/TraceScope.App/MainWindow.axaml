@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:TraceScope.App.Controls" x:Class="TraceScope.App.MainWindow" Title="TraceScope — Network diagnostics" Width="1180" Height="790" MinWidth="980" MinHeight="640" Background="#191A1D">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:TraceScope.App.Controls" xmlns:views="clr-namespace:TraceScope.App.Views" x:Class="TraceScope.App.MainWindow" Title="TraceScope — Network diagnostics" Width="1180" Height="790" MinWidth="980" MinHeight="640" Background="#191A1D">
   <Grid RowDefinitions="28,28,38,28,*,20" Background="#191A1D">
     <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
       <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
@@ -6,6 +6,7 @@
         <TextBlock Grid.Column="1" x:Name="TargetTitle" Text="Ready to trace" FontSize="11" Foreground="#DBDDE1" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="2" x:Name="TargetSubtitle" Text="Continuous route monitoring" FontSize="10" Foreground="#999DA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+          <Button x:Name="SettingsButton" Content="Settings" Click="OpenSettings" ToolTip.Tip="Settings (⌘, on macOS / Ctrl+, on Windows)"/>
           <Button Content="Summary" Click="OpenSummary"/>
           <Button Content="Alerts" Click="OpenAlerts"/>
           <Button Content="Workspace" Click="OpenWorkspace"/>
@@ -19,7 +20,7 @@
     </Border>
     <Border Grid.Row="1" Background="#1D1F23" BorderBrush="#36383E" BorderThickness="0,0,0,1">
       <Grid ColumnDefinitions="Auto,*">
-        <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,0,10,0" VerticalAlignment="Center"><TextBlock Text="Targets" FontSize="10" Foreground="#AFB3BD"/><TextBlock x:Name="TargetCount" Text="0" FontSize="10" Foreground="#747A84"/></StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,0,10,0" VerticalAlignment="Center"><Button x:Name="AllTargetsButton" Content="All Targets" Click="OpenAllTargets" ToolTip.Tip="Show every target together"/><Button Content="+" Click="NewTargetFromOverview" ToolTip.Tip="Add a target"/><TextBlock x:Name="TargetCount" Text="0" FontSize="10" Foreground="#747A84"/></StackPanel>
         <ListBox Grid.Column="1" x:Name="TargetList" Background="Transparent" SelectionChanged="TargetChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
           <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ListBox.ItemsPanel>
           <ListBox.ItemTemplate><DataTemplate>
@@ -37,7 +38,7 @@
         <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4"><TextBlock Text="Focus" VerticalAlignment="Center"/><ComboBox x:Name="FocusInput" Width="104" SelectedIndex="0" SelectionChanged="FocusChanged"><ComboBoxItem Content="Auto"/><ComboBoxItem Content="Latest sample"/><ComboBoxItem Content="Held"/></ComboBox></StackPanel>
         <ComboBox Grid.Column="5" x:Name="TimeoutInput" Width="108" SelectedIndex="1" ToolTip.Tip="Probe timeout"><ComboBoxItem Content="500 ms"/><ComboBoxItem Content="1 s timeout"/><ComboBoxItem Content="2 s timeout"/></ComboBox>
         <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4"><TextBlock Text="Hops" VerticalAlignment="Center"/><NumericUpDown x:Name="MaxHopsInput" Value="30" Minimum="1" Maximum="64" Width="112" FormatString="0"/></StackPanel>
-        <StackPanel Grid.Column="7" Spacing="2" VerticalAlignment="Center" Margin="6,0,0,0"><TextBlock Text="100 ms   200 ms" FontSize="9" Foreground="#B9BDC3"/><Grid Width="82" Height="4" ColumnDefinitions="*,*,*"><Border Background="#528447"/><Border Grid.Column="1" Background="#B29953"/><Border Grid.Column="2" Background="#B85858"/></Grid></StackPanel>
+        <StackPanel Grid.Column="7" Spacing="2" VerticalAlignment="Center" Margin="6,0,0,0"><TextBlock x:Name="LatencyLegend" Text="100 ms   200 ms" FontSize="9" Foreground="#B9BDC3"/><Grid Width="82" Height="4" ColumnDefinitions="*,*,*"><Border Background="#528447"/><Border Grid.Column="1" Background="#B29953"/><Border Grid.Column="2" Background="#B85858"/></Grid></StackPanel>
       </Grid>
     </Border>
     <Border Grid.Row="3" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,0,0,1" Padding="6,1">
@@ -52,7 +53,7 @@
       </Grid>
     </Border>
     <Grid Grid.Row="4" RowDefinitions="1*,5,28,1*,23">
-      <Grid Grid.Row="0" RowDefinitions="*,22">
+      <Grid Grid.Row="0" x:Name="SingleTargetPane" RowDefinitions="*,22">
         <Grid ColumnDefinitions="*,285" Background="#191A1D">
           <DataGrid x:Name="HopTable" ColumnHeaderHeight="24" RowHeight="22" FontSize="11" IsReadOnly="True" AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserSortColumns="False" SelectionMode="Single" SelectionChanged="HopChanged" GridLinesVisibility="None" Background="#191A1D">
             <DataGrid.Columns>
@@ -72,6 +73,7 @@
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="Round trip (ms)" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LatencyValue" Text="—" FontSize="11"/><TextBlock Text="Loss" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="LossValue" Text="—" FontSize="11"/><TextBlock Text="Jitter" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="JitterValue" Text="—" FontSize="11"/><TextBlock Text="MOS est." FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="MosValue" Text="—" FontSize="11"/><TextBlock Text="Avg 30s / 5m" FontSize="10" Foreground="#979CA6"/><TextBlock x:Name="ShortAverageValue" Text="—" FontSize="11"/><TextBlock x:Name="LongAverageValue" Text="—" FontSize="11"/></StackPanel><TextBlock Grid.Column="1" x:Name="FocusRange" Text="Focus: Auto" FontSize="10" Foreground="#A5ABB6"/></Grid>
         </Border>
       </Grid>
+      <views:AllTargetsView Grid.Row="0" x:Name="AllTargetsPane" IsVisible="False"/>
       <GridSplitter Grid.Row="1" ResizeDirection="Rows" Background="#373A40"/>
       <Border Grid.Row="2" Background="#24262A" Padding="7,2" BorderBrush="#3A3D43" BorderThickness="0,0,0,1">
         <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6"><TextBlock x:Name="GraphHeading" Text="Latency history" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/><ComboBox Grid.Column="1" x:Name="HorizonInput" Width="120" SelectedIndex="2" SelectionChanged="ViewChanged"><ComboBoxItem Content="1 minute"/><ComboBoxItem Content="5 minutes"/><ComboBoxItem Content="10 minutes"/><ComboBoxItem Content="15 minutes"/><ComboBoxItem Content="1 hour"/><ComboBoxItem Content="6 hours"/><ComboBoxItem Content="24 hours"/><ComboBoxItem Content="7 days"/></ComboBox><Button Grid.Column="2" Content="◀" Tag="back" Click="ShiftHistory" ToolTip.Tip="Scroll back half a view"/><Button Grid.Column="3" Content="▶" Tag="forward" Click="ShiftHistory" ToolTip.Tip="Scroll forward half a view"/><Button Grid.Column="4" Content="Live" Click="GoLive"/></Grid>
