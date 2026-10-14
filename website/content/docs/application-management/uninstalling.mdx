@@ -1,0 +1,29 @@
+---
+title: "Uninstalling Pngr"
+description: "Remove the application while keeping or deliberately removing local data."
+---
+
+## macOS
+
+Quit Pngr, then move the Pngr application from Applications to the Trash. The application bundle and monitoring data are separate. Removing the bundle leaves the data directory available for a later installation.
+
+## Windows
+
+Quit Pngr, then open Windows **Installed apps**, find **Pngr**, and choose **Uninstall**. Installer builds register uninstall support through Velopack. A portable copy can be removed by deleting its application folder after closing it.
+
+## Keep a backup or remove data
+
+Default installed-app data locations are:
+
+| Platform | Data directory |
+| --- | --- |
+| macOS | `~/Library/Application Support/TraceScope` |
+| Windows | `%LOCALAPPDATA%\TraceScope` |
+
+The database filename is `tracescope.db`. The TraceScope directory name is retained to preserve existing sessions, settings, profiles, and workspaces after the Pngr rename.
+
+For a backup, quit Pngr and copy the entire data directory to a safe location. CSV export is useful for measurement analysis, but it is not a full workspace backup.
+
+To remove local history and configuration completely, quit Pngr and delete this data directory only after saving anything you want to keep. Removing it discards locally stored monitoring history and configuration.
+
+Source-checkout launches use `artifacts/data` when a containing checkout is detected. Launches using `--data-dir PATH` store data at that explicit path instead. Check which location you used before deleting data.

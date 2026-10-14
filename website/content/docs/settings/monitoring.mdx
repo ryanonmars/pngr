@@ -1,0 +1,39 @@
+---
+title: "Monitoring settings"
+description: "Defaults, timing limits, and the configuration scope."
+---
+
+## Choose the scope first
+
+Select **Defaults for new targets** or **Selected target**. The selected-target scope is available for a running or paused target. Editing defaults does not rewrite existing targets.
+
+**Use saved defaults for every new target** is off by default. When off, new targets inherit the last-used probing configuration. When on, they use the saved defaults.
+
+## Supported settings
+
+| Setting | Initial default | Allowed range or behavior |
+| --- | --- | --- |
+| Packet type | ICMP | ICMP, TCP, UDP |
+| TCP destination port | 443 | 1–65535; ignored for ICMP |
+| Remembered UDP starting port | 33434 | 1–65535 |
+| UDP port mode | Fixed port | Fixed or inclusive range |
+| UDP ending port | 33625 | 1–65535; at least the starting port for a range |
+| UDP packet size | 56 bytes | 56–65535; includes IP and UDP headers |
+| Allow UDP IP fragmentation | Off | Path MTU can still restrict delivery |
+| Network source | System route | Available interface/address or OS-selected source |
+| Interval | 2.5 seconds | 0.1–3600 seconds |
+| Timeout | 1 second | 0.1–30 seconds |
+| Maximum hops | 30 | 1–64 |
+| Concurrent hop probes | 6 | 1–32 |
+| In-memory samples per hop | 1800 | 10–100000 |
+| Resolve router hostnames | On | Reverse DNS names when available |
+
+TCP and UDP ports are remembered separately. The underlying initial probe configuration has a destination-port field of 443; the UI remembers UDP's starting port as 33434 when switching protocols. Confirm the displayed port before applying a UDP configuration.
+
+The memory limit controls live per-hop history, independently of the stored database. Interval is the requested cadence: a round that takes longer cannot produce samples at the requested interval. macOS ICMP traceroute uses a minimum one-second timeout.
+
+UDP size includes a 20-byte IPv4 or 40-byte IPv6 header plus an 8-byte UDP header. Pngr does not silently truncate the requested packet. A UDP Port Unreachable response proves host reachability, not availability of a UDP service.
+
+<Callout title="Interpret response loss carefully">Loss counts failed eligible diagnostic attempts. Local setup errors are excluded. A router that suppresses replies can forward traffic normally; missing diagnostic responses alone do not prove forwarding loss.</Callout>
+
+See [network interface selection](/docs/advanced/network-interfaces) and [probing profiles](/docs/settings/probing-profiles).

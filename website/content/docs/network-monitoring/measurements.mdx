@@ -1,0 +1,47 @@
+---
+title: "Latency, response loss, and jitter"
+description: "Interpret timing statistics without confusing diagnostic silence with forwarding loss."
+---
+
+## Latency
+
+Latency is the round-trip time of a qualifying diagnostic response, in milliseconds. The hop table includes **Avg**, **Min**, **Cur**, and **Jit**. A missing latency is unavailable rather than a measured zero.
+
+Average and minimum latency use qualifying responses. Intermediate-hop timing and destination timing are separate measurements: Pngr sends an independent endpoint probe in each round, rather than treating the final visible router row as the only destination measurement.
+
+ICMP, TCP, and UDP use different response mechanisms. TCP timing includes connection-call overhead, and Windows ICMP intermediate-hop timing includes .NET call overhead. Avoid treating small differences between protocols or platforms as identical packet-level measurements.
+
+## Response loss
+
+The table's **PL%** and the **Response loss** summary count eligible diagnostic attempts without qualifying replies:
+
+```text
+response loss (%) = 100 × (eligible attempts − qualifying replies) / eligible attempts
+```
+
+Timeouts and explicit network failures can count as eligible attempts. Local setup / transport errors are excluded from the eligible-attempt counter. Per-measurement details distinguish confirmed sends, attempts not sent, and cases where transmission is unknown.
+
+<Callout type="warn" title="Do not label diagnostic silence as confirmed forwarding loss">
+An intermediate router may suppress or rate-limit replies while forwarding the same traffic normally. Missing diagnostic responses are evidence about the probes, not proof that forwarded application packets were dropped.
+</Callout>
+
+Examples:
+
+| Observation | Interpretation |
+| --- | --- |
+| One middle hop has high response loss, later hops and destination respond normally | Often diagnostic filtering or rate limiting; not confirmed forwarding loss |
+| Destination responses disappear | Endpoint probes lack qualifying replies; investigate filtering, route, source, deadlines, and service behavior |
+| Local source bind fails | Local probe setup problem; not remote packet loss |
+| UDP returns destination Port Unreachable | Destination reachability established; UDP service availability not established |
+
+## Jitter
+
+Pngr reports the mean absolute difference between adjacent qualifying latency samples. An unanswered or unavailable sample breaks the pair. Live cumulative hop jitter is unavailable until there is a qualifying adjacent pair. The rolling-window summary reports zero when it has responses but no adjacent response pair, and unavailable when it has no responses. A zero in that summary therefore does not necessarily mean enough samples established stable timing.
+
+This is a diagnostic RTT variation measure, not an RTP media jitter measurement. The **MOS est.** display is an estimate based on network measurements, not a call-quality test.
+
+## Time windows and changes
+
+Live cumulative hop counters and a selected historical time range can describe different populations. Read the active focus / range when comparing summaries. The UI also shows short and long destination averages for **30 seconds / 5 minutes**.
+
+Changing measurement configuration starts a new measurement identity for live statistics while retaining saved history. Returning to a router identity can preserve its cumulative counters, but jitter pairs do not span time spent on another router identity. **Reset Statistics** clears current cumulative counters while retaining saved measurements.

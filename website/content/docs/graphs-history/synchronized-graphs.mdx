@@ -1,0 +1,26 @@
+---
+title: "Multiple synchronized graphs"
+description: "Compare hops using one shared time window per target."
+---
+
+## Add and remove graphs
+
+Select a hop to make it the primary history graph. Use the ▥ graph visibility control beside a hop to show additional hop graphs alongside it. Use a graph's × button or its hop visibility control to hide it. This changes the display; it does not stop probes or delete measurements.
+
+The destination graph represents the independent destination probe. When the route identifies a terminal destination hop, Pngr treats that hop and the destination graph as the same display identity to avoid duplicate destination graphs.
+
+## Shared navigation
+
+All visible history graphs for the selected target share their time range, held timestamp, and selection. Zoom or pan one graph to move all of them. This makes it easier to compare an upstream diagnostic response change with downstream and destination measurements.
+
+Each target has its own view state. Switching targets restores that target's graph view rather than synchronizing unrelated sessions.
+
+## Resize graphs
+
+Drag a divider between graphs to adjust their relative heights. A focused divider also accepts Up and Down keys. Pngr keeps graph panels at a minimum height and allows scrolling when the stack exceeds the available space.
+
+Graph visibility and relative sizes are saved with the workspace. Display preferences control latency thresholds, fixed scale, jitter, loss, and event-marker visibility.
+
+<Callout>
+A simultaneous change across graphs is useful evidence, but diagnostic replies still need interpretation. Intermediate response loss alone does not confirm loss of forwarded traffic.
+</Callout>

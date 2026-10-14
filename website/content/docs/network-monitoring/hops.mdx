@@ -1,0 +1,28 @@
+---
+title: "Understanding network hops"
+description: "Read TTL positions, router responses, and the independent destination measurement."
+---
+
+## What a hop means
+
+Pngr probes increasing IP TTL or IPv6 hop-limit positions. A router that expires a probe can return an ICMP Time Exceeded response. Its address and optional reverse-DNS name then appear in the hop table.
+
+A hop number is a probed position, not a guarantee that a router replied. Firewalls, tunnels, rate limits, asymmetric paths, and routers that suppress diagnostics can leave gaps. Reverse-DNS names describe responding addresses; they are not verified device identities or geographic locations.
+
+## Destination versus route discovery
+
+Pngr sends an independent destination probe with each round. This shares the round's concurrency budget but does not define the route length. An endpoint can respond even when route discovery never receives enough evidence to locate its hop number.
+
+The destination footer and destination history refer to this endpoint measurement. Compare them with the route rows rather than assuming every visible last row is the destination.
+
+## Missing responses
+
+Known addresses can remain visible when later rounds receive no reply. That retained address is historical identity evidence, not a new reply. Unanswered trailing TTL positions can be collapsed or expanded using the hop-table control when it appears.
+
+A run of missing replies does not establish how many real routers exist, that the destination is down, or that application packets are being dropped.
+
+## Compare neighboring evidence
+
+If a middle hop appears slow but later hops and the endpoint respond quickly, that hop may simply deprioritize diagnostic replies. Hop RTT includes the return path and reply-processing time; subtracting two hop RTTs does not produce a reliable link delay.
+
+Look for correlated destination symptoms over time and compare protocols where appropriate. See [measurement interpretation](/docs/network-monitoring/measurements) and [route discovery](/docs/network-monitoring/routes).

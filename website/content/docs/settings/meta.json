@@ -1,0 +1,13 @@
+{
+  "title": "Settings",
+  "pages": [
+    "index",
+    "general",
+    "monitoring",
+    "display",
+    "history-storage",
+    "alerts-notifications",
+    "local-web-api",
+    "probing-profiles"
+  ]
+}

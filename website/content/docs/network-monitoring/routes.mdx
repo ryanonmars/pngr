@@ -1,0 +1,34 @@
+---
+title: "Route discovery and changes"
+description: "Understand changing responding routers and retained route evidence."
+---
+
+## Discovery rounds
+
+Pngr repeatedly probes the route while monitoring an independent endpoint. **Maximum hops** bounds TTL/hop-limit discovery. **Concurrent probes** bounds outstanding work for each target round.
+
+For ICMP and TCP, once a destination hop is known, ordinary rounds can probe up to two positions beyond it, limited by maximum hops. Every tenth round refreshes discovery to the configured maximum. Responding destination evidence bounds the displayed route.
+
+UDP discovery proceeds in ascending, bounded concurrent waves. It waits for a wave to finish before deciding whether a destination reply bounds the path. Higher-hop router replies are evidence that discovery may need to continue, including when different UDP ports encounter different paths.
+
+## Route-change events
+
+Pngr compares responding router addresses at each hop position. It confirms a changed address after seeing the same candidate in **two observation rounds**. A newly discovered position establishes its initial identity rather than producing a change event.
+
+Silence does not replace a known route address and does not itself generate a router-address change. A confirmed event identifies the hop and old / new addresses. Route-change events are saved with session history and can be used by alert rules.
+
+## UDP retained bounds
+
+An earlier UDP destination reply can provide a retained terminal-hop bound even if a later round is silent. Pngr marks retained bounds as historical when current-round destination-hop evidence is absent.
+
+An ICMP Time Exceeded response at or beyond the old bound invalidates it immediately. Ten silent rediscovery rounds also clear a stale bound so it cannot suppress broader discovery indefinitely. The independent endpoint measurement never determines this route bound.
+
+<Callout title="Different ports can expose different routes">
+UDP port ranges change the destination port sequentially. Networks may hash those flows onto different paths, so a route change can describe diagnostic flow behavior rather than one fixed application connection.
+</Callout>
+
+## Interpreting changes
+
+Compare route events with [destination latency and response loss](/docs/network-monitoring/measurements). A responding address change alone does not establish an outage, and missing replies alone do not confirm forwarding loss.
+
+Changing probe settings can reset live route identity tracking while preserving the existing saved measurements. Keep the selected protocol, source, and UDP port behavior in mind when comparing historical paths.

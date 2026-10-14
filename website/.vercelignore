@@ -1,4 +1,10 @@
-docs/
+/docs/
+.next/
+.source/
+out/
+public/
+test-results/
+playwright-report/
 node_modules/
 dist/
 .gitignore

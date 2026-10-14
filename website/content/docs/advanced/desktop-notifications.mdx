@@ -1,0 +1,22 @@
+---
+title: "Desktop notifications"
+description: "Permission, platform behavior, and notification testing."
+---
+
+Open **Settings → Alerts & notifications**, enable native desktop notifications, and click **Request OS notification permission…**. You can also configure them in **Alerts → Notifications and actions…**.
+
+Native notifications are off by default. Recovery delivery is on by default, and native notifications share a global minimum spacing of 30 seconds. In-app alerts have their own enable checkbox.
+
+## macOS
+
+Native delivery uses macOS Notification Center and requires the packaged Pngr app with its bundled native notification helper. Request permission explicitly, then check Pngr's permission in macOS notification settings if messages do not appear. An OS acknowledgment of delivery does not guarantee that a banner is visible.
+
+## Windows
+
+Pngr uses the Windows notification area. Windows notification and focus settings control visibility; the permission button reports this behavior instead of presenting a macOS-style permission request.
+
+## Test delivery
+
+In **Notifications and alert actions**, select a live target and choose **Test enabled actions**. This saves the action configuration and queues a test event. Results appear in the alert event log. The test can send email, webhooks, or run the executable if those actions are enabled.
+
+If delivery fails, inspect the action result, confirm the enable checkbox and OS settings, and check whether spacing suppressed a closely repeated event. Notifications stop when Pngr exits.

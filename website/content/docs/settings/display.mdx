@@ -1,0 +1,20 @@
+---
+title: "Display"
+description: "Graph colors, scaling, time range, and overlays."
+---
+
+Display preferences affect the integrated hop plot and historical timeline.
+
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| Warning latency | 100 ms | Lower latency color boundary; must be below critical |
+| Critical latency | 200 ms | Must exceed warning; maximum 60000 ms |
+| Graph maximum | 0 | 0 uses automatic scaling; fixed values are 1–60000 ms |
+| Default time range | 10 minutes | 1, 5, 10, 15 minutes; 1 or 6 hours; 1 day or 1 week |
+| Show jitter graph | On | Shows timeline jitter |
+| Show packet-loss bars and scale | On | Shows diagnostic response loss in plot/timeline |
+| Show alert, recovery and route-change markers | On | Shows stored event markers on the timeline |
+
+Warning latency must be at least 1 ms. These visual thresholds do not create alert rules or change their thresholds. Configure those separately in [Alert rules and recovery](/docs/advanced/alert-rules).
+
+Changing the default time range selects that range in the main graph. Hiding a graph overlay does not disable collection of the underlying measurements.

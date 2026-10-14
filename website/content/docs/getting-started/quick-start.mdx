@@ -1,0 +1,34 @@
+---
+title: "Quick start"
+description: "Create your first target and interpret the first measurements."
+---
+
+## Monitor a target
+
+1. Open Pngr and select **+** beside **All Targets**, or **New Target** from the monitoring actions menu.
+2. Enter a hostname or IP address, such as `example.com` or a device on your own network.
+3. Leave the default **ICMP** configuration and **2.5 seconds** interval for an initial baseline.
+4. Press **Enter** or the start monitoring button.
+5. Let several measurement rounds complete, then select a responding hop to inspect its history.
+
+Use **Configure Probe** to change the protocol, port, timeout, source, and discovery settings. See [probe configuration](/docs/network-monitoring/probe-configuration).
+
+## Read the results
+
+The hop table reports responding addresses and statistics at each TTL/hop-limit position. The destination footer is based on an independent endpoint probe, so endpoint results can be available even when intermediate routers do not reply.
+
+Look at destination latency and response loss first. A single intermediate hop with missing replies, followed by normal destination responses, is not confirmed forwarding loss. See [understanding hops](/docs/network-monitoring/hops).
+
+The historical graph lets you compare spikes and gaps over time. Saved measurements remain available after you stop or close a target.
+
+## Pause, stop, or start again
+
+With an empty target input, the main monitoring button pauses or resumes the selected running target. The adjacent monitoring actions menu includes **Stop Trace**, **Restart Trace**, **Reset Statistics**, and **Close Target**.
+
+- **Pause** temporarily suspends new measurement rounds.
+- **Stop Trace** ends the session.
+- **Restart Trace** creates a new session with the target's current probe settings.
+- **Reset Statistics** clears cumulative counters while keeping saved measurements.
+- **Close Target** removes the tab and stops its monitoring; saved history is retained.
+
+Closing Pngr stops all monitoring. It does not leave a monitoring service running.

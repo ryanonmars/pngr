@@ -1,0 +1,26 @@
+---
+title: "Saved sessions"
+description: "Reopen locally retained monitoring history."
+---
+
+## Open history
+
+1. Choose **File → Open History…**.
+2. Select a session in **Saved trace sessions**.
+3. Click **Open selected session**, or double-click the entry.
+
+If that session is already open as a live target, Pngr selects the existing target. Otherwise it adds a **Saved session** target for historical inspection. Opening a saved session does not restart monitoring.
+
+## Read saved data carefully
+
+The initial saved hop table uses the latest probing configuration and route from the latest 15 minutes of available measurements. It is not a summary of every route ever observed in that session. Select a historical interval to inspect earlier statistics.
+
+Older sessions may show a warning that their probing configuration was not recorded. Do not infer unrecorded payload, timeout, or protocol settings from those samples.
+
+Saved graphs are limited to retained data. A session with no saved samples cannot be opened for graph inspection. Retention and data-maintenance operations can remove older measurements; a saved session is not an independent archive file.
+
+## Preserve history
+
+Pngr stores sessions in its local SQLite database. [CSV export](/docs/graphs-history/csv-export) creates a portable copy of retained raw measurements. Workspace configuration export saves configuration rather than exporting measurement history.
+
+Quit Pngr before copying the full application data directory for a backup. See [uninstalling](/docs/application-management/uninstalling) for default storage locations.

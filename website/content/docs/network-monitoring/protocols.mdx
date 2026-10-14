@@ -1,0 +1,43 @@
+---
+title: "ICMP, TCP, and UDP"
+description: "Choose a diagnostic transport and understand platform capabilities."
+---
+
+Open **Configure Probe** for a new or selected live target and choose **Protocol**. Each protocol measures qualifying diagnostic responses; none performs an application-level transaction such as fetching a web page.
+
+## ICMP
+
+ICMP uses echo probes for the endpoint and TTL/hop-limit expiry responses for intermediate hops. It is the default protocol and does not require a destination port.
+
+macOS uses the system `traceroute` / `traceroute6` ICMP implementation for packet round-trip measurements. Its ICMP timeout must be at least **1 second**. Windows uses the native .NET Ping implementation. On Windows, intermediate TTL-expiry RTT is an estimate that includes managed call overhead; endpoint echo RTT comes from the ping reply.
+
+## TCP
+
+TCP monitors the configured destination port, initially **443**. Choose the actual port you need to investigate.
+
+A validated connection response establishes TCP reachability. Some validated reset responses establish that the host replied while the port is closed. A generic socket refusal or rejection without validated origin is not treated as a confirmed destination reply. Review the result details before interpreting a closed port as an available service.
+
+TCP endpoint timing includes connection-call overhead. It does not establish HTTP, TLS, login, or other application-level health.
+
+## UDP
+
+UDP sends a datagram to a **fixed port** or cycles sequentially through an inclusive **port range**. The remembered initial UDP port is **33434**; the default range ending port is **33625**.
+
+A matching UDP reply or validated destination ICMP Port Unreachable response can establish destination reachability.
+
+<Callout type="warn" title="Reachability is not service availability">
+An ICMP Port Unreachable response confirms that the destination replied to the UDP diagnostic probe. It does not confirm that a UDP application is listening or working. An unanswered UDP probe also cannot establish that the host is down.
+</Callout>
+
+UDP ports can affect load balancing and routing. A range may reveal different paths from a single fixed port. Packet size includes IP and UDP headers, with a default total of **56 bytes**. See [probe configuration](/docs/network-monitoring/probe-configuration).
+
+## Platform capabilities
+
+| Platform | ICMP | TCP and UDP |
+| --- | --- | --- |
+| macOS | Native endpoint and hop probing | Hop receiver support; TCP depends on the bundled helper |
+| Windows | Native endpoint and hop probing | Endpoint monitoring available; raw ICMP hop receiver can require explicit elevation |
+
+Pngr tests local transport availability and shows warnings when hop discovery is unavailable. On Windows, an access-denied raw receiver leaves endpoint monitoring available. Pngr installs no driver or monitoring service and never automatically requests elevation.
+
+If the macOS TCP helper is missing, TCP endpoint monitoring still works while intermediate-hop discovery is unavailable. Network filtering can suppress replies even when local capability checks succeed.

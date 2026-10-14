@@ -1,0 +1,33 @@
+---
+title: "Troubleshooting"
+description: "Resolve launch, probe, history, and update problems without misreading measurements."
+---
+
+<Accordions>
+<Accordion title="The operating system blocks launching Pngr">
+Release packages are unsigned; macOS packages are not notarized. Review the download source and use Gatekeeper or SmartScreen's normal approval interface if you trust the package. Pngr does not disable these protections. On macOS, copy the app out of the DMG into Applications before running or updating it.
+</Accordion>
+<Accordion title="An intermediate hop shows high loss or no response">
+Routers can filter or rate-limit TTL-expired replies while forwarding normal traffic. Compare later hops and the independent destination probe. Missing diagnostic replies do not prove forwarding loss. Route discovery can also be incomplete even when the destination responds.
+</Accordion>
+<Accordion title="UDP reaches the destination but my service is still unavailable">
+An ICMP Port Unreachable reply confirms that the destination was reached. It does not prove that a UDP application service is accepting traffic. Check the intended service separately and confirm the target port and probe protocol.
+</Accordion>
+<Accordion title="The graph has no measurements">
+Confirm the target is running and that your time window overlaps recorded samples. Press Home with the graph focused to return to the latest measurements. A saved session may have no retained samples, and retention can remove older intervals. Probe errors are distinct from response loss; read the target status and available diagnostic details.
+</Accordion>
+<Accordion title="The saved hop table differs from an earlier route">
+The initial table reflects the latest probing configuration and route within the latest 15 minutes. Select the earlier interval to calculate historical statistics. Older legacy sessions may not include recorded probing settings.
+</Accordion>
+<Accordion title="The update check fails or installation is unavailable">
+Retry a manual check after confirming internet access to GitHub. Automatic checks are limited to one attempt per 24 hours, including failed attempts. macOS needs a writable installed app in Applications. Windows portable copies need the Setup installer for in-app updates. Use the release installer when automatic installation is unavailable.
+</Accordion>
+<Accordion title="CSV export fails">
+Select a target with measurements and choose a writable save location. The status bar reports the export failure. CSV export includes all retained raw samples for the selected session; selecting a graph interval does not reduce the export.
+</Accordion>
+<Accordion title="My history seems to have disappeared after changing how I launch Pngr">
+Installed apps use the per-user TraceScope data directory. Source-checkout runs can use artifacts/data, and --data-dir selects a different location. Confirm the original location before assuming the database was lost. Quit Pngr before backing up or moving its data directory.
+</Accordion>
+</Accordions>
+
+When reporting an issue, include your Pngr version, OS and architecture, probe protocol and port, relevant settings, the status message, and steps to reproduce it. Review screenshots and CSV files for private hostnames or addresses before sharing them.

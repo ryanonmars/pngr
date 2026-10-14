@@ -1,0 +1,38 @@
+---
+title: "Windows installation"
+description: "Install Pngr for your Windows account."
+---
+
+## Install Pngr
+
+1. Open the [Pngr releases page](https://github.com/ryanonmars/pngr/releases) and choose the current stable release.
+2. Download `Pngr-Setup.exe`.
+3. Close an existing Pngr instance before continuing.
+4. Run Setup and follow its welcome, progress, and completion screens.
+5. Open Pngr from the Start Menu or desktop shortcut and follow the [quick start](/docs/getting-started/quick-start).
+
+Setup installs for your user account without administrator access. It creates shortcuts and an uninstall entry. The package includes the .NET runtime.
+
+<Callout type="warn" title="Windows security prompts">
+Current installers are unsigned. SmartScreen may warn or block launch. Use Windows' normal approval interface only if you trust the download. Pngr does not bypass these protections.
+</Callout>
+
+## Installer and updater assets
+
+Choose `Pngr-Setup.exe` for installation. Release assets such as `releases.win-x64.json` and `.nupkg` files are used by the updater, rather than being standalone installer choices.
+
+Portable v0.7.0 ZIP builds and source-checkout builds require migration using the installer before automatic installation is supported. See [updating Pngr](/docs/application-management/updates).
+
+## Your data
+
+Installed builds keep local settings and session history in:
+
+```text
+%LOCALAPPDATA%\TraceScope
+```
+
+The `TraceScope` directory and `tracescope.db` filename retain compatibility with older data. Application updates preserve this separate user-data directory.
+
+## TCP and UDP hop discovery
+
+Windows raw-socket access can require explicit elevation for TCP and UDP intermediate-hop responses. Endpoint monitoring remains available without that access. Inspect Pngr's capability warning before assuming an empty hop table is a network fault. See [ICMP, TCP, and UDP](/docs/network-monitoring/protocols).

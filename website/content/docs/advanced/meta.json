@@ -1,0 +1,12 @@
+{
+  "title": "Advanced Features",
+  "pages": [
+    "index",
+    "alert-rules",
+    "desktop-notifications",
+    "alert-actions",
+    "network-interfaces",
+    "data-maintenance",
+    "local-api"
+  ]
+}

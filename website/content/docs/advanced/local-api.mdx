@@ -1,0 +1,70 @@
+---
+title: "Local API reference"
+description: "Read live targets, saved sessions, network information, and aggregated history."
+---
+
+Enable the [Local Web / API](/docs/settings/local-web-api) first. The default base URL is `http://127.0.0.1:8787`.
+
+All endpoints below are **GET** and read-only. JSON response properties use camelCase, and enum values are strings. There are no API endpoints to add targets, change settings, acknowledge events, or start/stop monitoring.
+
+## Endpoints
+
+| Path | Response |
+| --- | --- |
+| `/` | Local HTML dashboard |
+| `/api/targets` | Current engine sessions with options, state, capability, health, and latest snapshot |
+| `/api/sessions` | Saved sessions with identifiers, target, destination address, start/stop dates, and sample count |
+| `/api/interfaces` | Local interface inventory |
+| `/api/neighbors` | Existing OS neighbor cache |
+| `/api/gateway` | Object with `gateway`, which can be null |
+| `/api/history/{sessionId}` | Aggregated samples and events for a stored session |
+| `/api/events/{sessionId}` | Stored events within a date range |
+
+```bash
+curl http://127.0.0.1:8787/api/targets
+curl http://127.0.0.1:8787/api/sessions
+curl http://127.0.0.1:8787/api/interfaces
+```
+
+Copy a session `id` from targets or saved sessions for the history and events requests.
+
+## History query
+
+| Parameter | Default | Accepted values |
+| --- | --- | --- |
+| `from` | One hour ago | Date/time; use ISO 8601 with a timezone |
+| `to` | Now | Date/time at or after `from` |
+| `hop` | 0 | 0 for destination, or 1–64 for an intermediate hop |
+| `maxPoints` | 1200 | 1–10000 |
+
+For example, replace the illustrative session ID with your own:
+
+```bash
+curl 'http://127.0.0.1:8787/api/history/00000000-0000-0000-0000-000000000002?hop=0&from=2026-10-14T12:00:00Z&to=2026-10-14T13:00:00Z&maxPoints=1200'
+```
+
+History returns `sessionId`, `hop`, `from`, `to`, `sampleCount`, `errorCount`, `truncated`, `points`, and `events`. Points are aggregated across the requested interval rather than being a raw CSV export. `sampleCount` sums point counts and `errorCount` sums local errors. The current endpoint reports `truncated: false`.
+
+## Events query
+
+`from` defaults to 24 hours ago and `to` defaults to now. It returns an array of stored events, including acknowledgment information when present.
+
+```bash
+curl 'http://127.0.0.1:8787/api/events/00000000-0000-0000-0000-000000000002?from=2026-10-14T00:00:00Z&to=2026-10-15T00:00:00Z'
+```
+
+Invalid session IDs, date ranges, or numeric parameters return **400**. An unknown stored session returns **404**.
+
+## Measurement semantics
+
+Target snapshots include the actual measurement options/epoch, route changes, response kind, and transmission evidence. `lossAvailable` is false when no eligible attempts exist. `applicationServiceAvailable` is true for UDP replies or successful TCP connects, false for UDP Port Unreachable or TCP reset responses, and otherwise null.
+
+UDP target health distinguishes `NoResponse`, `ProbeRejected`, `Reachable`, and `Responded`. ICMP/TCP health can be `Healthy`, `Degraded`, or `Unreachable`; the API's fixed degraded thresholds are 5% response loss, 150 ms average latency, or 30 ms jitter. These labels do not use your display colors or alert thresholds. Paused, stopped, waiting, and local-error states are reported separately.
+
+<Callout title="Response loss is diagnostic">A failed diagnostic response does not establish forwarding loss. Local setup errors are excluded from eligible attempt accounting, and a submitted probe does not prove delivery. A UDP Port Unreachable or TCP reset can establish host reachability while the selected service remains unavailable.</Callout>
+
+## Access and lifetime
+
+The listener binds to IPv4 loopback only. It accepts Host values `127.0.0.1` and `localhost`; other hosts return 400. No API authentication or cross-origin access configuration is provided. Responses use `Cache-Control: no-store`. The local dashboard and API require the desktop process to remain open.
+
+If a connection fails, confirm that the listener is enabled, use the configured port and `127.0.0.1`, and check for a port-in-use error in Pngr. Remote access and independent server deployment are not supported.

@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@theme {
+  --font-sans: Arial, Helvetica, sans-serif;
+}
+.dark {
+  --color-fd-background: #101214;
+  --color-fd-foreground: #f2f4f6;
+  --color-fd-muted: #171a1d;
+  --color-fd-muted-foreground: #a9b0b8;
+  --color-fd-card: #171a1d;
+  --color-fd-card-foreground: #f2f4f6;
+  --color-fd-border: #30353b;
+  --color-fd-primary: #1b95ff;
+  --color-fd-primary-foreground: #101214;
+  --color-fd-accent: #202b36;
+  --color-fd-accent-foreground: #8acbff;
+  --color-fd-popover: #171a1d;
+  --color-fd-popover-foreground: #f2f4f6;
+}
+body { margin: 0; }
+.prose img { border: 1px solid var(--color-fd-border); border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

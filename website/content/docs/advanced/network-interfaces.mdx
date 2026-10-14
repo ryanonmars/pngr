@@ -1,0 +1,22 @@
+---
+title: "Network interface selection"
+description: "Choose a probe source and inspect local network information."
+---
+
+Choose **Network source** in **Settings → Monitoring** or the probe configuration editor. **System route** lets the operating system select the source. Other choices identify a network interface and one of its IP addresses.
+
+Select the source in the configuration scope you want to change, then save. New-target defaults and existing targets have independent source settings. Saved profiles retain the source choice.
+
+Source address also influences address-family selection when resolving a hostname. Use an address suitable for the destination and the currently connected network. If an interface disconnects or its address changes, a saved choice can appear unavailable; select System route or a current address and retry.
+
+Source-bound ICMP is supported on macOS. On Windows, use **System route** for ICMP; choosing a bound source produces a local error rather than falling back silently. TCP/UDP endpoint binding requires a local numeric source address matching the destination address family.
+
+Source selection does not override every operating-system routing policy. Transport support differs by protocol and platform. In particular, Windows TCP/UDP intermediate-hop discovery can require explicitly running Pngr elevated; endpoint monitoring remains available without automatic elevation, a driver, or a service.
+
+## Network information
+
+Open **Network…** to inspect interface names, status, addresses, gateways, DNS servers, MAC addresses, and MTU when available. Local neighbor information comes from the operating system's existing neighbor/ARP cache. Pngr does not scan a subnet to populate it.
+
+Use **Refresh** to reload the inventory, **Trace gateway** to create a gateway target, or select a cached neighbor and choose **Trace selected cached address**.
+
+These details, along with interface descriptions and speed, are available through the [local API](/docs/advanced/local-api) when enabled.

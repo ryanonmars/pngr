@@ -1,0 +1,29 @@
+---
+title: "Introduction"
+description: "Local network diagnostics for macOS and Windows."
+---
+
+Pngr monitors network paths and destinations from a desktop application. Use it to observe latency spikes, compare responding hops, and revisit measurements saved on your computer.
+
+## What Pngr includes
+
+- Independent monitoring targets using ICMP, TCP, or UDP.
+- A hop table and latency visualization, with response-loss and jitter statistics.
+- Multiple synchronized historical graphs, time selections, zooming, and panning.
+- Saved sessions, CSV export, and workspace restoration.
+- Target groups and reusable probing profiles.
+- Route-change events and optional alert actions.
+- An optional read-only local Web / API interface.
+- Installer-based updates with your approval before installation.
+
+Pngr stores settings and measurement history locally in SQLite. It requires no cloud account or background monitoring service. Keep the application open to collect measurements; closing it stops monitoring and the optional local API.
+
+<Callout type="warn" title="Response loss is diagnostic evidence">
+A missing probe reply does not prove that a router dropped forwarded traffic. Routers can filter or rate-limit diagnostic responses while continuing to forward packets. Compare destination measurements and application symptoms before drawing conclusions.
+</Callout>
+
+## Start here
+
+Read the [system requirements](/docs/getting-started/system-requirements), install for [macOS](/docs/getting-started/macos-installation) or [Windows](/docs/getting-started/windows-installation), then follow the [quick start](/docs/getting-started/quick-start).
+
+For measurement interpretation, see [latency, response loss, and jitter](/docs/network-monitoring/measurements).

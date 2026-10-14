@@ -1,0 +1,26 @@
+---
+title: "Hop latency visualization"
+description: "Read the route-aligned latency ranges and response-loss bars."
+---
+
+## Reading the plot
+
+The compact plot beside the hop table aligns one row with each displayed hop. Its horizontal axis is latency in milliseconds.
+
+| Mark | Meaning |
+| --- | --- |
+| Horizontal range with end caps | Minimum to maximum measured latency |
+| Small circular marker | Average latency, falling back to the current value when necessary |
+| Connecting line | Visual link between adjacent available hop markers |
+| Red bar extending from the right | Diagnostic response loss, using its own 0–100% width scale |
+| Highlighted row | Selected hop |
+
+The connecting line helps compare rows; it is not a measurement of latency between routers. Hop measurements are round-trip diagnostic responses from your computer.
+
+Click a hop row or its plot row to select that hop's history graph. Use the graph visibility control in the hop table to add or remove a graph without stopping monitoring.
+
+## Scale and thresholds
+
+The latency scale expands automatically unless a fixed maximum is configured in Display settings. Default warning and critical thresholds are 100 ms and 200 ms. Their background bands provide a visual reference; they are separate from alert rules.
+
+Missing responses have no measured latency. A long red bar at one intermediate hop, with healthy later hops and destination replies, can indicate limited diagnostic replies rather than a forwarding problem.

@@ -1,0 +1,17 @@
+---
+title: "History and storage"
+description: "Retain raw measurements and control historical graph aggregation."
+---
+
+Pngr automatically writes real measurements to its local SQLite database.
+
+| Setting | Default | Range |
+| --- | --- | --- |
+| Retention | 30 days | 1–3650 days |
+| Graph aggregation | 5 seconds | 1–3600 seconds |
+
+Retention removes old samples at startup and every 30 minutes. Saving preferences in **Workspaces and data** also runs retention immediately. Lowering retention can permanently remove older measurements when maintenance runs.
+
+Aggregation controls historical graph queries. It does not replace retained raw samples, which remain available to CSV export. The separate [in-memory samples per hop](/docs/settings/monitoring) setting limits live history, not database retention.
+
+Choose **Apply & open data maintenance…** to [compact the database or import/export a workspace](/docs/advanced/data-maintenance). The window also shows your data directory.

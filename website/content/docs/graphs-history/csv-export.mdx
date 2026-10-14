@@ -1,0 +1,41 @@
+---
+title: "CSV export"
+description: "Export all retained raw measurements for the selected session."
+---
+
+## Export a session
+
+1. Select a live target or an open saved session with measurements.
+2. Choose **File → Export CSV…**.
+3. Choose a filename and save location.
+
+Pngr exports all retained sample rows for that session, ordered by timestamp and hop. The default filename is `Pngr-YYYYMMDD-HHMMSS.csv`.
+
+<Callout>
+The current zoom window and selected interval do not restrict CSV export. Aggregated graph bins are not exported in place of raw rows.
+</Callout>
+
+## Columns
+
+```csv
+Session,Round,Timestamp,Hop,Address,Destination,LatencyMs,Status,Detail,ResponseKind,Transmission,MeasurementEpoch
+```
+
+| Column | Meaning |
+| --- | --- |
+| Session | Session identifier |
+| Round | Measurement round number |
+| Timestamp | Recorded measurement timestamp |
+| Hop | TTL position; `0` identifies the independent destination probe |
+| Address | Responding/associated address when available |
+| Destination | `1` for a destination sample, otherwise `0` |
+| LatencyMs | Measured latency in milliseconds; blank when unavailable |
+| Status | Probe result classification |
+| Detail | Additional diagnostic text when recorded |
+| ResponseKind | Classification of the reply |
+| Transmission | Recorded transmission classification |
+| MeasurementEpoch | Identifies the probing-configuration period |
+
+Numeric latency values use a decimal point. A blank latency is not zero latency. Retain status and transmission fields when analyzing missing responses or errors, and separate configuration epochs when comparing results.
+
+Export does not include an independent archive of settings, alert actions, or every event. It also cannot recover measurements already removed by retention or maintenance.

@@ -1,0 +1,39 @@
+---
+title: "Zooming, panning, and selection"
+description: "Navigate history precisely with a mouse, trackpad, or keyboard."
+---
+
+## Mouse and trackpad
+
+| Action | Result |
+| --- | --- |
+| Drag a graph horizontally | Pan and hold the view at a historical timestamp |
+| Double-click and drag | Select a time interval |
+| Command + wheel on macOS; Ctrl + wheel on Windows | Zoom around the pointer |
+| Shift + wheel, or horizontal wheel/trackpad scrolling | Pan horizontally |
+| Pinch/magnify | Zoom on supported touch/trackpad input |
+
+Ordinary vertical wheel scrolling is available for scrolling the graph stack. Zoom spans are limited to 5 seconds through 7 days. Navigation is bounded by available measurement timestamps.
+
+## Keyboard
+
+Click a graph to give it keyboard focus.
+
+| Key | Result |
+| --- | --- |
+| Left / Right | Pan by one tenth of the visible time span |
+| + / − | Zoom in / out around the center |
+| Escape | Clear the selected interval |
+| Home | Return to Live and clear selection |
+
+The default time range is 10 minutes. The time-range selector offers 1, 5, 10, and 15 minutes; 1 and 6 hours; 1 day; and 7 days. Pointer zoom can create a custom time range.
+
+## Investigate an interval
+
+1. Pan to the event or zoom around it.
+2. Double-click and drag across the interval you want to compare.
+3. Read the Selection label to confirm its start and end timestamps.
+4. Inspect the hop table, which recalculates statistics for the selected interval from retained history.
+5. Use Clear Selection or Escape to clear it. Use the Live button or Home to resume the live view.
+
+Clearing selection preserves zoom and the held timestamp. Returning to Live also clears the selection. Earlier route addresses and probing configurations can appear in selected statistics; do not assume the latest hop table describes the entire session.

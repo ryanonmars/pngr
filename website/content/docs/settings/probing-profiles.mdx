@@ -1,0 +1,20 @@
+---
+title: "Probing profiles"
+description: "Save and reuse protocol, port, source, and timing settings."
+---
+
+Profiles store a probe configuration: protocol, destination port, UDP options, network source, timing, hop limit, concurrency, live memory limit, and hostname resolution. They do not store alert rules, display preferences, or the target address.
+
+## Use the profile menus
+
+Open **Load Profile…** to apply a saved profile to the new-target configuration or selected active target. A running target uses the new configuration on its next round. Historical targets cannot load profiles; choose an active target or New Target first.
+
+Use **Save Current Configuration…**, enter a name, and save. Saving with the same name replaces that profile. **Manage/Delete Profiles…** removes saved profiles without changing active targets.
+
+## Use Settings
+
+In **Monitoring**, choose the configuration scope before loading a profile. Loading changes only that scope. Enter a name and click **Save**, or choose a profile and click **Delete**. These changes are staged until **Apply** or **OK**; Cancel discards them.
+
+Names must be nonempty and no longer than 80 characters. A workspace supports up to 100 profiles. Profiles persist locally with the workspace and travel with configuration exports.
+
+<Callout title="Saved source addresses">A profile can refer to an interface or IP address that is unavailable on another machine or after a network change. Recheck Network source before using an imported profile.</Callout>

@@ -1,0 +1,38 @@
+---
+title: "Checking for updates and updating Pngr"
+description: "Understand automatic notifications, verified downloads, and installation requirements."
+---
+
+## Manual checks
+
+On macOS, choose **Pngr → Check for Updates…**. On Windows, choose **File → Check for Updates…**. The update window reports whether a newer public GitHub release is available and shows its release notes.
+
+A failed check does not mean your installed version is current. Check internet access to GitHub and try again later. **View Release** opens the release page when a release is available.
+
+## Automatic notifications
+
+Pngr checks when the application opens. Automatic attempts are limited to once per 24 hours, including failed attempts. This is a launch-time check, not a background check every 24 hours while the app stays open. A manual check bypasses the automatic-check interval.
+
+When a newer version is found, Pngr displays an in-app notice. Open it to review the release, or dismiss it. An automatic check does not download or install an update.
+
+## Download and install
+
+1. Review the release notes.
+2. Click **Download Update**.
+3. Wait for the download and integrity verification to complete.
+4. Click **Install and Restart** when ready to stop monitoring.
+
+Pngr verifies the update package against the published SHA-256 checksum. Download failure or cancellation leaves the installed application unchanged. Installation waits for normal application exit so Pngr can stop monitoring and save the workspace. Monitoring data is preserved.
+
+## Supported installations
+
+| Platform | In-app installation requirements |
+| --- | --- |
+| macOS | Installed DMG application in `/Applications/` or your user `~/Applications/` directory, with write access |
+| Windows | Installed using `Pngr-Setup.exe`; portable copies do not support in-app installation |
+
+An app running from a disk image or Downloads must be moved into Applications first. A read-only macOS installation needs a writable installation location. If the update window says automatic installation is unavailable, use **View Release** and install the published release package.
+
+<Callout type="warn">
+Distribution packages are unsigned, and macOS packages are not notarized. Gatekeeper or SmartScreen may require approval through the operating system's normal interface. Approve only a download you trust.
+</Callout>

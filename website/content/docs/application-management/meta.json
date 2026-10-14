@@ -1,0 +1,9 @@
+{
+  "title": "Application Management",
+  "pages": [
+    "index",
+    "updates",
+    "uninstalling",
+    "troubleshooting"
+  ]
+}

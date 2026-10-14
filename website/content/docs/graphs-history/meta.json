@@ -1,0 +1,12 @@
+{
+  "title": "Graphs & History",
+  "pages": [
+    "index",
+    "hop-latency",
+    "timeline",
+    "navigation",
+    "synchronized-graphs",
+    "saved-sessions",
+    "csv-export"
+  ]
+}

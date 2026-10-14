@@ -1,0 +1,40 @@
+---
+title: "System requirements"
+description: "Supported installer platforms and local requirements."
+---
+
+## Installer platforms
+
+| Platform | Published website support baseline | Architecture | Installer |
+| --- | --- | --- | --- |
+| macOS | macOS 15 or later | Apple Silicon and Intel | `Pngr-macos-universal.dmg` |
+| Windows | Windows 11 | x64 Intel and AMD | `Pngr-Setup.exe` |
+
+The macOS bundle declares a minimum system version of 12.0. That packaging declaration alone does not establish tested support on older macOS releases; the website advertises macOS 15 or later. Windows ARM64 and Linux installers are not included in the current release packaging.
+
+The installers include the .NET runtime. You do not need to install .NET separately to run the packaged application.
+
+## Network and storage
+
+You need access to the targets you want to monitor. DNS access is needed for hostnames, and Internet access is needed to check or download GitHub releases. A local target can be monitored without a cloud account.
+
+Allow enough writable local storage for saved measurements. Pngr's history is held in its user-data directory, separately from the installed application. See [history and storage](/docs/settings/history-storage) for retention and maintenance settings.
+
+The desktop window has a minimum size of 980 × 640 logical pixels. A display that comfortably fits that window makes the hop table and graphs easier to use.
+
+## Permissions
+
+Installation on Windows is per user and does not require administrator access. Normal ICMP probing does not install a privileged helper or background service.
+
+Windows TCP and UDP intermediate-hop discovery can require running Pngr explicitly with administrator permissions, because it uses a raw ICMP receiver. Without that receiver, endpoint monitoring remains available. Pngr does not elevate itself automatically. See [protocol behavior](/docs/network-monitoring/protocols).
+
+## Running from source
+
+Development builds require the .NET 10 SDK. From the repository root:
+
+```sh
+dotnet restore TraceScope.slnx
+dotnet run --project src/TraceScope.App
+```
+
+Source-checkout launches use `artifacts/data` rather than the installed application's user-data directory. Use `--data-dir PATH` to select a directory explicitly.

@@ -1,0 +1,26 @@
+---
+title: "Data maintenance"
+description: "Manage retention, compact history, and transfer workspace configuration."
+---
+
+Open **Workspace…**, or **Settings → History → Apply & open data maintenance…**.
+
+## Retention and compaction
+
+Set retention and graph aggregation, then choose **Save workspace and preferences**. This saves configuration and immediately removes samples older than retention. Automatic maintenance also runs at startup and every 30 minutes.
+
+**Compact database…** compacts the SQLite history database and reports its before/after size. Database writes wait while compaction holds the storage lock, then resume. Compaction is not an export or backup.
+
+## Export configuration
+
+Choose **Export configuration…** to write a workspace JSON file. It contains target definitions, groups, paused states, probe options, profiles, rules, summaries, preferences, and action configuration. Secret fields contain environment variable names only.
+
+Configuration export does not include measurement history from `tracescope.db`. Use CSV export for measurement data, or close Pngr before making a file backup of its data directory.
+
+## Import configuration
+
+Choose **Import configuration…** and select the JSON file. Pngr validates the configuration before applying it. Import replaces the workspace and restores its configured targets; it does not import a history database. Configuration imports are limited to 4 MiB and the supported configuration version.
+
+Native notifications, SMTP, webhooks, and executable actions from the imported file are disabled. Review destinations and executable paths before re-enabling them in the action editor. Recheck source interfaces and addresses when moving configuration to another machine.
+
+See [General](/docs/settings/general) for the data directory and filenames.

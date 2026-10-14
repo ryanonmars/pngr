@@ -1,0 +1,14 @@
+---
+title: "Local Web / API"
+description: "Enable the read-only dashboard on this computer."
+---
+
+The local web interface is disabled by default. Enable **local read-only dashboard and REST API**, choose a port, and press **Apply**.
+
+The default address is `http://127.0.0.1:8787`. Supported Settings ports are **1024–65535**. Apply starts or stops the listener immediately; changing the port replaces it. If the requested port is occupied, Pngr reports the error and keeps the previous listener and saved settings.
+
+Choose **Apply & open local dashboard controls…**, then **Open dashboard** to launch a browser. The dashboard displays targets, per-hop measurements, historical graphs, and saved sessions. Its Earlier, Later, and Live controls navigate the selected history range.
+
+The listener binds only to IPv4 loopback and closes when Pngr exits. It has no authentication token and is intended for local read-only use. It is unavailable to other computers and does not control monitoring.
+
+See [Local API reference](/docs/advanced/local-api) for endpoints, parameters, and examples.

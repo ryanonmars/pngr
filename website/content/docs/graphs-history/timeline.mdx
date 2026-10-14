@@ -1,0 +1,30 @@
+---
+title: "Historical timeline"
+description: "Understand raw measurements, aggregate bins, errors, and event markers."
+---
+
+## What the timeline shows
+
+Each graph plots latency against local time. The destination graph uses the independent destination probe. Numbered hop graphs follow a TTL position, so the responding address at that position can change over time.
+
+Hover over the graph to inspect the nearest measurement, timestamp, diagnostic response loss, and jitter when available. Event markers show recorded monitoring events when enabled in Display settings. Jitter is the absolute latency change between consecutive qualifying responses; raw jitter comparisons require the same address and probing configuration.
+
+| Appearance | Meaning |
+| --- | --- |
+| Light latency line | Measured qualifying response latency |
+| Red loss bars | Missing diagnostic responses or response loss within an aggregate bin |
+| Gray bars | Probe errors; errors are distinguished from response loss |
+| Jitter band | Consecutive-response latency variation, when enabled |
+| Blue interval overlay | Selected historical interval |
+
+Latency and jitter lines break at address or measurement-configuration changes rather than joining unrelated measurements.
+
+## Raw and aggregated history
+
+Pngr loads retained measurements for the visible interval from its local database. Larger windows can use aggregate bins to keep the graph responsive. The graph title identifies raw measurements or aggregated bins and reports the number of probes.
+
+Aggregated bins may include address or configuration changes. Zoom in and select a shorter interval when you need to inspect a transition. Aggregation changes the display, not the CSV export of retained raw measurements.
+
+## Live and held views
+
+A live view follows the latest sample. Panning or selecting an interval holds the view at a timestamp while monitoring continues. Empty space before the first recorded measurement is not packet loss. “No measurements in this time range” means the current window contains no available samples.

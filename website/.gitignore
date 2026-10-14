@@ -1,6 +1,19 @@
-docs/
+/docs/
 node_modules/
 dist/
 .vercel/
 .env
 .env.*
+.next/
+.source/
+out/
+public/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
+playwright-report/
+# Product documentation is explicitly requested source content.
+!content/docs/
+!content/docs/**
+!app/docs/
+!app/docs/**

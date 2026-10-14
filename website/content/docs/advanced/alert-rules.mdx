@@ -1,0 +1,31 @@
+---
+title: "Alert rules and recovery"
+description: "Configure sustained destination conditions and inspect stored events."
+---
+
+Open **Alerts…**, or use **Settings → Alerts & notifications → Apply & edit alert rules / history…**.
+
+## Create a rule
+
+Enter a name, choose a condition and threshold, and set evaluation, cooldown, and recovery periods. Choose **All targets**, **Selected target**, or **Selected group**, then click **Add rule**. Adding, removing, and enabling/disabling a rule saves it immediately. A workspace supports up to 200 rules.
+
+| Condition | Evaluation |
+| --- | --- |
+| Latency | Destination average latency exceeds the threshold in milliseconds |
+| PacketLoss | Destination diagnostic response-loss percentage exceeds the threshold |
+| Jitter | Destination jitter exceeds the threshold in milliseconds |
+| Unreachable | Destination does not return a successful measured response |
+| RouteChanged | Confirmed route-change event; threshold and sustained periods do not apply |
+| Recovery | Reports recovery after an outage has lasted the evaluation period |
+
+Latency, PacketLoss, and Jitter use destination history within the evaluation window. A breach must persist for the evaluation period before firing. A continuing breach can fire again after cooldown. A normal condition must persist for the recovery period before a recovery event is emitted.
+
+The editor starts with **PacketLoss**, a **5% threshold**, **30-second evaluation**, **300-second cooldown**, and **10-second recovery**. The underlying new-rule model defaults to a 10% threshold; use the displayed editor values when adding a rule. Evaluation and recovery fields accept 0–3600 seconds; cooldown accepts 0–86400 seconds.
+
+<Callout title="Diagnostic alerts are not proof of traffic loss">Rules evaluate probe responses. Filtering or rate limiting can suppress diagnostics while user traffic still forwards. Local probe errors neither trigger a network outage nor recover an active network alert.</Callout>
+
+## Events and acknowledgment
+
+The event log contains persisted alerts, recoveries, confirmed route changes, and action results. Select an event and choose **Acknowledge selected event** to record an acknowledgment timestamp and note. Acknowledgment records that you reviewed an event; it does not disable the rule or resolve the network condition.
+
+Native delivery and external actions use separate [notification/action spacing](/docs/advanced/alert-actions). Suppressing delivery does not remove stored monitoring events.

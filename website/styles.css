@@ -647,3 +647,17 @@ dialog img {
     width: clamp(160px, 50vw, 195px);
   }
 }
+
+@media (max-width: 450px) {
+  .header {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .header .brand-lockup {
+    flex-shrink: 0;
+  }
+  .header nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

@@ -1,0 +1,23 @@
+---
+title: "General"
+description: "Restore your workspace and locate Pngr\u2019s local files."
+---
+
+## Restore targets at startup
+
+**Restore monitored targets and paused states at startup** is enabled by default. Pngr restores the workspace's monitored targets, groups, per-target probe options, and paused states. Disable it to start without automatically restoring monitored targets.
+
+Open **Apply & manage workspaces…** for [configuration import, export, and data maintenance](/docs/advanced/data-maintenance).
+
+## Local files
+
+General displays the actual data directory. Pngr uses `workspace.json` for preferences and workspace configuration, and `tracescope.db` for SQLite measurements. The legacy TraceScope folder and database name are retained for compatibility.
+
+| Platform | Installed application default |
+| --- | --- |
+| macOS | `~/Library/Application Support/TraceScope` |
+| Windows | `%LOCALAPPDATA%\TraceScope` |
+
+A development checkout can use `artifacts/data`; the `--data-dir` launch argument overrides the directory. Use the path displayed in Settings when locating your own files.
+
+<Callout title="Keep Pngr open">Monitoring, history writes, alerts, and the optional local API run in the desktop process. Closing Pngr stops them; there is no separate background monitoring service.</Callout>

@@ -1,0 +1,73 @@
+---
+title: "Email, webhooks, and scripts"
+description: "Configure optional alert actions and test delivery."
+---
+
+Open **Alerts → Notifications and actions…**, or **Settings → Alerts & notifications → Apply & configure email, webhooks and scripts…**. Each action is disabled until explicitly configured and enabled. Press **Save actions** to persist changes.
+
+## Delivery controls
+
+| Setting | Default | Range and effect |
+| --- | --- | --- |
+| Send recovery notifications and actions | On | Applies to native and external recovery delivery |
+| Notification spacing | 30 seconds | 0–86400; global native-notification spacing |
+| Action spacing | 30 seconds | 0–86400; per session, rule, and event kind |
+| Action timeout | 15 seconds | 1–120; applies to each delivery attempt |
+
+Actions run serially through a bounded queue. A full queue can reject an event. Failures are logged as action events; they do not stop monitoring. Turning off an action prevents queued work from continuing with the old configuration.
+
+## Email
+
+On **SMTP**, enable SMTP email and enter the host, port, sender, and recipient. Port defaults to **587**, and **Use STARTTLS** is on. Username is optional. If authentication is needed, provide the name of an environment variable containing the password.
+
+The subject is `Pngr — <event kind>`; the body includes the timestamp, message, and session ID. The editor accepts one sender and one recipient email address.
+
+## Webhooks
+
+Enable **webhook POST**, supply an HTTP or HTTPS URL, and optionally supply a bearer-token environment variable name. Embedded credentials in the URL are rejected. Pngr posts the monitoring event as JSON with `Content-Type: application/json`. It does not follow redirects; a non-success HTTP response is logged as a failure.
+
+The webhook event uses these case-sensitive property names:
+
+```json
+{
+  "Id": "00000000-0000-0000-0000-000000000001",
+  "SessionId": "00000000-0000-0000-0000-000000000002",
+  "Timestamp": "2026-10-14T12:00:00+00:00",
+  "Kind": "Alert",
+  "Message": "example.net: Monitoring alert — Average latency exceeds the threshold",
+  "AlertRuleId": "example-rule",
+  "AcknowledgedAt": null,
+  "AcknowledgmentNote": null
+}
+```
+
+This is an illustrative event payload. Event kinds delivered by actions are `Alert`, `Recovery`, and `RouteChange`.
+
+## Local executable
+
+On **Executable**, enable the action and provide an absolute executable path, a JSON array of arguments, and an optional absolute working directory. For example, choose `/bin/sh` on macOS with arguments `["/absolute/path/to/handle-pngr-alert.sh"]`. On Windows, select the absolute path to your interpreter or executable and pass its arguments as the same JSON array format.
+
+Pngr launches the executable directly without shell interpolation. Messages are supplied through environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `TRACESCOPE_EVENT_JSON` | Serialized monitoring event |
+| `TRACESCOPE_EVENT_KIND` | Alert, Recovery, or RouteChange |
+| `TRACESCOPE_EVENT_MESSAGE` | Human-readable event message |
+
+The legacy variable names are intentional. Output is drained and discarded. A nonzero exit code is a failure; timeout or application exit cancels the process tree. Only enable programs you trust.
+
+## Secrets and testing
+
+Pngr stores environment variable **names**, not secret values, in the workspace and exported configuration. The variables must be present in Pngr's own process environment; setting one in an unrelated terminal after Pngr starts does not make it available to the running app. A named but missing variable causes the relevant action to fail.
+
+Choose a live target and click **Test enabled actions**. This saves settings and performs real enabled actions. Check the alert event log for success or failure. Imported workspaces disable native, SMTP, webhook, and executable actions until you explicitly re-enable them.
+
+<Accordions>
+  <Accordion title="Why did a test not produce an action?">
+    Confirm that an action is enabled and a live target is selected. Check the persisted action result for a missing environment variable, unreachable SMTP server, non-success webhook response, missing executable, or timeout. A closely repeated test can be suppressed by action spacing.
+  </Accordion>
+  <Accordion title="Does Pngr retry a failed delivery?">
+    There is no delivery retry setting. The current dispatcher performs one attempt for each queued action; a continuing breached condition can generate another alert after its rule cooldown.
+  </Accordion>
+</Accordions>

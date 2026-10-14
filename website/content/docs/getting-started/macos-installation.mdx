@@ -1,0 +1,33 @@
+---
+title: "macOS installation"
+description: "Install the universal Pngr application from the DMG."
+---
+
+## Install Pngr
+
+1. Open the [Pngr releases page](https://github.com/ryanonmars/pngr/releases) and choose the current stable release.
+2. Download `Pngr-macos-universal.dmg`.
+3. Open the DMG and drag **Pngr** to **Applications**.
+4. Open Pngr from Applications, then follow the [quick start](/docs/getting-started/quick-start).
+
+The universal launcher selects the native Apple Silicon or Intel runtime payload. No separate .NET installation is needed.
+
+<Callout type="warn" title="macOS security prompts">
+Current packages are unsigned and not notarized. They have ad-hoc integrity signatures. macOS may warn or block launch. Use the operating system's normal approval interface only if you trust the download. Pngr does not disable or bypass Gatekeeper.
+</Callout>
+
+## Install in a writable location
+
+Copy the app out of the DMG before using in-app updates. Automatic installation requires an app copied into a writable Applications folder. Running from a mounted DMG, an older portable ZIP, or a source checkout requires manual installer migration.
+
+If an update reports that installation is unavailable, download the current DMG and replace the installed app using the normal installation process. See [updating Pngr](/docs/application-management/updates).
+
+## Your data
+
+Installed builds keep history, settings, profiles, and workspace data in:
+
+```text
+~/Library/Application Support/TraceScope
+```
+
+The retained `TraceScope` folder name and `tracescope.db` filename preserve compatibility with earlier versions. Updating the application preserves this separate directory.
