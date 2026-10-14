@@ -1,6 +1,7 @@
 """Universal 2 packaging checks, including architecture-dependent .NET payloads."""
 import importlib.util
 import json
+import os
 import pathlib
 import plistlib
 import struct
@@ -86,6 +87,7 @@ class UniversalPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "Updater must be Universal 2"):
             VERIFIER.verify(bundle, "0.7.1", False, True)
 
+    @unittest.skipUnless(os.name == "posix", "Unix execution bits are not represented by Windows chmod")
     def test_update_permission_validation_checks_a_copy_and_preserves_original(self):
         bundle = self.bundle()
         assembly = bundle / "Contents/Resources/runtimes/osx-arm64/pngr.dll"

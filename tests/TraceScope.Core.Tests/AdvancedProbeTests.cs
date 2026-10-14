@@ -54,10 +54,19 @@ public sealed class AdvancedProbeTests
     [Fact]
     public async Task TcpClosedPortCountsARealResetAsHostResponse()
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
+        // Use an unused port outside the hosted platforms' ephemeral range. A port
+        // allocated with port 0 can be reused by a concurrent test or the probe itself.
+        // A bound, non-listening socket is unsuitable: macOS can silently drop its SYNs.
+        var port = 0;
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var candidate = Random.Shared.Next(10000, 20000);
+            var reservation = new TcpListener(IPAddress.Loopback, candidate);
+            try { reservation.Start(); port = candidate; break; }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse) { }
+            finally { reservation.Stop(); }
+        }
+        Assert.NotEqual(0, port);
         var result = await new AdvancedProbeTransport().ProbeAsync(IPAddress.Loopback, 255,
             new ProbeOptions { Protocol = ProbeProtocol.Tcp, DestinationPort = port,
                 Timeout = TimeSpan.FromSeconds(OperatingSystem.IsWindows() ? 10 : 2) }, CancellationToken.None);
