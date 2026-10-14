@@ -1,0 +1,204 @@
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace TraceScope.Core;
+
+/// <summary>Stores webhook credentials outside workspace configuration.</summary>
+public interface IWebhookSecretStore
+{
+    string Store(string url, string? existingId = null);
+    string Retrieve(string id);
+    void Delete(string id);
+}
+
+/// <summary>Uses the current user's macOS Keychain or Windows Credential Manager.</summary>
+public sealed class WebhookSecretStore : IWebhookSecretStore
+{
+    private const string Service = "com.pngr.webhooks";
+    private const string FailureMessage = "Unable to access the secure webhook credential store.";
+    private const int NotFoundMac = -25300;
+    private const int NotFoundWindows = 1168;
+    public static IWebhookSecretStore Default { get; } = new WebhookSecretStore();
+    public static IWebhookSecretStore Create() => new WebhookSecretStore();
+
+    public string Store(string url, string? existingId = null)
+    {
+        if (string.IsNullOrWhiteSpace(url) || Encoding.UTF8.GetByteCount(url) > 2560)
+            throw new ArgumentException("A valid webhook credential is required.");
+        var id = existingId ?? Guid.NewGuid().ToString("N");
+        ValidateId(id);
+        EnsureSupported();
+        var bytes = Encoding.UTF8.GetBytes(url);
+        try
+        {
+            if (OperatingSystem.IsMacOS()) StoreMac(id, bytes);
+            else StoreWindows(id, bytes);
+            return id;
+        }
+        catch { throw new InvalidOperationException(FailureMessage); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    public string Retrieve(string id)
+    {
+        ValidateId(id);
+        EnsureSupported();
+        byte[]? bytes = null;
+        try
+        {
+            bytes = OperatingSystem.IsMacOS() ? RetrieveMac(id) : RetrieveWindows(id);
+            return Encoding.UTF8.GetString(bytes);
+        }
+        catch { throw new InvalidOperationException(FailureMessage); }
+        finally { if (bytes is not null) CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    public void Delete(string id)
+    {
+        ValidateId(id);
+        EnsureSupported();
+        try
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                var status = FindMac(id, out var length, out var data, out var item);
+                ClearMacData(data, length);
+                if (status == NotFoundMac) return;
+                try { if (status != 0 || SecKeychainItemDelete(item) != 0) throw new InvalidOperationException(); }
+                finally { if (item != 0) CFRelease(item); }
+            }
+            else if (!CredDeleteW(Target(id), 1, 0) && Marshal.GetLastWin32Error() != NotFoundWindows)
+                throw new InvalidOperationException();
+        }
+        catch { throw new InvalidOperationException(FailureMessage); }
+    }
+
+    private static void ValidateId(string id)
+    {
+        if (id is null || !Guid.TryParseExact(id, "N", out _))
+            throw new ArgumentException("Invalid webhook credential identifier.");
+    }
+
+    private static void EnsureSupported()
+    {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Secure webhook credential storage requires macOS or Windows.");
+    }
+
+    private static string Target(string id) => $"{Service}/{id}";
+    private static int FindMac(string id, out uint length, out nint data, out nint item)
+    {
+        var service = Encoding.UTF8.GetBytes(Service);
+        var account = Encoding.UTF8.GetBytes(id);
+        return SecKeychainFindGenericPassword(0, (uint)service.Length, service, (uint)account.Length, account, out length, out data, out item);
+    }
+
+    private static void StoreMac(string id, byte[] bytes)
+    {
+        var status = FindMac(id, out var oldLength, out var oldData, out var item);
+        ClearMacData(oldData, oldLength);
+        try
+        {
+            if (status == 0)
+            {
+                if (SecKeychainItemModifyAttributesAndData(item, 0, (uint)bytes.Length, bytes) != 0) throw new InvalidOperationException();
+            }
+            else if (status == NotFoundMac)
+            {
+                var service = Encoding.UTF8.GetBytes(Service);
+                var account = Encoding.UTF8.GetBytes(id);
+                if (SecKeychainAddGenericPassword(0, (uint)service.Length, service, (uint)account.Length, account, (uint)bytes.Length, bytes, out var created) != 0)
+                    throw new InvalidOperationException();
+                if (created != 0) CFRelease(created);
+            }
+            else throw new InvalidOperationException();
+        }
+        finally { if (item != 0) CFRelease(item); }
+    }
+
+    private static byte[] RetrieveMac(string id)
+    {
+        var status = FindMac(id, out var length, out var data, out var item);
+        try
+        {
+            if (status != 0 || length > 2560 || data == 0) throw new InvalidOperationException();
+            var bytes = new byte[length];
+            Marshal.Copy(data, bytes, 0, bytes.Length);
+            return bytes;
+        }
+        finally
+        {
+            ClearMacData(data, length);
+            if (item != 0) CFRelease(item);
+        }
+    }
+
+    private static void ClearMacData(nint data, uint length)
+    {
+        if (data == 0) return;
+        // Clear native credential memory before releasing it back to Security.framework.
+        for (uint i = 0; i < length; i++) Marshal.WriteByte(data, (int)i, 0);
+        SecKeychainItemFreeContent(0, data);
+    }
+
+    private static void StoreWindows(string id, byte[] bytes)
+    {
+        var blob = Marshal.AllocHGlobal(bytes.Length);
+        try
+        {
+            Marshal.Copy(bytes, 0, blob, bytes.Length);
+            var credential = new Credential { Type = 1, TargetName = Target(id), CredentialBlobSize = (uint)bytes.Length, CredentialBlob = blob, Persist = 2, UserName = "Pngr" };
+            if (!CredWriteW(ref credential, 0)) throw new InvalidOperationException();
+        }
+        finally
+        {
+            for (var i = 0; i < bytes.Length; i++) Marshal.WriteByte(blob, i, 0);
+            Marshal.FreeHGlobal(blob);
+        }
+    }
+
+    private static byte[] RetrieveWindows(string id)
+    {
+        if (!CredReadW(Target(id), 1, 0, out var pointer)) throw new InvalidOperationException();
+        try
+        {
+            var credential = Marshal.PtrToStructure<Credential>(pointer);
+            if (credential.CredentialBlobSize > 2560 || credential.CredentialBlob == 0) throw new InvalidOperationException();
+            var bytes = new byte[credential.CredentialBlobSize];
+            Marshal.Copy(credential.CredentialBlob, bytes, 0, bytes.Length);
+            for (var i = 0; i < bytes.Length; i++) Marshal.WriteByte(credential.CredentialBlob, i, 0);
+            return bytes;
+        }
+        finally { CredFree(pointer); }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct Credential
+    {
+        public uint Flags;
+        public uint Type;
+        public string TargetName;
+        public string? Comment;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+        public uint CredentialBlobSize;
+        public nint CredentialBlob;
+        public uint Persist;
+        public uint AttributeCount;
+        public nint Attributes;
+        public string? TargetAlias;
+        public string UserName;
+    }
+
+    private const string Security = "/System/Library/Frameworks/Security.framework/Security";
+    [DllImport(Security)] private static extern int SecKeychainFindGenericPassword(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, out uint length, out nint data, out nint item);
+    [DllImport(Security)] private static extern int SecKeychainAddGenericPassword(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, uint length, byte[] data, out nint item);
+    [DllImport(Security)] private static extern int SecKeychainItemModifyAttributesAndData(nint item, nint attributes, uint length, byte[] data);
+    [DllImport(Security)] private static extern int SecKeychainItemFreeContent(nint attributes, nint data);
+    [DllImport(Security)] private static extern int SecKeychainItemDelete(nint item);
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")] private static extern void CFRelease(nint value);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CredWriteW(ref Credential credential, uint flags);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CredReadW(string target, uint type, uint flags, out nint credential);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CredDeleteW(string target, uint type, uint flags);
+    [DllImport("advapi32.dll")] private static extern void CredFree(nint credential);
+}

@@ -17,10 +17,17 @@ public sealed record SmtpAlertConfiguration
     public string From { get; init; } = "";
     public string To { get; init; } = "";
 }
+public enum WebhookFormat { GenericJson, Discord }
+public sealed record WebhookEventContext(string? Target = null, string? AlertRule = null);
+
 public sealed record WebhookAlertConfiguration
 {
     public bool Enabled { get; init; }
+    // Url is retained only to import legacy configurations. Saves migrate it to secure storage.
     public string Url { get; init; } = "";
+    public string UrlSecretId { get; init; } = "";
+    public WebhookFormat Format { get; init; } = WebhookFormat.GenericJson;
+    public override string ToString() => $"WebhookAlertConfiguration {{ Enabled = {Enabled}, Format = {Format}, Url = [redacted] }}";
     public string BearerTokenEnvironmentVariable { get; init; } = "";
 }
 public sealed record ScriptAlertConfiguration
@@ -53,8 +60,7 @@ public sealed record AlertActionConfiguration
             try { _ = new MailAddress(Smtp.From); _ = new MailAddress(Smtp.To); }
             catch (Exception error) when (error is ArgumentException or FormatException) { throw new InvalidDataException("SMTP sender and recipient must be email addresses."); }
         }
-        if (Webhook.Enabled && (!Uri.TryCreate(Webhook.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo)))
-            throw new InvalidDataException("Webhook requires an HTTP(S) URL without embedded credentials.");
+        WebhookDelivery.ValidateConfiguration(Webhook);
         if (Script.Enabled && (string.IsNullOrEmpty(Script.Executable) || !Path.IsPathFullyQualified(Script.Executable) || Script.Arguments.Length > 128 ||
             !string.IsNullOrEmpty(Script.WorkingDirectory) && !Path.IsPathFullyQualified(Script.WorkingDirectory)))
             throw new InvalidDataException("Script action requires an absolute executable path and working directory.");
@@ -75,12 +81,14 @@ public sealed record AlertActionResult(Guid EventId, string Action, bool Success
 /// notification/action spacing, strict timeouts, and process-tree cancellation prevent action storms.</summary>
 public sealed class AlertActionDispatcher : IAsyncDisposable
 {
-    private sealed record Work(MonitoringEvent Event, AlertActionConfiguration Configuration);
+    private sealed record Work(MonitoringEvent Event, AlertActionConfiguration Configuration, WebhookEventContext? Context);
     private readonly Channel<Work> _queue = Channel.CreateBounded<Work>(new BoundedChannelOptions(64)
     { FullMode = BoundedChannelFullMode.Wait, SingleReader = true, SingleWriter = false });
     private readonly CancellationTokenSource _stop = new();
     private readonly IDesktopNotifier _notifier;
     private readonly HttpClient _http;
+    private readonly WebhookDelivery _webhooks;
+    private readonly Func<MonitoringEvent, WebhookEventContext?>? _webhookContext;
     private readonly Task _worker;
     private readonly Dictionary<(Guid Session, string Rule, string Kind), DateTimeOffset> _lastActions = [];
     private DateTimeOffset? _lastNotification;
@@ -88,12 +96,16 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
     private int _disposed;
     public event Action<AlertActionResult>? ActionCompleted;
 
-    public AlertActionDispatcher(AlertActionConfiguration? configuration = null, IDesktopNotifier? notifier = null)
+    public AlertActionDispatcher(AlertActionConfiguration? configuration = null, IDesktopNotifier? notifier = null,
+        HttpMessageHandler? httpHandler = null, IWebhookSecretStore? secretStore = null,
+        Func<MonitoringEvent, WebhookEventContext?>? webhookContext = null)
     {
         _configuration = configuration ?? new(); _configuration.Validate();
         _configuration = _configuration with { Script = _configuration.Script with { Arguments = _configuration.Script.Arguments.ToArray() } };
         _notifier = notifier ?? DesktopNotifier.Create();
-        _http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+        _http = new HttpClient(httpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+        _webhooks = new WebhookDelivery(_http, secretStore ?? WebhookSecretStore.Default);
+        _webhookContext = webhookContext;
         _worker = ProcessQueueAsync();
     }
     public void Configure(AlertActionConfiguration configuration)
@@ -115,7 +127,10 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         var config = Volatile.Read(ref _configuration);
         if (monitoringEvent.Kind == "Recovery" && !config.IncludeRecovery) return false;
         if (!config.NativeNotificationsEnabled && !config.Smtp.Enabled && !config.Webhook.Enabled && !config.Script.Enabled) return false;
-        return _queue.Writer.TryWrite(new(monitoringEvent, config));
+        WebhookEventContext? context = null;
+        if (config.Webhook.Format == WebhookFormat.Discord)
+            try { context = _webhookContext?.Invoke(monitoringEvent); } catch { /* Optional context must not prevent delivery. */ }
+        return _queue.Writer.TryWrite(new(monitoringEvent, config, context));
     }
     private async Task ProcessQueueAsync()
     {
@@ -144,7 +159,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
                     foreach (var stale in _lastActions.Where(x => now - x.Value > TimeSpan.FromDays(1)).Select(x => x.Key).Take(2048).ToArray()) _lastActions.Remove(stale);
                 if (_lastActions.Count > 8192) _lastActions.Clear();
                 if (config.Smtp.Enabled && ReferenceEquals(config, Volatile.Read(ref _configuration))) await ExecuteAsync(e, "SMTP", config.ActionTimeoutSeconds, ct => SendEmailAsync(e, config.Smtp, ct));
-                if (config.Webhook.Enabled && ReferenceEquals(config, Volatile.Read(ref _configuration))) await ExecuteAsync(e, "Webhook", config.ActionTimeoutSeconds, ct => SendWebhookAsync(e, config.Webhook, ct));
+                if (config.Webhook.Enabled && ReferenceEquals(config, Volatile.Read(ref _configuration))) await ExecuteAsync(e, "Webhook", config.ActionTimeoutSeconds, ct => _webhooks.SendAsync(e, config.Webhook, work.Context, () => ReferenceEquals(config, Volatile.Read(ref _configuration)), ct));
                 if (config.Script.Enabled && ReferenceEquals(config, Volatile.Read(ref _configuration))) await ExecuteAsync(e, "Script", config.ActionTimeoutSeconds, ct => RunScriptAsync(e, config.Script, ct));
             }
         }
@@ -155,21 +170,18 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token); cts.CancelAfter(TimeSpan.FromSeconds(timeout));
         try { await action(cts.Token); Report(new(e.Id, name, true, "Completed")); }
         catch (OperationCanceledException) { if (!_stop.IsCancellationRequested) Report(new(e.Id, name, false, "Action timed out")); }
-        catch (Exception error) { Report(new(e.Id, name, false, error is HttpRequestException ? "HTTP request failed" : error.Message)); }
+        catch (Exception error)
+        {
+            var message = name == "Webhook" ? error is WebhookDeliveryException ? error.Message : "Webhook delivery failed; check the URL credential and connection."
+                : error is HttpRequestException ? "HTTP request failed" : error.Message;
+            Report(new(e.Id, name, false, message));
+        }
     }
     private void Report(AlertActionResult result) { try { ActionCompleted?.Invoke(result); } catch { /* Observers cannot break delivery/shutdown. */ } }
     private static string Secret(string environmentVariable)
     {
         if (string.IsNullOrEmpty(environmentVariable)) return "";
         return Environment.GetEnvironmentVariable(environmentVariable) ?? throw new InvalidOperationException($"Secret environment variable {environmentVariable} is not configured.");
-    }
-    private async Task SendWebhookAsync(MonitoringEvent e, WebhookAlertConfiguration config, CancellationToken ct)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, config.Url)
-        { Content = new StringContent(JsonSerializer.Serialize(e), System.Text.Encoding.UTF8, "application/json") };
-        if (!string.IsNullOrEmpty(config.BearerTokenEnvironmentVariable)) request.Headers.Authorization = new("Bearer", Secret(config.BearerTokenEnvironmentVariable));
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        if (!response.IsSuccessStatusCode) throw new IOException($"Webhook returned HTTP {(int)response.StatusCode}.");
     }
     private static async Task SendEmailAsync(MonitoringEvent e, SmtpAlertConfiguration config, CancellationToken ct)
     {

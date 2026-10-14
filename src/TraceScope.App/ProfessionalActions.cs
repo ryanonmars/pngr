@@ -14,7 +14,9 @@ public partial class MainWindow
         if (_closing) return;
         if (_actions is null)
         {
-            _actions = new AlertActionDispatcher(_configuration.Actions);
+            _actions = new AlertActionDispatcher(_configuration.Actions, webhookContext: item => new WebhookEventContext(
+                _engine.Sessions.FirstOrDefault(s => s.Id == item.SessionId)?.Target,
+                _configuration.Alerts.FirstOrDefault(r => r.Id == item.AlertRuleId)?.Name));
             _actions.ActionCompleted += result => Dispatcher.UIThread.Post(async () =>
             {
                 if (_closing) return;
@@ -68,8 +70,15 @@ public partial class MainWindow
         var passwordVariable = Input(settings.Smtp.PasswordEnvironmentVariable, "Password environment variable name");
         var from = Input(settings.Smtp.From, "Sender email"); var to = Input(settings.Smtp.To, "Recipient email");
         var webhookEnabled = new CheckBox { Content = "Enable webhook POST", IsChecked = settings.Webhook.Enabled };
-        var url = Input(settings.Webhook.Url, "HTTP(S) webhook URL");
+        var format = new ComboBox { Name = "WebhookFormat", ItemsSource = new[] { "Generic JSON", "Discord" }, SelectedIndex = (int)settings.Webhook.Format };
+        var url = Input(settings.Webhook.Url, settings.Webhook.UrlSecretId.Length > 0 ? "Stored securely — leave blank to keep, or paste a replacement URL" : "HTTP(S) webhook URL");
+        url.Name = "WebhookUrl";
+        url.PasswordChar = '●';
+        url.MaxLength = 2560;
+        var clearUrl = new CheckBox { Name = "ClearWebhookUrl", Content = "Remove saved webhook URL" };
         var tokenVariable = Input(settings.Webhook.BearerTokenEnvironmentVariable, "Bearer-token environment variable name (optional)");
+        tokenVariable.Name = "WebhookBearerReference";
+        webhookEnabled.Name = "WebhookEnabled";
         var scriptEnabled = new CheckBox { Content = "Enable local executable action", IsChecked = settings.Script.Enabled };
         var executable = Input(settings.Script.Executable, "Absolute executable path");
         var arguments = Input(JsonSerializer.Serialize(settings.Script.Arguments), "JSON argument array, e.g. [\"arg\"]");
@@ -85,7 +94,10 @@ public partial class MainWindow
                 Smtp = new() { Enabled = smtpEnabled.IsChecked == true, Host = host.Text?.Trim() ?? "", Port = (int)(port.Value ?? 587),
                     UseTls = tls.IsChecked == true, Username = username.Text ?? "", PasswordEnvironmentVariable = passwordVariable.Text?.Trim() ?? "",
                     From = from.Text?.Trim() ?? "", To = to.Text?.Trim() ?? "" },
-                Webhook = new() { Enabled = webhookEnabled.IsChecked == true, Url = url.Text?.Trim() ?? "", BearerTokenEnvironmentVariable = tokenVariable.Text?.Trim() ?? "" },
+                Webhook = new() { Enabled = webhookEnabled.IsChecked == true && clearUrl.IsChecked != true, Format = (WebhookFormat)format.SelectedIndex,
+                    Url = clearUrl.IsChecked == true ? "" : url.Text?.Trim() ?? "",
+                    UrlSecretId = clearUrl.IsChecked == true || !string.IsNullOrWhiteSpace(url.Text) ? "" : _configuration.Actions.Webhook.UrlSecretId,
+                    BearerTokenEnvironmentVariable = tokenVariable.Text?.Trim() ?? "" },
                 Script = new() { Enabled = scriptEnabled.IsChecked == true, Executable = executable.Text?.Trim() ?? "",
                     Arguments = JsonSerializer.Deserialize<string[]>(arguments.Text ?? "[]") ?? [], WorkingDirectory = directory.Text?.Trim() ?? "" }
             };
@@ -95,8 +107,14 @@ public partial class MainWindow
         {
             try
             {
-                _configuration = _configuration with { Actions = ReadActions() }; ConfigureActions();
-                await SaveWorkspaceNowAsync(); status.Text = "Actions saved. Disabled actions perform no work."; return true;
+                var previousId = _configuration.Actions.Webhook.UrlSecretId;
+                var saved = await _workspaceStore.SaveAsync(CaptureWorkspace() with { Actions = ReadActions() });
+                _configuration = _configuration with { Actions = saved.Actions }; ConfigureActions();
+                if (previousId.Length > 0 && previousId != saved.Actions.Webhook.UrlSecretId)
+                    try { WebhookSecretStore.Default.Delete(previousId); } catch { /* Never echo credential-store errors. */ }
+                url.Text = ""; clearUrl.IsChecked = false; webhookEnabled.IsChecked = saved.Actions.Webhook.Enabled;
+                url.Watermark = saved.Actions.Webhook.UrlSecretId.Length > 0 ? "Stored securely — leave blank to keep, or paste a replacement URL" : "HTTP(S) webhook URL";
+                status.Text = "Actions saved. Disabled actions perform no work."; return true;
             }
             catch (Exception ex) { status.Text = ex.Message; return false; }
         }
@@ -129,11 +147,14 @@ public partial class MainWindow
             FormRow("Action timeout (s)", timeout), permission);
         var email = ToolPanel(smtpEnabled, FormRow("SMTP server", host), FormRow("Port", port), tls, FormRow("Username", username),
             FormRow("Password reference", passwordVariable), FormRow("From", from), FormRow("To", to));
-        var webhook = ToolPanel(webhookEnabled, url, tokenVariable);
+        format.SelectionChanged += (_, _) => tokenVariable.IsEnabled = format.SelectedIndex == (int)WebhookFormat.GenericJson;
+        tokenVariable.IsEnabled = format.SelectedIndex == (int)WebhookFormat.GenericJson;
+        var webhook = ToolPanel(webhookEnabled, FormRow("Webhook format", format), url, clearUrl, tokenVariable,
+            new TextBlock { Text = "URLs are credentials, stored in macOS Keychain or Windows Credential Manager and omitted from exports. Discord uses embeds with mentions disabled.", TextWrapping = Avalonia.Media.TextWrapping.Wrap });
         var script = ToolPanel(scriptEnabled, new TextBlock { Text = "An enabled executable runs locally for matching alerts. Enable only programs you trust.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }, executable, arguments, directory);
         var tabs = new TabControl { ItemsSource = new[] { new TabItem { Header = "Notifications", Content = general }, new TabItem { Header = "SMTP", Content = email },
             new TabItem { Header = "Webhook", Content = webhook }, new TabItem { Header = "Executable", Content = script } } };
-        dialog.Content = ToolPanel(new TextBlock { Text = "All actions are optional. Secrets are referenced by environment variable name and are never written to exported configuration.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+        dialog.Content = ToolPanel(new TextBlock { Text = "All actions are optional. Webhook URLs use secure OS storage. SMTP passwords and generic bearer tokens use environment variable references.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
             tabs, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { save, test } }, status);
         await dialog.ShowDialog(this);
     }

@@ -119,6 +119,7 @@ public partial class MainWindow
             if (_closing) return;
             if (_configuration.WebEnabled) await EnableWebAsync();
             ConfigureActions();
+            if (_workspaceStore.CredentialWarning is { } warning) StatusText.Text = warning;
         }
         catch (Exception ex) { StatusText.Text = "Workspace could not be restored: " + ex.Message; }
     }
@@ -130,7 +131,15 @@ public partial class MainWindow
         Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
             .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused, x.TcpPort, x.UdpPort, x.ProfileName)).ToArray()
     };
-    private Task SaveWorkspaceNowAsync() => _workspaceStore.SaveAsync(CaptureWorkspace());
+    private async Task SaveWorkspaceNowAsync()
+    {
+        var saved = await _workspaceStore.SaveAsync(CaptureWorkspace());
+        if (_configuration.Actions.Webhook != saved.Actions.Webhook)
+        {
+            _configuration = _configuration with { Actions = saved.Actions };
+            ConfigureActions();
+        }
+    }
     private void ScheduleWorkspaceSave()
     {
         if (!_runtimeFeatures || _restoringWorkspace || _closing) return;
@@ -290,7 +299,7 @@ public partial class MainWindow
                     SuggestedFileName = "Pngr.workspace.json", DefaultExtension = "json" });
                 if (file is null) return;
                 await using var stream = await file.OpenWriteAsync(); if (stream.CanSeek) stream.SetLength(0);
-                await JsonSerializer.SerializeAsync(stream, CaptureWorkspace(), WorkspaceStore.JsonOptions);
+                await WorkspaceStore.ExportAsync(stream, CaptureWorkspace());
                 status.Text = "Configuration exported.";
             }
             catch (Exception ex) { status.Text = ex.Message; }

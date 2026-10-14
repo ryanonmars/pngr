@@ -47,17 +47,17 @@ Build installers locally:
 
 ```sh
 # macOS universal app, DMG and macOS update feed (run on a Mac)
-scripts/package-universal.sh 0.7.3
+scripts/package-universal.sh 0.7.4
 
 # Windows cross-publish/installer (also works from macOS)
-scripts/package.sh win-x64 0.7.3
-python3 scripts/package-windows-installer.py 0.7.3
+scripts/package.sh win-x64 0.7.4
+python3 scripts/package-windows-installer.py 0.7.4
 ```
 
 ```powershell
 # Native Windows publish and per-user installer
-./scripts/package.ps1 -Version 0.7.3
-python scripts/package-windows-installer.py 0.7.3
+./scripts/package.ps1 -Version 0.7.4
+python scripts/package-windows-installer.py 0.7.4
 ```
 
 The updater SDK and CLI are pinned to Velopack 1.2.161; the packaging scripts restore the repository's local tool manifest. Final assets are in `artifacts/installers/osx-universal` and `artifacts/installers/win-x64`. Architecture-specific ZIPs remain internal build intermediates/portable local packages, not future public release downloads. Run from source with `dotnet run --project src/TraceScope.App`. The existing solution and internal namespaces retain the TraceScope name.

@@ -131,7 +131,7 @@ public partial class MainWindow
                 }).ToArray()
             };
             // Failure to bind or save leaves the previous settings/listener intact.
-            await _workspaceStore.SaveAsync(saved, _applicationCancellation.Token);
+            saved = await _workspaceStore.SaveAsync(saved, _applicationCancellation.Token);
             if (options is not null && sessionId.HasValue)
             {
                 _engine.UpdateOptions(sessionId.Value, options);

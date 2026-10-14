@@ -1,6 +1,6 @@
 ---
 title: "Email, webhooks, and scripts"
-description: "Configure optional alert actions and test delivery."
+description: "Configure Discord notifications, generic JSON webhooks, email, and local scripts."
 ---
 
 Open **Alerts → Notifications and actions…**, or **Settings → Alerts & notifications → Apply & configure email, webhooks and scripts…**. Each action is disabled until explicitly configured and enabled. Press **Save actions** to persist changes.
@@ -12,7 +12,7 @@ Open **Alerts → Notifications and actions…**, or **Settings → Alerts & not
 | Send recovery notifications and actions | On | Applies to native and external recovery delivery |
 | Notification spacing | 30 seconds | 0–86400; global native-notification spacing |
 | Action spacing | 30 seconds | 0–86400; per session, rule, and event kind |
-| Action timeout | 15 seconds | 1–120; applies to each delivery attempt |
+| Action timeout | 15 seconds | 1–120; bounds each action, including webhook retries and waits |
 
 Actions run serially through a bounded queue. A full queue can reject an event. Failures are logged as action events; they do not stop monitoring. Turning off an action prevents queued work from continuing with the old configuration.
 
@@ -24,9 +24,18 @@ The subject is `Pngr — <event kind>`; the body includes the timestamp, message
 
 ## Webhooks
 
-Enable **webhook POST**, supply an HTTP or HTTPS URL, and optionally supply a bearer-token environment variable name. Embedded credentials in the URL are rejected. Pngr posts the monitoring event as JSON with `Content-Type: application/json`. It does not follow redirects; a non-success HTTP response is logged as a failure.
+On **Webhook**, enable **webhook POST** and choose **Webhook format**:
 
-The webhook event uses these case-sensitive property names:
+| Format | Use it for | Payload |
+| --- | --- | --- |
+| **Generic JSON** (default) | Your own HTTP(S) endpoint or existing integration | The original Pngr monitoring event JSON |
+| **Discord** | A Discord incoming webhook | A colored Discord embed |
+
+Existing configurations without a format stay **Generic JSON**. Switching formats does not change your alert rules. Pngr sends directly from your computer, without a relay service.
+
+### Generic JSON
+
+Supply an HTTP or HTTPS URL and, if required by your endpoint, a bearer-token environment variable name. Embedded username/password credentials in the URL are rejected. Use HTTPS for credentials and monitoring data. Pngr posts `Content-Type: application/json` and preserves the existing event property names and payload:
 
 ```json
 {
@@ -41,7 +50,52 @@ The webhook event uses these case-sensitive property names:
 }
 ```
 
-This is an illustrative event payload. Event kinds delivered by actions are `Alert`, `Recovery`, and `RouteChange`.
+This is an illustrative event payload. Event kinds delivered by actions are `Alert`, `Recovery`, and `RouteChange`. Generic JSON retains its single-request delivery behavior.
+
+### Create a Discord webhook
+
+1. In Discord, open your server's **Server Settings → Integrations → Webhooks**. You need the **Manage Webhooks** permission.
+2. Create a webhook, give it a name such as **Pngr**, and choose the text channel that should receive notifications.
+3. Select **Copy Webhook URL**. Keep the URL private: its token authorizes posting to that channel.
+4. In Pngr's **Webhook** tab, select **Discord**, enable webhook POST, and paste the copied URL.
+5. Leave the bearer-token environment variable empty; Discord authenticates through the webhook URL itself.
+6. Press **Save actions**, choose a live target, and press **Test enabled actions**. The test sends a real alert message.
+
+See Discord's [webhook setup guide](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) and [webhook API reference](https://docs.discord.com/developers/resources/webhook).
+
+Use the native incoming webhook URL, rather than a GitHub-compatible `/github` URL. Pngr accepts HTTPS webhook URLs on `discord.com`, `canary.discord.com`, or `ptb.discord.com`, with a webhook ID and token and no custom port, query parameters, or fragment. Pngr requests confirmation that Discord created the message. Forum/media channels and thread selection are not configurable in Pngr; choose a text channel.
+
+### Discord messages
+
+| Event | Embed color | Information |
+| --- | --- | --- |
+| `Alert` | Red | The alert message and rule ID, when present |
+| `Recovery` | Green | The recovery message and rule ID, when present |
+| `RouteChange` | Blue | The route-change message and rule ID, when present |
+
+Embeds include the event type, session ID, event timestamp, and existing event message. Pngr includes the monitored target and alert rule name when they are available from the session and configured rule. The rule ID is used as a fallback; events without a rule omit that field. Long text is shortened to fit Discord's embed limits. Recovery delivery follows **Send recovery notifications and actions**.
+
+For example, an alert event could display:
+
+```text
+Pngr — Alert                       [red]
+example.net: Monitoring alert — Average latency 125.0 ms exceeds 100.0 ms
+Event type: Alert
+Session: 00000000-0000-0000-0000-000000000002
+Target: example.net
+Alert rule: Monitoring alert
+2026-10-14 12:00 UTC
+```
+
+A recovery uses a green embed with the existing recovery description; a route change uses a blue embed with the existing route description. These are illustrative messages, not screenshots. Actual details depend on the generated event. Discord delivery disables mention parsing, including `@everyone`, `@here`, users, and roles; alert text does not intentionally ping channel members.
+
+### Delivery and retries
+
+Neither format follows HTTP redirects. Non-success responses are failures; Pngr records an action result without logging the URL, webhook token, response body, or bearer token.
+
+Discord delivery makes up to **three requests** for HTTP **429** rate limits and **5xx** server errors. It respects Discord's `Retry-After` response header or JSON `retry_after` value, waiting for the longer value when both are valid. Without a valid retry signal, it waits one second before the first retry and two seconds before the second. Rate-limit waits also apply to subsequent queued events for the same webhook. Retries and their waits share the configured **Action timeout**; a long requested wait can end in a timeout instead of another request. Permanent errors, such as an invalid or deleted webhook, need a configuration change. There is no retry setting in the UI. Connection failures and action timeouts are reported without retrying; monitoring continues.
+
+See Discord's [rate-limit documentation](https://docs.discord.com/developers/topics/rate-limits) for its retry signals.
 
 ## Local executable
 
@@ -59,7 +113,11 @@ The legacy variable names are intentional. Output is drained and discarded. A no
 
 ## Secrets and testing
 
-Pngr stores environment variable **names**, not secret values, in the workspace and exported configuration. The variables must be present in Pngr's own process environment; setting one in an unrelated terminal after Pngr starts does not make it available to the running app. A named but missing variable causes the relevant action to fail.
+Webhook URLs are credentials. Pngr stores them in **macOS Keychain** or **Windows Credential Manager**, with a secret reference in the workspace. Exported configuration does not contain the URL; after importing a workspace on another computer, enter the webhook URL again. If secure storage is unavailable or access is denied, Pngr reports a failure rather than saving the URL in plaintext. Previously saved plaintext URLs are migrated when the workspace loads or is saved. If migration fails, the original file is retained and webhook delivery is disabled with a warning, while targets and history still load. Restore credential-store access and save the webhook again. Rotate any URL that may have been shared in an older export or backup.
+
+The URL field is masked and becomes blank after saving. Leave it blank to retain the stored URL, paste a new URL to replace it, or select **Remove saved webhook URL** to remove the credential. Treat the masked URL field as a credential entry. Do not paste webhook URLs into screenshots, support reports, logs, or source control. To rotate a Discord URL, delete the old webhook in Discord and create a replacement, then enter the new URL in Pngr and save/test it. Renaming a webhook or changing its channel does not revoke its token.
+
+For SMTP passwords and generic bearer tokens, Pngr stores environment variable **names**, not secret values, in the workspace and exported configuration. The variables must be present in Pngr's own process environment; setting one in an unrelated terminal after Pngr starts does not make it available to the running app. A named but missing variable causes the relevant action to fail.
 
 Choose a live target and click **Test enabled actions**. This saves settings and performs real enabled actions. Check the alert event log for success or failure. Imported workspaces disable native, SMTP, webhook, and executable actions until you explicitly re-enable them.
 
@@ -68,6 +126,15 @@ Choose a live target and click **Test enabled actions**. This saves settings and
     Confirm that an action is enabled and a live target is selected. Check the persisted action result for a missing environment variable, unreachable SMTP server, non-success webhook response, missing executable, or timeout. A closely repeated test can be suppressed by action spacing.
   </Accordion>
   <Accordion title="Does Pngr retry a failed delivery?">
-    There is no delivery retry setting. The current dispatcher performs one attempt for each queued action; a continuing breached condition can generate another alert after its rule cooldown.
+    There is no delivery retry setting. Discord retries HTTP 429 and 5xx responses, making up to three requests within the action timeout. Generic JSON, SMTP, and local executable actions make one attempt. A continuing breached condition can also generate another alert after its rule cooldown.
+  </Accordion>
+  <Accordion title="Discord rejected the URL or returned HTTP 401/403/404">
+    Copy the complete incoming webhook URL again and select Discord format. Check that the webhook still exists and uses a supported Discord HTTPS host. A deleted webhook or revoked token needs a replacement URL. Do not append `/github`; generic JSON is not a Discord message payload. Never include the URL in a support report.
+  </Accordion>
+  <Accordion title="Discord returned HTTP 429, a server error, or timed out">
+    Rate limits can occur when several targets generate actions together. Pngr waits according to Discord's retry signal and retries within the action timeout. Increase action spacing to reduce traffic. Check network access to Discord and the action event log; a long Retry-After delay can exceed the configured timeout. Failed actions do not stop monitoring.
+  </Accordion>
+  <Accordion title="A webhook stopped working after import or secure-storage access failed">
+    Imported workspaces disable actions and omit webhook URLs. Enter the URL on this computer, save it to the operating system's credential store, and explicitly re-enable the action. On macOS, allow Pngr access to its Keychain item when prompted. Check that your credential store is available before testing again.
   </Accordion>
 </Accordions>

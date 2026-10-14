@@ -93,14 +93,17 @@ public sealed class WorkspaceStore
 {
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate;
+    private readonly IWebhookSecretStore _secrets;
+    public string? CredentialWarning { get; private set; }
     public static JsonSerializerOptions JsonOptions { get; } = new()
     {
         WriteIndented = true,
         PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
-    public WorkspaceStore(string path)
+    public WorkspaceStore(string path, IWebhookSecretStore? secretStore = null)
     {
+        _secrets = secretStore ?? WebhookSecretStore.Default;
         Path = System.IO.Path.GetFullPath(path);
         _gate = Gates.GetOrAdd(Path, _ => new SemaphoreSlim(1, 1));
     }
@@ -114,8 +117,25 @@ public sealed class WorkspaceStore
         try
         {
             if (!File.Exists(Path)) return null;
-            await using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            return await ImportAsync(stream, cancellationToken);
+            WorkspaceConfiguration configuration;
+            await using (var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                configuration = await ImportAsync(stream, cancellationToken);
+            CredentialWarning = null;
+            if (configuration.Actions.Webhook.Url.Length == 0) return configuration;
+            try
+            {
+                var secured = ProtectWebhook(configuration);
+                await WriteAsync(secured, cancellationToken);
+                return secured;
+            }
+            catch (Exception error) when (error is InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                // Credential access must not prevent targets/history from restoring.
+                // Preserve the original file so migration can be retried after access is restored.
+                CredentialWarning = "Webhook credential migration failed; webhook delivery is disabled. Check secure-store access and save the webhook again.";
+                return configuration with { Actions = configuration.Actions with
+                { Webhook = configuration.Actions.Webhook with { Enabled = false } } };
+            }
         }
         finally { _gate.Release(); }
     }
@@ -138,10 +158,41 @@ public sealed class WorkspaceStore
         return configuration;
     }
 
-    public async Task SaveAsync(WorkspaceConfiguration configuration, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceConfiguration> SaveAsync(WorkspaceConfiguration configuration, CancellationToken cancellationToken = default)
     {
         configuration.Validate();
         await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var secured = ProtectWebhook(configuration);
+            await WriteAsync(secured, cancellationToken);
+            CredentialWarning = null;
+            return secured;
+        }
+        finally { _gate.Release(); }
+    }
+
+    private WorkspaceConfiguration ProtectWebhook(WorkspaceConfiguration configuration)
+    {
+        var webhook = configuration.Actions.Webhook;
+        try
+        {
+            if (webhook.Url.Length == 0)
+            {
+                if (webhook.Enabled && webhook.UrlSecretId.Length > 0)
+                    WebhookDelivery.ValidateUrl(_secrets.Retrieve(webhook.UrlSecretId), webhook.Format);
+                return configuration;
+            }
+            // A new immutable credential preserves the old saved workspace on write failure.
+            var id = _secrets.Store(webhook.Url);
+            return configuration with { Actions = configuration.Actions with
+            { Webhook = webhook with { Url = "", UrlSecretId = id } } };
+        }
+        catch { throw new InvalidOperationException("Webhook URL could not be stored securely. Check access to the secure credential store."); }
+    }
+
+    private async Task WriteAsync(WorkspaceConfiguration configuration, CancellationToken cancellationToken)
+    {
         var temporary = Path + ".tmp";
         try
         {
@@ -150,6 +201,14 @@ public sealed class WorkspaceStore
                 await JsonSerializer.SerializeAsync(stream, configuration, JsonOptions, cancellationToken);
             File.Move(temporary, Path, true);
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); _gate.Release(); }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    public static Task ExportAsync(Stream stream, WorkspaceConfiguration configuration, CancellationToken cancellationToken = default)
+    {
+        configuration.Validate();
+        var exported = configuration with { Actions = configuration.Actions with
+        { Webhook = configuration.Actions.Webhook with { Enabled = false, Url = "", UrlSecretId = "" } } };
+        return JsonSerializer.SerializeAsync(stream, exported, JsonOptions, cancellationToken);
     }
 }

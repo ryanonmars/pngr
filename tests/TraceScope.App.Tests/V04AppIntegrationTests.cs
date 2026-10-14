@@ -79,6 +79,55 @@ public sealed class V04AppIntegrationTests
     }
 
     [AvaloniaFact]
+    public async Task WebhookFormatSelectorMasksAndPersistsCredentialsWithoutChangingLegacyDefault()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var secrets = new InMemoryWebhookSecrets();
+        SetField(fixture.Window, "_workspaceStore", new WorkspaceStore(fixture.WorkspacePath, secrets));
+        Invoke(fixture.Window, "OpenAlertActions", null, new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => fixture.Window.OwnedWindows.Any(w => w.Title == "Notifications and alert actions"));
+        var dialog = fixture.Window.OwnedWindows.Single();
+        dialog.GetVisualDescendants().OfType<TabControl>().Single().SelectedIndex = 2;
+        await Until(() => dialog.GetVisualDescendants().OfType<ComboBox>().Any(c => c.Name == "WebhookFormat"));
+        var format = Find<ComboBox>(dialog, "WebhookFormat");
+        var url = Find<TextBox>(dialog, "WebhookUrl");
+        Assert.Equal(0, format.SelectedIndex);
+        Assert.Equal('●', url.PasswordChar);
+        Assert.True(Find<TextBox>(dialog, "WebhookBearerReference").IsEnabled);
+        format.SelectedIndex = 1;
+        Assert.False(Find<TextBox>(dialog, "WebhookBearerReference").IsEnabled);
+        Find<CheckBox>(dialog, "WebhookEnabled").IsChecked = true;
+        url.Text = "https://discord.com/api/webhooks/123456789012345678/test-credential";
+        Click(Find<Button>(dialog, "SaveAlertActions"));
+        await Until(() => Find<TextBlock>(dialog, "ActionStatus").Text?.StartsWith("Actions saved.") == true);
+        var saved = (await new WorkspaceStore(fixture.WorkspacePath, secrets).LoadAsync())!;
+        Assert.Equal(WebhookFormat.Discord, saved.Actions.Webhook.Format);
+        Assert.True(saved.Actions.Webhook.Enabled);
+        Assert.Equal("", saved.Actions.Webhook.Url);
+        Assert.Single(secrets.Values);
+        Assert.Equal("", url.Text);
+        Assert.DoesNotContain("test-credential", await File.ReadAllTextAsync(fixture.WorkspacePath));
+        dialog.Close();
+        Invoke(fixture.Window, "OpenAlertActions", null, new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => fixture.Window.OwnedWindows.Any());
+        var reopened = fixture.Window.OwnedWindows.Single();
+        reopened.GetVisualDescendants().OfType<TabControl>().Single().SelectedIndex = 2;
+        await Until(() => reopened.GetVisualDescendants().OfType<ComboBox>().Any(c => c.Name == "WebhookFormat"));
+        Assert.Equal(1, Find<ComboBox>(reopened, "WebhookFormat").SelectedIndex);
+        Assert.Equal("", Find<TextBox>(reopened, "WebhookUrl").Text);
+        reopened.Close();
+    }
+
+    private sealed class InMemoryWebhookSecrets : IWebhookSecretStore
+    {
+        public Dictionary<string, string> Values { get; } = [];
+        public string Store(string url, string? existingId = null)
+        { var id = existingId ?? Guid.NewGuid().ToString("N"); Values[id] = url; return id; }
+        public string Retrieve(string id) => Values[id];
+        public void Delete(string id) => Values.Remove(id);
+    }
+
+    [AvaloniaFact]
     public async Task AcknowledgeButtonUpdatesVisibleEventAndPersistsItsNote()
     {
         await using var fixture = await Fixture.CreateAsync();
