@@ -13,7 +13,7 @@ public partial class MainWindow
 
     private void InitializeUpdates()
     {
-        var version = typeof(MainWindow).Assembly.GetName().Version ?? new Version(0, 7, 1);
+        var version = typeof(MainWindow).Assembly.GetName().Version ?? new Version(0, 7, 3);
         _updates = new UpdateService(_dataDirectory, new Version(version.Major, version.Minor, version.Build));
     }
 

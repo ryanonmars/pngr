@@ -3,7 +3,7 @@
 set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
-version=${1:-0.7.2}
+version=${1:-0.7.3}
 version=${version#v}
 archive_directory=${PNGR_UNIVERSAL_ARCHIVE_DIR:-artifacts}
 # CI provides validated architecture ZIPs; local builds can publish both payloads here.

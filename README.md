@@ -14,7 +14,7 @@ No background monitoring service or cloud account is required. Closing Pngr stop
 
 ## Install
 
-The existing [v0.7.0 release](https://github.com/ryanonmars/pngr/releases/tag/v0.7.0) retains its three portable ZIP downloads. The [v0.7.1 release](https://github.com/ryanonmars/pngr/releases/tag/v0.7.1) introduced installers and in-app updates. Prepared v0.7.2 packages use the following names:
+The existing [v0.7.0 release](https://github.com/ryanonmars/pngr/releases/tag/v0.7.0) retains its three portable ZIP downloads. The [v0.7.1 release](https://github.com/ryanonmars/pngr/releases/tag/v0.7.1) introduced installers and in-app updates. Current installer packages use the following names:
 
 | Platform | Installer |
 | --- | --- |
@@ -47,17 +47,17 @@ Build installers locally:
 
 ```sh
 # macOS universal app, DMG and macOS update feed (run on a Mac)
-scripts/package-universal.sh 0.7.2
+scripts/package-universal.sh 0.7.3
 
 # Windows cross-publish/installer (also works from macOS)
-scripts/package.sh win-x64 0.7.2
-python3 scripts/package-windows-installer.py 0.7.2
+scripts/package.sh win-x64 0.7.3
+python3 scripts/package-windows-installer.py 0.7.3
 ```
 
 ```powershell
 # Native Windows publish and per-user installer
-./scripts/package.ps1 -Version 0.7.2
-python scripts/package-windows-installer.py 0.7.2
+./scripts/package.ps1 -Version 0.7.3
+python scripts/package-windows-installer.py 0.7.3
 ```
 
 The updater SDK and CLI are pinned to Velopack 1.2.161; the packaging scripts restore the repository's local tool manifest. Final assets are in `artifacts/installers/osx-universal` and `artifacts/installers/win-x64`. Architecture-specific ZIPs remain internal build intermediates/portable local packages, not future public release downloads. Run from source with `dotnet run --project src/TraceScope.App`. The existing solution and internal namespaces retain the TraceScope name.
@@ -70,8 +70,8 @@ Data is stored locally. Existing TraceScope settings, profiles, workspaces, and 
 
 ## Automated releases
 
-Pushes and pull requests build, test, and package ARM64 macOS, Intel macOS and Windows x64 on GitHub-hosted runners. A dependent macOS job assembles and validates the universal app. The final validation job checks updater package versions, SHA-256 digests and archive integrity, rejects private data, and generates `SHA256SUMS` for the installers and updater assets.
+Builds and tests cover ARM64 macOS, Intel macOS and Windows x64 on GitHub-hosted runners. During a release, the final validation job checks updater package versions, SHA-256 digests and archive integrity, rejects private data, and generates `SHA256SUMS` for the installers and updater assets.
 
-Version tags run the same checks and publish the validated installer assets. The tag version is embedded in the application and bundle metadata. Existing releases are never overwritten; v0.7.0 remains unchanged. Manual Release workflow dispatch is **build-only validation** and does not create tags or releases. v0.7.1 remains unchanged; do not publish v0.7.2 without explicit approval.
+Normal pushes and pull requests run builds and automated tests on all three platforms without installer packaging. Version tags run tests, package each platform once, assemble the universal macOS DMG from those artifacts, validate the same installer/update assets, and publish only after every required check passes. NuGet and DMG tooling dependencies are cached. Already published tags are skipped; existing releases are never overwritten. Release packaging is reserved for version tags.
 
-To validate the complete update sequence: build and install v0.7.1 on a test machine, then build v0.7.2 with the same application ID and feed channels. v0.7.1 is already published; publish v0.7.2 only after approval. In the installed v0.7.1 app, check manually, review notes, download, approve installation and verify v0.7.2 after restart. Compare history, profiles and workspace before/after. Repeat with an interrupted download/offline check and verify the existing app remains usable. Apple Silicon testing does not establish Intel or Windows runtime behavior.
+To validate updating, use an installed v0.7.1 or later release and check manually, review the release notes, download, approve installation, and verify the new version after restart. Compare history, profiles and workspace before/after. Repeat with an interrupted download/offline check and verify the existing app remains usable. Apple Silicon testing does not establish Intel or Windows runtime behavior.

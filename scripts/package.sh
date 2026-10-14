@@ -4,7 +4,7 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
 runtime=${1:-osx-arm64}
-version=${2:-0.7.2}
+version=${2:-0.7.3}
 version=${version#v}
 if ! printf '%s\n' "$version" | LC_ALL=C grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
     echo "Version must be semantic X.Y.Z, optionally with a prerelease suffix." >&2
