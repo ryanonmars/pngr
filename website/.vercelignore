@@ -1,0 +1,8 @@
+docs/
+node_modules/
+dist/
+.gitignore
+.DS_Store
+.env
+.env.*
+.vercel/
