@@ -182,7 +182,7 @@ def verify(setup: Path, package: Path, expected_version: str, evidence: Path):
                 'InteractiveWizardManuallyVerified': False}, indent=2))
         finally:
             uninstall(installation)
-    print(f'Verified native Windows installer and 0.7.1 → {expected_version} update; interactive wizard remains manual testing.')
+    print(f'Verified native Windows installer and 0.7.1 -> {expected_version} update; interactive wizard remains manual testing.')
 
 
 if __name__ == '__main__':
