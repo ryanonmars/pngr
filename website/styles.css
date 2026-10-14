@@ -598,6 +598,7 @@ dialog img {
   }
 }
 
-.targets-image {
-  margin-top: 42px;
+.probe-image {
+  margin: 42px auto 0;
+  max-width: 560px;
 }
