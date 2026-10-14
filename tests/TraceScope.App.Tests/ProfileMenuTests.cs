@@ -146,7 +146,11 @@ public sealed class ProfileMenuTests
         public async ValueTask DisposeAsync()
         {
             foreach (var child in Window.OwnedWindows.ToArray()) child.Close();
-            Window.Close(); await Until(() => !Window.IsVisible); await Engine.DisposeAsync(); System.IO.Directory.Delete(Directory, true);
+            Window.Close();
+            await Until(() => !Window.IsVisible);
+            await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            System.IO.Directory.Delete(Directory, true);
         }
     }
     private sealed class Transport : IProbeTransport

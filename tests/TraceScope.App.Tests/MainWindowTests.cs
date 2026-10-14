@@ -504,6 +504,7 @@ public sealed class MainWindowTests
             Window.Close();
             await Until(() => !Window.IsVisible);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Directory.Delete(_directory, true);
         }
 

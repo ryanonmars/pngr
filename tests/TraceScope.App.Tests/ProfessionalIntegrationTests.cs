@@ -194,6 +194,7 @@ public sealed class ProfessionalIntegrationTests
             Window.Close();
             await Until(() => !Window.IsVisible);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(Directory, true);
         }
     }

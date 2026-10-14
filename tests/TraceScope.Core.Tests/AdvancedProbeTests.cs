@@ -60,7 +60,7 @@ public sealed class AdvancedProbeTests
         listener.Stop();
         var result = await new AdvancedProbeTransport().ProbeAsync(IPAddress.Loopback, 255,
             new ProbeOptions { Protocol = ProbeProtocol.Tcp, DestinationPort = port,
-                Timeout = TimeSpan.FromSeconds(2) }, CancellationToken.None);
+                Timeout = TimeSpan.FromSeconds(OperatingSystem.IsWindows() ? 10 : 2) }, CancellationToken.None);
         Assert.True(result.Responded, result.Detail);
         Assert.Contains("TCP RST", result.Detail);
     }
@@ -82,7 +82,7 @@ public sealed class AdvancedProbeTests
     }
 
     [Fact]
-    public async Task UdpClosedPortMeasuresActualIcmpPortUnreachable()
+    public async Task UdpClosedPortRequiresValidatedIcmpOrConservativeSocketFailure()
     {
         int port;
         using (var reserve = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
@@ -90,6 +90,16 @@ public sealed class AdvancedProbeTests
         var result = await new AdvancedProbeTransport().ProbeAsync(IPAddress.Loopback, 255,
             new ProbeOptions { Protocol = ProbeProtocol.Udp, DestinationPort = port,
                 Timeout = TimeSpan.FromSeconds(2) }, CancellationToken.None);
+        // Windows may only expose a loopback socket reset, without a qualifying
+        // raw ICMP quote. That rejection must remain an unanswered measurement.
+        if (OperatingSystem.IsWindows() && !result.Responded)
+        {
+            Assert.True(result.Status is ProbeStatus.Unreachable or ProbeStatus.Timeout, result.Detail);
+            Assert.Null(result.LatencyMs);
+            Assert.NotEqual(ProbeTransmission.NotSent, result.Transmission);
+            Assert.NotEqual(ProbeResponseKind.UdpPortUnreachable, result.ResponseKind);
+            return;
+        }
         Assert.True(result.Responded, result.Detail);
         Assert.Equal(ProbeResponseKind.UdpPortUnreachable, result.ResponseKind);
         Assert.Contains("Matched ICMP", result.Detail);

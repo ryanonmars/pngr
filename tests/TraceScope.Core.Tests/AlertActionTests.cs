@@ -50,7 +50,7 @@ public sealed class AlertActionTests
         using var listener = new HttpListener();
         var socket = new TcpListener(IPAddress.Loopback, 0); socket.Start(); var port = ((IPEndPoint)socket.LocalEndpoint).Port; socket.Stop();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/"); listener.Start();
-        var receive = Task.Run(async () => { var ctx = await listener.GetContextAsync(); using var reader = new StreamReader(ctx.Request.InputStream); var body = await reader.ReadToEndAsync(); ctx.Response.StatusCode = 204; ctx.Response.Close(); return (ctx.Request.HttpMethod, body); });
+        var receive = Task.Run(async () => { var ctx = await listener.GetContextAsync(); using var reader = new StreamReader(ctx.Request.InputStream); var body = await reader.ReadToEndAsync(); var method = ctx.Request.HttpMethod; ctx.Response.StatusCode = 204; ctx.Response.Close(); return (HttpMethod: method, body); });
         await using var dispatcher = new AlertActionDispatcher(new() { Webhook = new() { Enabled = true, Url = $"http://127.0.0.1:{port}/" } }, new Notifier());
         var completed = new TaskCompletionSource<AlertActionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         dispatcher.ActionCompleted += result => completed.TrySetResult(result);

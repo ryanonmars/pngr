@@ -108,9 +108,16 @@ public sealed class WorkspaceStore
 
     public async Task<WorkspaceConfiguration?> LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(Path)) return null;
-        await using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        return await ImportAsync(stream, cancellationToken);
+        // Windows cannot reliably replace an open destination during consecutive
+        // saves. Use the existing per-path save gate until this reader closes.
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(Path)) return null;
+            await using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return await ImportAsync(stream, cancellationToken);
+        }
+        finally { _gate.Release(); }
     }
 
     public static async Task<WorkspaceConfiguration> ImportAsync(Stream stream, CancellationToken cancellationToken = default)

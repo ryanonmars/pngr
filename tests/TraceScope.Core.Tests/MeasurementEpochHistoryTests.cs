@@ -12,7 +12,11 @@ public sealed class MeasurementEpochHistoryTests : IDisposable
     private readonly HistoryStore _store;
     private static readonly DateTimeOffset At = new(2026, 10, 13, 0, 0, 0, TimeSpan.Zero);
     public MeasurementEpochHistoryTests() => _store = new(Path.Combine(_directory, "history.db"));
-    public void Dispose() => Directory.Delete(_directory, true);
+    public void Dispose()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        Directory.Delete(_directory, true);
+    }
 
     [Fact]
     public async Task AggregatedJitterRemainsUnknownWithoutAnyConsecutiveResponsePair()

@@ -538,6 +538,7 @@ public sealed class SettingsWindowTests
             foreach (var child in Window.OwnedWindows.ToArray()) child.Close();
             Window.Close(); await Until(() => !Window.IsVisible);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(Directory, true);
         }
     }

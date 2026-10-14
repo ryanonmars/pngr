@@ -135,6 +135,7 @@ public sealed class WebLifecycleTests
         public async ValueTask DisposeAsync()
         {
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Directory.Delete(_directory, true);
         }
     }

@@ -80,6 +80,7 @@ public sealed class AllTargetsTests
             window.Close();
             await Until(() => !window.IsVisible);
             await engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Directory.Delete(directory, true);
         }
     }

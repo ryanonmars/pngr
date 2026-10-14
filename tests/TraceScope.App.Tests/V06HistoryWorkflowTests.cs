@@ -369,6 +369,7 @@ public sealed class V06HistoryWorkflowTests
             Window.Close();
             await Until(() => !Window.IsVisible);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(_directory, true);
         }
     }

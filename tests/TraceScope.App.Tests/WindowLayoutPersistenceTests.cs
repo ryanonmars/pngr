@@ -37,7 +37,11 @@ public sealed class WindowLayoutPersistenceTests
             Assert.Equal(new PixelPoint(110, 80), second.Window.Position);
             Assert.Equal(.73, second.Capture().HistoryLayout.PanelFraction);
         }
-        finally { System.IO.Directory.Delete(directory, true); }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            System.IO.Directory.Delete(directory, true);
+        }
     }
 
     [AvaloniaFact]
@@ -64,7 +68,11 @@ public sealed class WindowLayoutPersistenceTests
             Assert.Equal(.57, f.Capture().HistoryLayout.PanelFraction);
             Assert.Empty(f.Engine.Sessions);
         }
-        finally { System.IO.Directory.Delete(directory, true); }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            System.IO.Directory.Delete(directory, true);
+        }
     }
 
     [AvaloniaFact]
@@ -86,7 +94,11 @@ public sealed class WindowLayoutPersistenceTests
             Assert.True(minimized.Maximized);
             Assert.Equal(normal.Width, minimized.Width); Assert.Equal(normal.Height, minimized.Height);
         }
-        finally { System.IO.Directory.Delete(directory, true); }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            System.IO.Directory.Delete(directory, true);
+        }
     }
 
     private sealed class Fixture : IAsyncDisposable

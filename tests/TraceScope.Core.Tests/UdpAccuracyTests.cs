@@ -206,6 +206,11 @@ public sealed class UdpAccuracyTests
     {
         using var responding = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         using var silent = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        // The test server deliberately sends late duplicates to closed sockets.
+        // Suppress Windows' resulting ICMP reset notifications on this server
+        // socket only, so receiving the next test request remains possible.
+        if (OperatingSystem.IsWindows())
+            responding.Client.IOControl((IOControlCode)unchecked((int)0x9800000C), new byte[4], null);
         var respondingPort = ((IPEndPoint)responding.Client.LocalEndPoint!).Port;
         var silentPort = ((IPEndPoint)silent.Client.LocalEndPoint!).Port;
         var options = new ProbeOptions { Protocol = ProbeProtocol.Udp,

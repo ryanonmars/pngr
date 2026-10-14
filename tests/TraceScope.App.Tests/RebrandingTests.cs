@@ -58,6 +58,7 @@ public sealed class RebrandingTests
         {
             window.Close();
             while (window.IsVisible) await Task.Delay(20);
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             Directory.Delete(directory, true);
         }
     }

@@ -141,6 +141,7 @@ public sealed class ProbeUiRefinementTests
             Window.Close();
             for (var i = 0; Window.IsVisible && i < 200; i++) await Task.Delay(10);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(Directory, true);
         }
     }

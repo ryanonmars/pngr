@@ -265,6 +265,7 @@ public sealed class V061LayoutTests
             var deadline = DateTime.UtcNow.AddSeconds(10);
             while (Window.IsVisible && DateTime.UtcNow < deadline) await Task.Delay(20);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(Directory, true);
         }
     }

@@ -288,6 +288,7 @@ public sealed class WorkflowV05Tests
             Window.Close();
             await Until(() => !Window.IsVisible);
             await Engine.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             System.IO.Directory.Delete(Directory, true);
         }
     }
