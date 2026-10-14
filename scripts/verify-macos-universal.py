@@ -89,7 +89,18 @@ def verify(bundle, version, check_dependencies=True, require_updater=False):
     for file in bundle.rglob("*"):
         assert file.suffix.lower() not in (".db", ".sqlite", ".sqlite3", ".pdb", ".cs", ".csproj", ".trx"), f"User/development file: {file}"
         assert file.name not in ("workspace.json", "settings.json", "profiles.json", ".env")
+    verify_runtime_signatures(bundle, version)
     print(f"Verified Universal 2 pngr {version}: native ARM64/x64 launcher and both self-contained payloads")
+
+
+def verify_runtime_signatures(bundle, version):
+    """Resources are not nested code to --deep; check each running host directly."""
+    # Keep inspection of historical releases possible; 0.7.5 repairs these hosts.
+    if tuple(map(int, version.split("-")[0].split("."))) < (0, 7, 5):
+        return
+    for rid in ("osx-arm64", "osx-x64"):
+        host = bundle / "Contents/Resources/runtimes" / rid / "pngr"
+        subprocess.run(["codesign", "--verify", "--strict", str(host)], check=True)
 
 
 def verify_update_permissions(bundle):
@@ -101,6 +112,8 @@ def verify_update_permissions(bundle):
             if file.is_file() and not file.is_symlink():
                 file.chmod(0o755)
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(copy)], check=True)
+        metadata = plistlib.loads((copy / "Contents/Info.plist").read_bytes())
+        verify_runtime_signatures(copy, metadata["pngrReleaseVersion"])
     print("Verified bundle signatures after updater permission normalization")
 
 

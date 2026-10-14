@@ -3,7 +3,7 @@
 set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
-version=${1:-0.7.4}
+version=${1:-0.7.5}
 version=${version#v}
 archive_directory=${PNGR_UNIVERSAL_ARCHIVE_DIR:-artifacts}
 # CI provides validated architecture ZIPs; local builds can publish both payloads here.
@@ -26,6 +26,10 @@ for rid in osx-arm64 osx-x64; do
     mkdir "$stage/$rid"
     ditto -x -k "$archive_directory/pngr-$rid.zip" "$stage/$rid"
     mv "$stage/$rid/pngr.app/Contents/MacOS" "$bundle/Contents/Resources/runtimes/$rid"
+    # The apphost carried its original bundle's Info.plist signature slot.
+    # Re-sign it as a standalone tool after relocation; outer --deep signing
+    # treats Resources as data and does not repair the running host's identity.
+    codesign --force --sign - --identifier dev.tracescope.desktop "$bundle/Contents/Resources/runtimes/$rid/pngr"
 done
 cp "$stage/osx-arm64/pngr.app/Contents/Info.plist" "$bundle/Contents/Info.plist"
 cp -R "$stage/osx-arm64/pngr.app/Contents/Resources/." "$bundle/Contents/Resources/"

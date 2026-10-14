@@ -134,6 +134,17 @@ Choose a live target and click **Test enabled actions**. This saves settings and
   <Accordion title="Discord returned HTTP 429, a server error, or timed out">
     Rate limits can occur when several targets generate actions together. Pngr waits according to Discord's retry signal and retries within the action timeout. Increase action spacing to reduce traffic. Check network access to Discord and the action event log; a long Retry-After delay can exceed the configured timeout. Failed actions do not stop monitoring.
   </Accordion>
+  <Accordion title="macOS reports OSStatus -67030 while saving a webhook">
+    Install Pngr 0.7.5 or later. Version 0.7.4's universal macOS package had invalid signing metadata on its relocated runtime executable, preventing Keychain creation even with a valid Login Keychain. Pngr now reports the failed operation and numeric OSStatus without showing the URL. Existing credential identifiers and Keychain access controls are preserved.
+
+    To check the installed application's credential storage, run:
+
+    ```sh
+    /Applications/pngr.app/Contents/MacOS/pngr --verify-webhook-credentials
+    ```
+
+    The check creates, reads, updates, and deletes a temporary credential. It does not open your workspace or print webhook URLs. Other Keychain errors can indicate a locked Keychain or denied access; allow Pngr access when macOS prompts. Never paste a webhook URL into diagnostics or a support report.
+  </Accordion>
   <Accordion title="A webhook stopped working after import or secure-storage access failed">
     Imported workspaces disable actions and omit webhook URLs. Enter the URL on this computer, save it to the operating system's credential store, and explicitly re-enable the action. On macOS, allow Pngr access to its Keychain item when prompted. Check that your credential store is available before testing again.
   </Accordion>

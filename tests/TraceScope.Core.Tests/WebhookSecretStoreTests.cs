@@ -57,11 +57,33 @@ public sealed class WebhookSecretStoreTests
             Assert.Equal("https://example.invalid/pngr-native-storage-test-updated", store.Retrieve(id));
             store.Delete(id);
             store.Delete(id); // Idempotent cleanup.
-            var error = Assert.Throws<InvalidOperationException>(() => store.Retrieve(id));
-            Assert.Equal("Unable to access the secure webhook credential store.", error.Message);
+            var error = Assert.ThrowsAny<InvalidOperationException>(() => store.Retrieve(id));
+            if (OperatingSystem.IsMacOS())
+            {
+                var native = Assert.IsType<WebhookCredentialException>(error);
+                Assert.Equal(-25300, native.OSStatus);
+                Assert.Equal(WebhookCredentialOperation.Read, native.Operation);
+            }
+            else Assert.Equal("Unable to access the secure webhook credential store.", error.Message);
             Assert.Null(error.InnerException);
         }
         finally { if (id is not null) store.Delete(id); }
+    }
+
+    [Theory]
+    [InlineData(WebhookCredentialOperation.Create, -67030, "create")]
+    [InlineData(WebhookCredentialOperation.Read, -25300, "read")]
+    [InlineData(WebhookCredentialOperation.Update, -25308, "update")]
+    [InlineData(WebhookCredentialOperation.Delete, -25293, "delete")]
+    public void KeychainDiagnosticsExposeOnlyOperationAndStatus(WebhookCredentialOperation operation, int status, string name)
+    {
+        var error = new WebhookCredentialException(operation, status);
+        Assert.Equal(status, error.OSStatus);
+        Assert.Equal(operation, error.Operation);
+        Assert.Contains(name, error.Message);
+        Assert.Contains($"OSStatus {status}", error.Message);
+        Assert.DoesNotContain("https", error.ToString());
+        Assert.Null(error.InnerException);
     }
 
     private sealed class NativeSecretStoreFactAttribute : FactAttribute

@@ -231,8 +231,9 @@ public sealed class DiscordWebhookTests
     {
         public readonly Dictionary<string, string> Values = [];
         public bool FailWrites;
+        public bool KeychainFailure;
         public string Store(string url, string? existingId = null)
-        { if (FailWrites) throw new IOException($"Unable to store {url}"); var id = existingId ?? Guid.NewGuid().ToString("N"); Values[id] = url; return id; }
+        { if (KeychainFailure) throw new WebhookCredentialException(WebhookCredentialOperation.Create, -67030); if (FailWrites) throw new IOException($"Unable to store {url}"); var id = existingId ?? Guid.NewGuid().ToString("N"); Values[id] = url; return id; }
         public string Retrieve(string id) => Values.TryGetValue(id, out var url) ? url : throw new IOException($"Missing secret {DiscordUrl}");
         public void Delete(string id) => Values.Remove(id);
     }
@@ -408,8 +409,10 @@ public sealed class DiscordWebhookTests
         Assert.DoesNotContain("test-token", (Configuration() with { Webhook = webhook }).ToString());
     }
 
-    [Fact]
-    public async Task FailedLegacyCredentialMigrationDisablesWebhookWithoutOverwritingWorkspace()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedLegacyCredentialMigrationDisablesWebhookWithoutOverwritingWorkspace(bool keychainFailure)
     {
         var path = Path.Combine(Path.GetTempPath(), "pngr-webhook-migration-failure-" + Guid.NewGuid().ToString("N"), "workspace.json");
         try
@@ -417,18 +420,21 @@ public sealed class DiscordWebhookTests
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var json = JsonSerializer.Serialize(new WorkspaceConfiguration { Actions = Configuration() }, WorkspaceStore.JsonOptions);
             await File.WriteAllTextAsync(path, json);
-            var store = new WorkspaceStore(path, new SecretStore { FailWrites = true });
+            var store = new WorkspaceStore(path, new SecretStore { FailWrites = true, KeychainFailure = keychainFailure });
             var restored = await store.LoadAsync();
             Assert.False(restored!.Actions.Webhook.Enabled);
             Assert.NotNull(store.CredentialWarning);
+            if (keychainFailure) Assert.Contains("OSStatus -67030", store.CredentialWarning);
             Assert.DoesNotContain("test-token", store.CredentialWarning);
             Assert.Equal(json, await File.ReadAllTextAsync(path));
         }
         finally { if (Directory.Exists(Path.GetDirectoryName(path))) Directory.Delete(Path.GetDirectoryName(path)!, true); }
     }
 
-    [Fact]
-    public async Task FailedCredentialSaveLeavesExistingWorkspaceIntactAndRedactsException()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedCredentialSaveLeavesExistingWorkspaceIntactAndRedactsException(bool keychainFailure)
     {
         var path = Path.Combine(Path.GetTempPath(), "pngr-webhook-save-failure-" + Guid.NewGuid().ToString("N"), "workspace.json");
         try
@@ -436,8 +442,9 @@ public sealed class DiscordWebhookTests
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var json = JsonSerializer.Serialize(new WorkspaceConfiguration(), WorkspaceStore.JsonOptions);
             await File.WriteAllTextAsync(path, json);
-            var store = new WorkspaceStore(path, new SecretStore { FailWrites = true });
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(new WorkspaceConfiguration { Actions = Configuration() }));
+            var store = new WorkspaceStore(path, new SecretStore { FailWrites = true, KeychainFailure = keychainFailure });
+            var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => store.SaveAsync(new WorkspaceConfiguration { Actions = Configuration() }));
+            if (keychainFailure) Assert.Equal(-67030, Assert.IsType<WebhookCredentialException>(error).OSStatus);
             Assert.DoesNotContain("test-token", error.Message);
             Assert.Null(error.InnerException);
             Assert.Equal(json, await File.ReadAllTextAsync(path));

@@ -12,6 +12,34 @@ public interface IWebhookSecretStore
     void Delete(string id);
 }
 
+/// <summary>Only fixed operation names and numeric OSStatus are exposed; never credential data.</summary>
+public enum WebhookCredentialOperation { Find, Create, Read, Update, Delete }
+
+public sealed class WebhookCredentialException : InvalidOperationException
+{
+    public WebhookCredentialOperation Operation { get; }
+    public int OSStatus { get; }
+    public WebhookCredentialException(WebhookCredentialOperation operation, int osStatus)
+        : base($"macOS Keychain {SafeOperation(operation)} failed (OSStatus {osStatus}). " +
+            (osStatus == -67030 ? "Application signing metadata is invalid. Install the latest Pngr release." :
+             osStatus == -25300 ? "The credential was not found. Save the webhook URL again." :
+             "Check Login Keychain access and retry."))
+    {
+        Operation = operation;
+        OSStatus = osStatus;
+    }
+
+    private static string SafeOperation(WebhookCredentialOperation operation) => operation switch
+    {
+        WebhookCredentialOperation.Find => "lookup",
+        WebhookCredentialOperation.Create => "create",
+        WebhookCredentialOperation.Read => "read",
+        WebhookCredentialOperation.Update => "update",
+        WebhookCredentialOperation.Delete => "delete",
+        _ => "operation"
+    };
+}
+
 /// <summary>Uses the current user's macOS Keychain or Windows Credential Manager.</summary>
 public sealed class WebhookSecretStore : IWebhookSecretStore
 {
@@ -36,6 +64,7 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
             else StoreWindows(id, bytes);
             return id;
         }
+        catch (WebhookCredentialException) { throw; }
         catch { throw new InvalidOperationException(FailureMessage); }
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
@@ -50,6 +79,7 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
             bytes = OperatingSystem.IsMacOS() ? RetrieveMac(id) : RetrieveWindows(id);
             return Encoding.UTF8.GetString(bytes);
         }
+        catch (WebhookCredentialException) { throw; }
         catch { throw new InvalidOperationException(FailureMessage); }
         finally { if (bytes is not null) CryptographicOperations.ZeroMemory(bytes); }
     }
@@ -65,12 +95,17 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
                 var status = FindMac(id, out var length, out var data, out var item);
                 ClearMacData(data, length);
                 if (status == NotFoundMac) return;
-                try { if (status != 0 || SecKeychainItemDelete(item) != 0) throw new InvalidOperationException(); }
+                try
+                {
+                    CheckMac(status, WebhookCredentialOperation.Find);
+                    CheckMac(SecKeychainItemDelete(item), WebhookCredentialOperation.Delete);
+                }
                 finally { if (item != 0) CFRelease(item); }
             }
             else if (!CredDeleteW(Target(id), 1, 0) && Marshal.GetLastWin32Error() != NotFoundWindows)
                 throw new InvalidOperationException();
         }
+        catch (WebhookCredentialException) { throw; }
         catch { throw new InvalidOperationException(FailureMessage); }
     }
 
@@ -102,17 +137,17 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
         {
             if (status == 0)
             {
-                if (SecKeychainItemModifyAttributesAndData(item, 0, (uint)bytes.Length, bytes) != 0) throw new InvalidOperationException();
+                CheckMac(SecKeychainItemModifyAttributesAndData(item, 0, (uint)bytes.Length, bytes), WebhookCredentialOperation.Update);
             }
             else if (status == NotFoundMac)
             {
                 var service = Encoding.UTF8.GetBytes(Service);
                 var account = Encoding.UTF8.GetBytes(id);
-                if (SecKeychainAddGenericPassword(0, (uint)service.Length, service, (uint)account.Length, account, (uint)bytes.Length, bytes, out var created) != 0)
-                    throw new InvalidOperationException();
-                if (created != 0) CFRelease(created);
+                var createStatus = SecKeychainAddGenericPassword(0, (uint)service.Length, service, (uint)account.Length, account, (uint)bytes.Length, bytes, out var created);
+                try { CheckMac(createStatus, WebhookCredentialOperation.Create); }
+                finally { if (created != 0) CFRelease(created); }
             }
-            else throw new InvalidOperationException();
+            else CheckMac(status, WebhookCredentialOperation.Find);
         }
         finally { if (item != 0) CFRelease(item); }
     }
@@ -122,7 +157,8 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
         var status = FindMac(id, out var length, out var data, out var item);
         try
         {
-            if (status != 0 || length > 2560 || data == 0) throw new InvalidOperationException();
+            CheckMac(status, WebhookCredentialOperation.Read);
+            if (length > 2560 || data == 0) throw new InvalidOperationException();
             var bytes = new byte[length];
             Marshal.Copy(data, bytes, 0, bytes.Length);
             return bytes;
@@ -132,6 +168,11 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
             ClearMacData(data, length);
             if (item != 0) CFRelease(item);
         }
+    }
+
+    private static void CheckMac(int status, WebhookCredentialOperation operation)
+    {
+        if (status != 0) throw new WebhookCredentialException(operation, status);
     }
 
     private static void ClearMacData(nint data, uint length)

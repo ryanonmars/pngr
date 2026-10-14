@@ -40,7 +40,7 @@ public partial class MainWindow : Window
     public MainWindow(string[] args, TraceEngine? engine = null)
     {
         InitializeComponent();
-        VersionLabel.Text = $"Pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.4"}";
+        VersionLabel.Text = $"Pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.5"}";
         ApplicationMenuBar.IsVisible = OperatingSystem.IsWindows();
         if (OperatingSystem.IsWindows())
         {

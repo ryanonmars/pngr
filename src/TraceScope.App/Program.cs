@@ -12,6 +12,11 @@ internal static class Program
     {
         // Installer hooks must run before Avalonia or any monitoring/database initialization.
         Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        if (args.Contains("--verify-webhook-credentials", StringComparer.Ordinal))
+        {
+            Environment.ExitCode = WebhookCredentialVerification.Run(TraceScope.Core.WebhookSecretStore.Create(), Console.Out);
+            return;
+        }
         using var signal = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
         {
             context.Cancel = true;

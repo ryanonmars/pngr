@@ -132,7 +132,8 @@ public sealed class WorkspaceStore
             {
                 // Credential access must not prevent targets/history from restoring.
                 // Preserve the original file so migration can be retried after access is restored.
-                CredentialWarning = "Webhook credential migration failed; webhook delivery is disabled. Check secure-store access and save the webhook again.";
+                CredentialWarning = "Webhook credential migration failed; webhook delivery is disabled. " +
+                    (error is WebhookCredentialException ? error.Message : "Check secure-store access and save the webhook again.");
                 return configuration with { Actions = configuration.Actions with
                 { Webhook = configuration.Actions.Webhook with { Enabled = false } } };
             }
@@ -188,6 +189,7 @@ public sealed class WorkspaceStore
             return configuration with { Actions = configuration.Actions with
             { Webhook = webhook with { Url = "", UrlSecretId = id } } };
         }
+        catch (WebhookCredentialException) { throw; }
         catch { throw new InvalidOperationException("Webhook URL could not be stored securely. Check access to the secure credential store."); }
     }
 

@@ -172,7 +172,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         catch (OperationCanceledException) { if (!_stop.IsCancellationRequested) Report(new(e.Id, name, false, "Action timed out")); }
         catch (Exception error)
         {
-            var message = name == "Webhook" ? error is WebhookDeliveryException ? error.Message : "Webhook delivery failed; check the URL credential and connection."
+            var message = name == "Webhook" ? error is WebhookDeliveryException or WebhookCredentialException ? error.Message : "Webhook delivery failed; check the URL credential and connection."
                 : error is HttpRequestException ? "HTTP request failed" : error.Message;
             Report(new(e.Id, name, false, message));
         }

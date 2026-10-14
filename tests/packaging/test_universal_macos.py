@@ -4,7 +4,10 @@ import json
 import os
 import pathlib
 import plistlib
+import shutil
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -100,18 +103,30 @@ class UniversalPackageTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix", "Unix execution bits are not represented by Windows chmod")
     def test_update_permission_validation_checks_a_copy_and_preserves_original(self):
         bundle = self.bundle()
+        plist = bundle / "Contents/Info.plist"
+        metadata = plistlib.loads(plist.read_bytes())
+        metadata["pngrReleaseVersion"] = "0.7.5"
+        plist.write_bytes(plistlib.dumps(metadata))
         assembly = bundle / "Contents/Resources/runtimes/osx-arm64/pngr.dll"
         assembly.chmod(0o644)
 
         def check_signature(arguments, check):
             self.assertTrue(check)
-            self.assertEqual(arguments[:4], ["codesign", "--verify", "--deep", "--strict"])
-            copied_assembly = pathlib.Path(arguments[-1]) / "Contents/Resources/runtimes/osx-arm64/pngr.dll"
+            checked = pathlib.Path(arguments[-1])
+            if checked.name == "pngr.app":
+                self.assertEqual(arguments[:4], ["codesign", "--verify", "--deep", "--strict"])
+                copied_bundle = checked
+            else:
+                self.assertEqual(arguments[:3], ["codesign", "--verify", "--strict"])
+                self.assertEqual(checked.name, "pngr")
+                copied_bundle = checked.parents[4]
+            copied_assembly = copied_bundle / "Contents/Resources/runtimes/osx-arm64/pngr.dll"
             self.assertEqual(copied_assembly.stat().st_mode & 0o777, 0o755)
-            self.assertNotEqual(pathlib.Path(arguments[-1]), bundle)
+            self.assertNotEqual(copied_bundle, bundle)
 
-        with mock.patch.object(VERIFIER.subprocess, "run", side_effect=check_signature):
+        with mock.patch.object(VERIFIER.subprocess, "run", side_effect=check_signature) as run:
             VERIFIER.verify_update_permissions(bundle)
+            self.assertEqual(run.call_count, 3)
         self.assertEqual(assembly.stat().st_mode & 0o777, 0o644)
 
     def test_managed_assemblies_are_rejected_in_macos_code_directory(self):
@@ -119,3 +134,41 @@ class UniversalPackageTests(unittest.TestCase):
         (bundle / "Contents/MacOS/System.Xml.Linq.dll").write_bytes(b"MZ managed image")
         with self.assertRaisesRegex(AssertionError, "Managed assemblies must remain Resources"):
             VERIFIER.verify(bundle, "0.7.1", False)
+
+    def test_repaired_releases_verify_each_apphost_independently(self):
+        bundle = self.bundle()
+        with mock.patch.object(VERIFIER.subprocess, "run") as run:
+            VERIFIER.verify_runtime_signatures(bundle, "0.7.4")
+            run.assert_not_called()
+            VERIFIER.verify_runtime_signatures(bundle, "0.7.5")
+            self.assertEqual(run.call_count, 2)
+            for call, rid in zip(run.call_args_list, ("osx-arm64", "osx-x64")):
+                self.assertEqual(call.args[0], ["codesign", "--verify", "--strict", str(bundle / "Contents/Resources/runtimes" / rid / "pngr")])
+                self.assertEqual(call.kwargs, {"check": True})
+
+    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("clang"), "Requires macOS signing and compiler")
+    def test_relocated_bundle_executable_requires_standalone_resigning(self):
+        # Exercise real Security.framework signatures rather than mocked commands.
+        with tempfile.TemporaryDirectory(prefix="pngr-apphost-signature-") as directory:
+            root = pathlib.Path(directory)
+            original = root / "original/pngr.app"
+            (original / "Contents/MacOS").mkdir(parents=True)
+            metadata = {"CFBundleIdentifier": "dev.tracescope.desktop", "CFBundleExecutable": "pngr", "CFBundleVersion": "0.7.4"}
+            (original / "Contents/Info.plist").write_bytes(plistlib.dumps(metadata))
+            source = root / "main.c"
+            source.write_text("int main(void) { return 0; }\n")
+            host = original / "Contents/MacOS/pngr"
+            subprocess.run(["clang", str(source), "-o", str(host)], check=True, capture_output=True)
+            subprocess.run(["codesign", "--force", "--sign", "-", str(original)], check=True, capture_output=True)
+            subprocess.run(["codesign", "--verify", "--strict", str(original)], check=True, capture_output=True)
+            moved = root / "relocated/pngr.app/Contents/Resources/runtimes/osx-arm64/pngr"
+            moved.parent.mkdir(parents=True)
+            shutil.copy2(host, moved)
+            stale = subprocess.run(["codesign", "--verify", "--strict", str(moved)], capture_output=True, text=True)
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("invalid Info.plist", stale.stderr)
+            subprocess.run(["codesign", "--force", "--sign", "-", "--identifier", metadata["CFBundleIdentifier"], str(moved)], check=True, capture_output=True)
+            subprocess.run(["codesign", "--verify", "--strict", str(moved)], check=True, capture_output=True)
+            # The updater's permission normalization must preserve the repair.
+            moved.chmod(0o755)
+            subprocess.run(["codesign", "--verify", "--strict", str(moved)], check=True, capture_output=True)
