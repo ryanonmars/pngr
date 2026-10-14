@@ -149,6 +149,9 @@ public sealed class ProfessionalIntegrationTests
         var recentTimes = timeline.Samples.Select(s => s.Time).ToArray();
         timeline.EndTime = end.AddHours(-1);
         await InvokeTask(fixture.Window, "LoadDiskGraphAsync", true);
+        // Navigation also queues the normal debounced history load. Wait for
+        // its UI result if it superseded this explicit asynchronous query.
+        await Until(() => timeline.Samples.Count > 0 && timeline.Samples.Max(s => s.Time) < recentTimes.Max());
         Assert.InRange(timeline.Samples.Count, 1, 2000);
         Assert.True(timeline.Samples.Max(s => s.Time) < recentTimes.Max());
         Assert.DoesNotContain(timeline.Markers, marker => marker.Kind == "RouteChanged");

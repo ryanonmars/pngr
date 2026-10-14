@@ -214,7 +214,10 @@ public sealed class V061LayoutTests
         var frames = fixture.Frames;
         Assert.Equal(count, frames.Length);
         var scroll = Find<ScrollViewer>(fixture.Window, "HistoryGraphsScroll");
-        Assert.All(frames, frame => Assert.InRange(frame.Height, frames[0].Height - 1, frames[0].Height + 1));
+        // Earlier frames are rounded down to device pixels; the last frame owns
+        // their accumulated remainder (up to count-1 pixels at 100% scaling).
+        var rounding = Math.Max(1, (count - 1) / fixture.Window.RenderScaling);
+        Assert.All(frames, frame => Assert.InRange(frame.Height, frames[0].Height - rounding, frames[0].Height + rounding));
         Assert.InRange(frames.Sum(frame => frame.Height), scroll.Viewport.Height - (count - 1) * 12 - 2, scroll.Viewport.Height + 2);
         Assert.True(scroll.Extent.Height <= scroll.Viewport.Height + 2, $"Extent {scroll.Extent.Height}; viewport {scroll.Viewport.Height}; bounds {scroll.Bounds.Height}; frames {string.Join(',', frames.Select(f => f.Height))}");
     }
