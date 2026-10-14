@@ -5,6 +5,13 @@
       <NativeMenuItem Header="Check for Updates…" Click="AppMenuCommand"/>
     </NativeMenu>
   </NativeMenu.Menu>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://pngr/Assets/Branding/Wordmark.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme><FluentTheme.Palettes><ColorPaletteResources x:Key="Dark" Accent="#637664"/></FluentTheme.Palettes></FluentTheme>
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />

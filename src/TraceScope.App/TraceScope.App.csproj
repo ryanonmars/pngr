@@ -18,6 +18,8 @@
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets/Icons/*.png" />
+    <AvaloniaResource Include="Assets/Branding/Pngr-Font.svg" />
+    <AvaloniaResource Include="Assets/Branding/Pngr-wordmark.png" />
     <PackageReference Include="Avalonia" Version="11.3.20" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />

@@ -26,8 +26,15 @@ func text(_ value: String, y: CGFloat, size: CGFloat, color: NSColor, weight: NS
         withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: weight),
                          .foregroundColor: color, .paragraphStyle: paragraph])
 }
-text("Pngr", y: 346, size: 36, color: .white, weight: .semibold)
-text("Network diagnostics, clearly.", y: 296, size: 15, color: NSColor(white: 0.67, alpha: 1))
+guard CommandLine.arguments.count == 3,
+      let wordmark = NSImage(contentsOfFile: CommandLine.arguments[2]) else {
+    fatalError("Installation artwork requires the Pngr wordmark.")
+}
+let wordmarkWidth: CGFloat = 200
+let wordmarkHeight = wordmarkWidth * wordmark.size.height / wordmark.size.width
+wordmark.draw(in: NSRect(x: (CGFloat(width) - wordmarkWidth) / 2,
+                         y: 333, width: wordmarkWidth, height: wordmarkHeight))
+text("Network diagnostics, clearly.", y: 270, size: 15, color: NSColor(white: 0.67, alpha: 1))
 let arrow = NSBezierPath()
 arrow.move(to: NSPoint(x: 313, y: 230)); arrow.line(to: NSPoint(x: 407, y: 230))
 arrow.move(to: NSPoint(x: 388, y: 249)); arrow.line(to: NSPoint(x: 407, y: 230))

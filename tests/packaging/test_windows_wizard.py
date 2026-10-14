@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import struct
 import tempfile
 import unittest
 from unittest import mock
@@ -29,6 +30,19 @@ class WindowsWizardTests(unittest.TestCase):
         self.assertNotIn('Delete ', script)
         self.assertNotIn('RMDir ', script)
 
+    def test_wordmark_artwork_is_nsis_compatible_and_icon_is_unchanged(self):
+        script = (ROOT / 'scripts/windows/installer.nsi').read_text()
+        self.assertIn('MUI_HEADERIMAGE_BITMAP "${HEADER_BITMAP}"', script)
+        self.assertIn('MUI_WELCOMEFINISHPAGE_BITMAP "${WELCOME_BITMAP}"', script)
+        self.assertIn('MUI_ICON "${ICON}"', script)
+        for name, size in [('windows-header.bmp', (150, 57)),
+                           ('windows-welcome.bmp', (164, 314))]:
+            bitmap = (ROOT / 'src/TraceScope.App/Assets/Branding/Installer' / name).read_bytes()
+            self.assertEqual(b'BM', bitmap[:2])
+            self.assertEqual(size, struct.unpack_from('<ii', bitmap, 18))
+            self.assertEqual(24, struct.unpack_from('<H', bitmap, 28)[0])
+            self.assertEqual(0, struct.unpack_from('<I', bitmap, 30)[0])
+
     def test_compiler_receives_paths_without_shell_interpolation(self):
         with tempfile.TemporaryDirectory(prefix='Pngr build ') as directory:
             output = Path(directory) / 'Pngr-Setup.exe'
@@ -37,6 +51,10 @@ class WindowsWizardTests(unittest.TestCase):
                 self.assertIn(str(ROOT / 'scripts/windows/installer.nsi'), arguments)
                 prefix = '/' if WINDOWS.os.name == 'nt' else '-'
                 self.assertIn(f'{prefix}DPAYLOAD={payload}', arguments)
+                for define, name in [('HEADER_BITMAP', 'windows-header.bmp'),
+                                     ('WELCOME_BITMAP', 'windows-welcome.bmp')]:
+                    artwork = ROOT / 'src/TraceScope.App/Assets/Branding/Installer' / name
+                    self.assertIn(f'{prefix}D{define}={artwork}', arguments)
                 self.assertNotIn('shell', kwargs)
                 output.write_bytes(b'MZ' + b'0' * 2048)
             with mock.patch.object(WINDOWS, 'nsis_compiler', return_value='/tools/makensis'):
@@ -74,6 +92,8 @@ class WindowsWizardTests(unittest.TestCase):
             self.assertEqual('Pngr', arguments[arguments.index('--packTitle') + 1])
             self.assertEqual('pngr.exe', arguments[arguments.index('--mainExe') + 1])
             self.assertEqual('win-x64', arguments[arguments.index('--channel') + 1])
+            self.assertEqual(str(ROOT / 'src/TraceScope.App/Assets/Branding/Pngr-wordmark.png'),
+                             arguments[arguments.index('--splashImage') + 1])
             self.assertFalse(output.with_name('output.pending').exists())
 
 

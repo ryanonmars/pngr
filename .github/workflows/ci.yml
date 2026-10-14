@@ -16,3 +16,5 @@ concurrency:
 jobs:
   platforms:
     uses: ./.github/workflows/build.yml
+    with:
+      package: false

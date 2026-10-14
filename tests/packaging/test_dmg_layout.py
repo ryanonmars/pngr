@@ -58,6 +58,14 @@ class DmgLayoutTests(unittest.TestCase):
         self.assertLess(cleanup, publication)
         self.assertNotIn('rm -f artifacts/pngr-macos-universal.dmg', script[publication:])
 
+    def test_background_renders_canonical_wordmark_instead_of_system_text(self):
+        artwork = (SCRIPT.parent / 'dmg-background.swift').read_text()
+        packaging = (SCRIPT.parents[1] / 'package-universal.sh').read_text()
+        self.assertIn('NSImage(contentsOfFile: CommandLine.arguments[2])', artwork)
+        self.assertIn('wordmark.draw(in:', artwork)
+        self.assertNotIn('text("Pngr"', artwork)
+        self.assertIn('src/TraceScope.App/Assets/Branding/Pngr-wordmark.png', packaging)
+
     def test_missing_app_or_artwork_prevents_packaging(self):
         with self.assertRaisesRegex(ValueError, 'application and installation background'):
             LAYOUT.configure(self.volume)

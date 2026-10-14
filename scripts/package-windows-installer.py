@@ -34,6 +34,8 @@ def build_wizard(version: str, payload: Path, destination: Path):
                     f'{prefix}DNUMERIC_VERSION={version.split("-", 1)[0]}.0',
                     f'{prefix}DPAYLOAD={payload}', f'{prefix}DOUTPUT={destination}',
                     f'{prefix}DICON={ROOT / "src/TraceScope.App/Assets/Icons/pngr.ico"}',
+                    f'{prefix}DHEADER_BITMAP={ROOT / "src/TraceScope.App/Assets/Branding/Installer/windows-header.bmp"}',
+                    f'{prefix}DWELCOME_BITMAP={ROOT / "src/TraceScope.App/Assets/Branding/Installer/windows-welcome.bmp"}',
                     str(ROOT / 'scripts/windows/installer.nsi')], check=True)
     if not destination.is_file() or destination.stat().st_size < 1024:
         raise ValueError('NSIS did not generate the expected installation wizard.')
@@ -61,7 +63,7 @@ def package(version: str, publish: Path, output: Path, dotnet: str):
                         '--mainExe', 'pngr.exe', '--runtime', 'win-x64',
                         '--channel', 'win-x64', '--delta', 'None',
                         '--icon', str(ROOT / 'src/TraceScope.App/Assets/Icons/pngr.ico'),
-                        '--splashImage', str(ROOT / 'src/TraceScope.App/Assets/Icons/pngr-windows.png'),
+                        '--splashImage', str(ROOT / 'src/TraceScope.App/Assets/Branding/Pngr-wordmark.png'),
                         '--outputDir', str(temporary), '--skip-updates'],
                        cwd=ROOT, env=environment, check=True)
         setup = list(temporary.glob('*Setup.exe'))

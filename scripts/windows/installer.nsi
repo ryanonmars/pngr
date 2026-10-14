@@ -20,6 +20,10 @@ BrandingText "Pngr"
 ShowInstDetails show
 !define MUI_ABORTWARNING
 !define MUI_ICON "${ICON}"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_HEADERIMAGE_BITMAP "${HEADER_BITMAP}"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "${WELCOME_BITMAP}"
 !define MUI_WELCOMEPAGE_TITLE "Welcome to Pngr Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard installs Pngr for your Windows account. No administrator access is required.$\r$\n$\r$\nPngr manages application updates and uninstall support through Velopack. Your monitoring history and settings are preserved.$\r$\n$\r$\nClose Pngr before continuing."
 !define MUI_FINISHPAGE_TITLE "Pngr installation complete"

@@ -8,6 +8,14 @@ on:
         required: false
         default: '0.7.2'
         type: string
+      package:
+        description: Build release packages (version-tag release workflow only)
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NUGET_PACKAGES: ${{ github.workspace }}/.tools/nuget
 
 permissions:
   contents: read
@@ -32,6 +40,13 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.x'
+      - name: Cache NuGet dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .tools/nuget
+          key: nuget-${{ runner.os }}-${{ runner.arch }}-dotnet10-${{ inputs.package && 'release' || 'ci' }}-${{ hashFiles('**/*.csproj', '**/*.props', '**/NuGet.Config', '**/nuget.config', 'global.json', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ runner.arch }}-dotnet10-
       - name: Restore
         run: dotnet restore TraceScope.slnx
       - name: Build
@@ -41,26 +56,27 @@ jobs:
       - name: Test packaging verification
         run: python -m unittest discover -s tests/packaging -v
       - name: Package macOS
-        if: runner.os == 'macOS'
+        if: inputs.package && runner.os == 'macOS'
         shell: bash
         env:
           PNGR_VERSION: ${{ inputs.version }}
           PNGR_RUNTIME: ${{ matrix.runtime }}
         run: scripts/package.sh "$PNGR_RUNTIME" "$PNGR_VERSION"
       - name: Package Windows
-        if: runner.os == 'Windows'
+        if: inputs.package && runner.os == 'Windows'
         shell: pwsh
         env:
           PNGR_VERSION: ${{ inputs.version }}
         run: ./scripts/package.ps1 -Version $env:PNGR_VERSION
       - name: Verify distribution
+        if: inputs.package
         shell: bash
         env:
           PNGR_VERSION: ${{ inputs.version }}
           PNGR_RUNTIME: ${{ matrix.runtime }}
         run: python scripts/verify-package.py "artifacts/pngr-$PNGR_RUNTIME.zip" "$PNGR_RUNTIME" "$PNGR_VERSION"
       - name: Prepare Windows wizard compiler
-        if: runner.os == 'Windows'
+        if: inputs.package && runner.os == 'Windows'
         shell: pwsh
         run: |
           $compilerDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
@@ -70,13 +86,13 @@ jobs:
           }
           $compilerDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Package Windows installer and update feed
-        if: runner.os == 'Windows'
+        if: inputs.package && runner.os == 'Windows'
         shell: pwsh
         env:
           PNGR_VERSION: ${{ inputs.version }}
         run: python scripts/package-windows-installer.py $env:PNGR_VERSION
       - name: Upload Windows installer assets
-        if: runner.os == 'Windows'
+        if: inputs.package && runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: installer-win-x64
@@ -85,7 +101,7 @@ jobs:
           compression-level: 0
           retention-days: 7
       - name: Verify Windows installation and v0.7.1 update compatibility
-        if: runner.os == 'Windows'
+        if: inputs.package && runner.os == 'Windows'
         shell: pwsh
         env:
           PNGR_VERSION: ${{ inputs.version }}
@@ -94,7 +110,7 @@ jobs:
           python scripts/windows/verify-install-update.py artifacts/installers/win-x64/Pngr-Setup.exe $package.FullName $env:PNGR_VERSION
           if ($LASTEXITCODE -ne 0) { throw 'Windows installer/update verification failed' }
       - name: Upload Windows installation verification
-        if: always() && runner.os == 'Windows'
+        if: always() && inputs.package && runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-installation-verification
@@ -102,6 +118,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Upload package
+        if: inputs.package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pngr-${{ matrix.runtime }}
@@ -120,6 +137,7 @@ jobs:
 
   universal:
     name: Universal macOS installer
+    if: inputs.package
     needs: build
     runs-on: macos-15
     timeout-minutes: 30
@@ -128,12 +146,24 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.x'
+      - name: Cache NuGet dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .tools/nuget
+          key: nuget-${{ runner.os }}-${{ runner.arch }}-dotnet10-universal-${{ hashFiles('**/*.csproj', '**/*.props', '**/NuGet.Config', '**/nuget.config', 'global.json', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ runner.arch }}-dotnet10-
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: pngr-osx-*
           merge-multiple: true
           path: artifacts
-      - name: Build universal application, DMG and update feed
+      - name: Cache DMG layout dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/pip
+          key: pip-dmg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/macos/dmg-requirements.txt') }}
+      - name: Assemble universal application, DMG and update feed
         shell: bash
         env:
           PNGR_VERSION: ${{ inputs.version }}
@@ -149,6 +179,7 @@ jobs:
           retention-days: 7
   validate-installers:
     name: Validate public installer assets
+    if: inputs.package
     needs: [build, universal]
     runs-on: ubuntu-latest
     steps:

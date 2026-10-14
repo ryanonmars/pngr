@@ -69,7 +69,8 @@ layout_python="$project_root/.tools/dmg-layout/bin/python3"
 if [ ! -x "$layout_python" ]; then python3 -m venv "$project_root/.tools/dmg-layout"; fi
 "$layout_python" -m pip install --disable-pip-version-check -q -r scripts/macos/dmg-requirements.txt
 mkdir -p "$stage/image/.background"
-xcrun swift scripts/macos/dmg-background.swift "$stage/image/.background/install.png"
+xcrun swift scripts/macos/dmg-background.swift "$stage/image/.background/install.png" \
+  src/TraceScope.App/Assets/Branding/Pngr-wordmark.png
 hdiutil create -quiet -volname Pngr -srcfolder "$stage/image" -format UDRW \
     -fs HFS+ "$stage/install-writable.dmg"
 mkdir "$stage/mounted"

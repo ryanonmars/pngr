@@ -11,7 +11,7 @@
   <Grid RowDefinitions="28,28,38,*,20" Background="#191A1D">
     <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
-        <TextBlock Text="Pngr" FontSize="12" FontWeight="SemiBold" Foreground="#F0F1F3" VerticalAlignment="Center"/>
+        <Image x:Name="BrandWordmark" Source="{StaticResource PngrWordmark}" Width="50" Height="18" Stretch="Uniform" VerticalAlignment="Center" AutomationProperties.Name="Pngr"/>
         <TextBlock Grid.Column="1" x:Name="TargetTitle" Text="Ready to trace" FontSize="11" Foreground="#DBDDE1" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="2" x:Name="TargetSubtitle" IsVisible="False" Text="" FontSize="10" Foreground="#999DA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Grid>
