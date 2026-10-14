@@ -8,7 +8,7 @@ on:
       version:
         description: Build-only validation version (does not create a release)
         required: true
-        default: 'v0.7.0'
+        default: 'v0.7.1'
         type: string
 
 permissions:
@@ -32,8 +32,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: pngr-*
-          merge-multiple: true
+          name: validated-release-assets
           path: release-assets
       - name: Publish verified version tag
         env:
@@ -42,10 +41,16 @@ jobs:
           PNGR_TAG: ${{ github.ref_name }}
         run: |
           set -eu
-          test -f release-assets/pngr-osx-arm64.zip
-          test -f release-assets/pngr-osx-x64.zip
-          test -f release-assets/pngr-win-x64.zip
+          test -f release-assets/pngr-macos-universal.dmg
+          test -f release-assets/pngr-Setup.exe
+          test -f release-assets/SHA256SUMS
+          (cd release-assets && sha256sum --check SHA256SUMS)
+          test "$PNGR_TAG" != v0.7.0 # Existing release is immutable.
+          if gh release view "$PNGR_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to replace its assets." >&2
+            exit 1
+          fi
           version=${PNGR_TAG#v}
           if [[ "$version" == *-* ]]; then prerelease=--prerelease; else prerelease=; fi
-          gh release create "$PNGR_TAG" release-assets/pngr-*.zip \
+          gh release create "$PNGR_TAG" release-assets/* \
             --verify-tag --title "pngr $version" --generate-notes $prerelease

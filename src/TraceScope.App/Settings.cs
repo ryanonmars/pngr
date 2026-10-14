@@ -30,6 +30,7 @@ public partial class MainWindow
                     case "alerts": OpenAlerts(null, e); break;
                     case "actions": OpenAlertActions(null, e); break;
                     case "web": OpenWeb(null, e); break;
+                    case "updates": _ = CheckForUpdatesAsync(true); break;
                 }
             }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;

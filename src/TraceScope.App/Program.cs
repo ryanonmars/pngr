@@ -10,6 +10,8 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Installer hooks must run before Avalonia or any monitoring/database initialization.
+        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         using var signal = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
         {
             context.Cancel = true;

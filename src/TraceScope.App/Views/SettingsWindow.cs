@@ -109,7 +109,12 @@ public sealed class SettingsWindow : Window
         _web.IsChecked = configuration.WebEnabled; _webPort.Value = configuration.WebPort;
         LoadProbe(_defaults); ReloadProfiles();
 
+        var checkUpdates = new Button { Name = "SettingsCheckUpdates", Content = "Check for Updates…" };
+        // Checking updates must not apply unrelated staged Settings edits.
+        checkUpdates.Click += (_, _) => _openTool("updates");
+
         _pages["General"] = Page("General", "Preferences are saved locally with your workspace.", _restore,
+            checkUpdates,
             Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing pngr stops them."),
             ToolButton("Apply & manage workspaces…", "workspace"),
             Heading("Local files"), Note(dataDirectory), Note("Settings: workspace.json   ·   Measurements: tracescope.db"));

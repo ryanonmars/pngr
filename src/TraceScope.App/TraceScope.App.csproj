@@ -10,7 +10,7 @@
     <Product>pngr</Product>
     <Title>pngr</Title>
     <Description>pngr — Network diagnostics</Description>
-    <Version>0.7.0</Version>
+    <Version>0.7.1</Version>
     <ApplicationIcon>Assets/Icons/pngr.ico</ApplicationIcon>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
   </PropertyGroup>
@@ -20,6 +20,7 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.7" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <ProjectReference Include="../TraceScope.Core/TraceScope.Core.csproj" />
   </ItemGroup>
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) And '$(RuntimeIdentifier)' != 'win-x64'">

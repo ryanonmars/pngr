@@ -6,7 +6,7 @@ on:
       version:
         description: Semantic version embedded in the application and packages
         required: false
-        default: '0.7.0'
+        default: '0.7.1'
         type: string
 
 permissions:
@@ -59,6 +59,21 @@ jobs:
           PNGR_VERSION: ${{ inputs.version }}
           PNGR_RUNTIME: ${{ matrix.runtime }}
         run: python scripts/verify-package.py "artifacts/pngr-$PNGR_RUNTIME.zip" "$PNGR_RUNTIME" "$PNGR_VERSION"
+      - name: Package Windows installer and update feed
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+        run: python scripts/package-windows-installer.py $env:PNGR_VERSION
+      - name: Upload Windows installer assets
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: installer-win-x64
+          path: artifacts/installers/win-x64/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
       - name: Upload package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -74,4 +89,56 @@ jobs:
           name: tests-${{ matrix.runtime }}
           path: artifacts/test-results/*.trx
           if-no-files-found: warn
+          retention-days: 7
+
+  universal:
+    name: Universal macOS installer
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: pngr-osx-*
+          merge-multiple: true
+          path: artifacts
+      - name: Build universal application, DMG and update feed
+        shell: bash
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+          PNGR_UNIVERSAL_USE_ARCHIVES: '1'
+        run: scripts/package-universal.sh "$PNGR_VERSION"
+      - name: Upload universal installer assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: installer-osx-universal
+          path: artifacts/installers/osx-universal/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+  validate-installers:
+    name: Validate public installer assets
+    needs: [build, universal]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: artifacts/release-assets
+      - name: Verify feeds and generate checksums
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+        run: python scripts/release-assets.py artifacts/release-assets "$PNGR_VERSION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validated-release-assets
+          path: artifacts/release-assets/*
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 7

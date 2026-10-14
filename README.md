@@ -14,19 +14,24 @@ No background monitoring service or cloud account is required. Closing pngr stop
 
 ## Install
 
-Download the archive for your platform from [Releases](https://github.com/ryanonmars/pngr/releases):
+The existing [v0.7.0 release](https://github.com/ryanonmars/pngr/releases/tag/v0.7.0) retains its three portable ZIP downloads. Starting with the planned v0.7.1 release, download an installer:
 
-| Platform | Archive |
+| Platform | Installer |
 | --- | --- |
-| macOS Apple Silicon | `pngr-osx-arm64.zip` |
-| macOS Intel | `pngr-osx-x64.zip` |
-| Windows x64 | `pngr-win-x64.zip` |
+| macOS Apple Silicon and Intel | `pngr-macos-universal.dmg` |
+| Windows x64 | `pngr-Setup.exe` |
 
-Extract the macOS archive and move `pngr.app` to Applications. On Windows, extract the entire archive into a folder and run `pngr.exe`; keep its accompanying runtime files together. No separate .NET installation is needed.
+On macOS, open the DMG and drag `pngr.app` to Applications. The app contains native ARM64 and Intel runtime payloads selected by a universal launcher. On Windows, run Setup to install under your user account without administrator access; it shows progress and creates Start Menu/Desktop shortcuts and an uninstall entry. No separate .NET installation is needed.
 
-Initial packages are unsigned and macOS packages are not notarized. Your operating system may prompt before opening them. macOS packages use an ad-hoc signature for Apple Silicon compatibility; no developer signing certificate is required.
+Packages are unsigned and macOS packages are not notarized (they have ad-hoc integrity signatures). Gatekeeper and SmartScreen may warn or block launching them; use the operating system's normal approval interface only if you trust the download. pngr does not disable or bypass these protections.
 
-The first release has not been published yet. Build artifacts are available from successful [Actions runs](https://github.com/ryanonmars/pngr/actions).
+### Updates
+
+pngr checks for newer stable GitHub releases in the background, at most approximately once every 24 hours. Use **Settings → Check for Updates…** for a manual check. An available update can be viewed or deferred; release notes and download progress are shown before installation, and installation always requires your approval. Updating restarts pngr and preserves its separate user-data directory.
+
+Automatic installation requires a supported installed location: an app copied from the DMG to a writable Applications folder on macOS, or a Windows installation made by Setup. Portable v0.7.0/source-checkout builds require a manual installer migration. Permissions or operating-system security restrictions may also require manual installation. Offline checks and failed downloads leave the running installation intact.
+
+Releases also contain platform-specific Velopack feeds (`releases.win-x64.json` and `releases.osx-universal.json`), full `.nupkg` update packages, and `SHA256SUMS`. These are updater assets; users should choose the DMG or Setup. The checksums detect download corruption and are verified before installation; unsigned GitHub assets are not a substitute for a trusted developer signature.
 
 ## Build and test
 
@@ -38,20 +43,24 @@ dotnet build TraceScope.slnx -c Release
 dotnet test TraceScope.slnx -c Release
 ```
 
-Build self-contained distributions:
+Build installers locally:
 
 ```sh
-# macOS (run on a Mac)
-scripts/package.sh osx-arm64 0.7.0
-scripts/package.sh osx-x64 0.7.0
+# macOS universal app, DMG and macOS update feed (run on a Mac)
+scripts/package-universal.sh 0.7.1
+
+# Windows cross-publish/installer (also works from macOS)
+scripts/package.sh win-x64 0.7.1
+python3 scripts/package-windows-installer.py 0.7.1
 ```
 
 ```powershell
-# Windows
-./scripts/package.ps1 -Version 0.7.0
+# Native Windows publish and per-user installer
+./scripts/package.ps1 -Version 0.7.1
+python scripts/package-windows-installer.py 0.7.1
 ```
 
-The packages replace `artifacts/pngr-<runtime>.zip`, rather than accumulating versioned copies. Run from source with `dotnet run --project src/TraceScope.App`. The existing solution and internal namespaces retain the TraceScope name.
+The updater SDK and CLI are pinned to Velopack 1.2.161; the packaging scripts restore the repository's local tool manifest. Final assets are in `artifacts/installers/osx-universal` and `artifacts/installers/win-x64`. Architecture-specific ZIPs remain internal build intermediates/portable local packages, not future public release downloads. Run from source with `dotnet run --project src/TraceScope.App`. The existing solution and internal namespaces retain the TraceScope name.
 
 ## Measurements and existing data
 
@@ -61,6 +70,8 @@ Data is stored locally. Existing TraceScope settings, profiles, workspaces, and 
 
 ## Automated releases
 
-Pushes and pull requests build, test, and package all three platforms on GitHub-hosted runners. Version tags such as `v0.7.0` run the same checks and publish the three stable asset names above. The tag version is embedded in the application and macOS bundle metadata.
+Pushes and pull requests build, test, and package ARM64 macOS, Intel macOS and Windows x64 on GitHub-hosted runners. A dependent macOS job assembles and validates the universal app. The final validation job checks updater package versions, SHA-256 digests and archive integrity, rejects private data, and generates `SHA256SUMS` for the installers and updater assets.
 
-The Release workflow's manual dispatch is **build-only validation**: it never creates a tag or release. The first version tag will be pushed only after validation and explicit approval. No in-app updater is implemented.
+Version tags run the same checks and publish the validated installer assets. The tag version is embedded in the application and bundle metadata. Existing releases are never overwritten; v0.7.0 remains unchanged. Manual Release workflow dispatch is **build-only validation** and does not create tags or releases. Do not push v0.7.1 or v0.7.2 without explicit publication approval.
+
+To validate the complete update sequence: build and install v0.7.1 on a test machine, then build v0.7.2 with the same application ID and feed channels. After approval, publish v0.7.1 and v0.7.2 in that order. In the installed v0.7.1 app, check manually, review notes, download, approve installation and verify v0.7.2 after restart. Compare history, profiles and workspace before/after. Repeat with an interrupted download/offline check and verify the existing app remains usable. Apple Silicon testing does not establish Intel or Windows runtime behavior.

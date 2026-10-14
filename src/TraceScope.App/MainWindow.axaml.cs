@@ -88,6 +88,7 @@ public partial class MainWindow : Window
             }
         };
         InitializeProfessional(dataDirectory, engine is null);
+        InitializeUpdates();
         InitializeAllTargets();
         InitializeHistoricalAnalysis();
         InitializeMainWindowLayout();
@@ -124,6 +125,8 @@ public partial class MainWindow : Window
         {
             await InitializeProfessionalOnOpenAsync();
             if (_closing) return;
+            // Avoid update traffic in headless tests and explicit capture-only runs.
+            if (_runtimeFeatures && !_args.Contains("--capture")) _ = CheckForUpdatesAsync(false);
             _windowLayoutReady = true;
             RememberMainWindowLayout();
             // Capture-only sizing keeps native visual verification repeatable.
