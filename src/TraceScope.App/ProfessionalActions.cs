@@ -117,7 +117,7 @@ public partial class MainWindow
         {
             if (!await SaveActions()) return;
             if (_selected?.Session is not { } session) { status.Text = "Select a live target to test configured actions."; return; }
-            var item = new MonitoringEvent(Guid.NewGuid(), session.Id, DateTimeOffset.UtcNow, "Alert", "TraceScope: user-requested notification/action test.", "manual-test");
+            var item = new MonitoringEvent(Guid.NewGuid(), session.Id, DateTimeOffset.UtcNow, "Alert", "pngr: user-requested notification/action test.", "manual-test");
             try
             {
                 await _engine.Storage.AppendEventAsync(item, _applicationCancellation.Token); _monitoringEvents.Insert(0, item);

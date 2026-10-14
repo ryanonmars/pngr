@@ -13,7 +13,7 @@ public sealed class SettingsConfigurationTests
         var configuration = await WorkspaceStore.ImportAsync(stream);
         Assert.Equal(new ProbeOptions(), configuration.DefaultProbeOptions);
         Assert.Equal(new DisplayConfiguration(), configuration.Display);
-        Assert.Equal(.6, configuration.HistoryLayout.PanelFraction);
+        Assert.Equal(.68, configuration.HistoryLayout.PanelFraction);
         Assert.Empty(configuration.HistoryLayout.Targets);
         Assert.False(configuration.WebEnabled);
         Assert.False(configuration.Actions.NativeNotificationsEnabled);

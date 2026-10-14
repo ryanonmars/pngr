@@ -7,6 +7,8 @@ public sealed class HopStatistics
     private double? _previous;
     private long _jitterCount;
     private LatencySample? _last;
+    // Legacy Sent counter counts eligible diagnostic attempts, including explicit network failures.
+    // Per-sample Transmission distinguishes confirmed sends from failures before transmission.
     public long Sent { get; private set; }
     public long Received { get; private set; }
 
@@ -19,6 +21,10 @@ public sealed class HopStatistics
         _last = null;
     }
 
+    // Keep cumulative counters across router revisits, but no jitter pair across other identities.
+    // Off-route sample buffers are released; complete history remains in SQLite.
+    public void Suspend() { _previous = null; _history.Clear(); }
+
     public void Add(DateTimeOffset timestamp, ProbeResult result, int historyLimit)
     {
         if (result.Status != ProbeStatus.Error) Sent++;
@@ -29,7 +35,10 @@ public sealed class HopStatistics
             if (_previous is { } previous) { _jitterSum += Math.Abs(ms - previous); _jitterCount++; }
             _previous = ms;
         }
-        _last = new LatencySample(timestamp, latency, result.Status);
+        // Match window/SQLite jitter semantics: an unanswered or unavailable probe breaks a pair.
+        if (latency is null) _previous = null;
+        _last = new LatencySample(timestamp, latency, result.Status)
+        { Detail = result.Detail, ResponseKind = result.ResponseKind, Transmission = result.Transmission };
         _history.Enqueue(_last);
         while (_history.Count > historyLimit) _history.Dequeue();
     }
@@ -39,5 +48,7 @@ public sealed class HopStatistics
         Received == 0 ? null : _sum / Received, Received == 0 ? null : _min,
         Received == 0 ? null : _max, _jitterCount == 0 ? null : _jitterSum / _jitterCount,
         Sent, Received, Sent == 0 ? 0 : 100d * (Sent - Received) / Sent,
-        isDestination, _history.ToArray(), _last?.Status ?? ProbeStatus.Timeout);
+        isDestination, _history.ToArray(), _last?.Status ?? ProbeStatus.Timeout)
+        { Detail = _last?.Detail, ResponseKind = _last?.ResponseKind ?? ProbeResponseKind.None,
+            Transmission = _last?.Transmission ?? ProbeTransmission.Unknown };
 }

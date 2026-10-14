@@ -13,21 +13,30 @@ public partial class App : Application
         if (OperatingSystem.IsMacOS())
         {
             MacNativeMenu.Install();
-            // Export the initial complete menu; native presentation keeps it stable
-            // when focus changes between the main and utility windows.
-            Window.WindowOpenedEvent.AddClassHandler<Window>((window, _) =>
-            {
-                NativeMenu.SetMenu(window, CreateWindowMenu());
-            });
+
         }
+        // One menu model: native macOS menu bar, Windows application menu bar.
+        Window.WindowOpenedEvent.AddClassHandler<Window>((window, _) =>
+        {
+            NativeMenu.SetMenu(window, CreateWindowMenu());
+        });
     }
 
-    private NativeMenu CreateWindowMenu()
+    internal NativeMenu CreateWindowMenu()
     {
         var menu = new NativeMenu();
         AddSubmenu("File", "Open History…", "Export CSV…");
         AddSubmenu("Window", "All Targets", "Summary", "Network", "Web");
         AddSubmenu("Tools", "Alerts", "Workspace");
+        var tools = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Tools").Menu!;
+        var profiles = new NativeMenu();
+        foreach (var command in new[] { "Load Profile…", "Save Current Configuration…", "Manage/Delete Profiles…" })
+        {
+            var item = new NativeMenuItem(command);
+            item.Click += AppMenuCommand;
+            profiles.Add(item);
+        }
+        tools.Add(new NativeMenuItem("Profiles") { Menu = profiles });
         return menu;
 
         void AddSubmenu(string header, params string[] commands)

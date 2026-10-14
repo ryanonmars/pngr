@@ -61,6 +61,8 @@ public partial class MainWindow
         ProtocolInput.SelectionChanged += (_, _) => ProtocolChanged();
         UpdateProtocolControls();
         PortInput.ValueChanged += (_, _) => ApplySelectedOptions();
+        UdpModeInput.SelectionChanged += (_, _) => { UpdateProtocolControls(); ApplySelectedOptions(); };
+        UdpEndPortInput.ValueChanged += (_, _) => ApplySelectedOptions();
         SourceInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         GroupInput.TextChanged += (_, _) =>
         {
@@ -84,7 +86,7 @@ public partial class MainWindow
             while (_monitoringEvents.Count > 500) _monitoringEvents.RemoveAt(_monitoringEvents.Count - 1);
             StatusText.Text = item.Message;
             if (_configuration.DesktopNotifications)
-                _notifications?.Show(new Notification("TraceScope · " + item.Kind, item.Message,
+                _notifications?.Show(new Notification("pngr · " + item.Kind, item.Message,
                     item.Kind == "Recovery" ? NotificationType.Success : NotificationType.Warning, TimeSpan.FromSeconds(8)));
             if (_selected?.Id == item.SessionId) RefreshEventMarkers();
         });
@@ -107,6 +109,7 @@ public partial class MainWindow
             if (saved is not null)
             {
                 _configuration = saved;
+                RestoreMainWindowLayout(saved.WindowLayout);
                 ApplyHistoryPanelFraction(saved.HistoryLayout.PanelFraction);
                 ApplyPreferenceControls();
                 ReloadProfiles();
@@ -123,6 +126,7 @@ public partial class MainWindow
     private WorkspaceConfiguration CaptureWorkspace() => _configuration with
     {
         HistoryLayout = CaptureHistoryLayout(),
+        WindowLayout = CaptureMainWindowLayout(),
         Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
             .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused, x.TcpPort, x.UdpPort, x.ProfileName)).ToArray()
     };
@@ -152,7 +156,7 @@ public partial class MainWindow
             foreach (var item in _targets.ToArray()) if (item.Session is not null)
             { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
             _targets.Clear(); TargetList.SelectedItem = null; TargetCount.Text = "0";
-            _configuration = workspace; _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
+            _configuration = workspace; RestoreMainWindowLayout(workspace.WindowLayout); _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
             foreach (var target in workspace.Targets)
             {
                 try
@@ -282,8 +286,8 @@ public partial class MainWindow
         {
             try
             {
-                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export TraceScope workspace",
-                    SuggestedFileName = "tracescope.workspace.json", DefaultExtension = "json" });
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export pngr workspace",
+                    SuggestedFileName = "pngr.workspace.json", DefaultExtension = "json" });
                 if (file is null) return;
                 await using var stream = await file.OpenWriteAsync(); if (stream.CanSeek) stream.SetLength(0);
                 await JsonSerializer.SerializeAsync(stream, CaptureWorkspace(), WorkspaceStore.JsonOptions);
@@ -295,7 +299,7 @@ public partial class MainWindow
         {
             try
             {
-                var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import TraceScope workspace", AllowMultiple = false });
+                var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import pngr workspace", AllowMultiple = false });
                 if (files.Count == 0) return;
                 await using var stream = await files[0].OpenReadAsync();
                 var workspace = await WorkspaceStore.ImportAsync(stream);
@@ -381,10 +385,10 @@ public partial class MainWindow
             if (events.SelectedItem is not MonitoringEvent selectedEvent) return;
             try
             {
-                if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in TraceScope")) return;
+                if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in pngr")) return;
                 var index = _monitoringEvents.IndexOf(selectedEvent);
                 if (index >= 0) _monitoringEvents[index] = selectedEvent with
-                { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in TraceScope" };
+                { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in pngr" };
             }
             catch (Exception ex) { StatusText.Text = "Acknowledgment failed: " + ex.Message; }
         };

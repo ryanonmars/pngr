@@ -25,7 +25,7 @@ public sealed class EngineTests
         Assert.Equal(20, snapshot.AverageMs);
         Assert.Equal(10, snapshot.MinimumMs);
         Assert.Equal(30, snapshot.MaximumMs);
-        Assert.Equal(15, snapshot.JitterMs);
+        Assert.Equal(10, snapshot.JitterMs); // Lost probes break a jitter pair, consistently with historical statistics.
         Assert.Equal(3, snapshot.History.Count);
         Assert.Null(snapshot.History[0].LatencyMs);
     }
@@ -34,6 +34,8 @@ public sealed class EngineTests
     [InlineData("traceroute to 1.1.1.1 (1.1.1.1), 1 hops max\n 1  192.168.30.1  0.677 ms\n", "1.1.1.1", "192.168.30.1", 0.677, ProbeStatus.TimeExceeded)]
     [InlineData(" 2  1.1.1.1  12.340 ms\n", "1.1.1.1", "1.1.1.1", 12.34, ProbeStatus.Success)]
     [InlineData(" 2  ::1  0.030 ms\n", "::1", "::1", 0.03, ProbeStatus.Success)]
+    [InlineData(" 2  1.1.1.1  12.340 ms !\n", "1.1.1.1", "1.1.1.1", 12.34, ProbeStatus.Success)]
+    [InlineData(" 1  192.168.30.1  0.677 ms !\n", "1.1.1.1", "192.168.30.1", 0.677, ProbeStatus.TimeExceeded)]
     public void MacTracerouteParsesActualResponderAndRtt(string text, string target, string expectedIp,
         double expectedRtt, ProbeStatus expectedStatus)
     {

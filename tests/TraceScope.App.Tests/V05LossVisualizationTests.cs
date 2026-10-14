@@ -12,7 +12,7 @@ namespace TraceScope.App.Tests;
 public sealed class V05LossVisualizationTests
 {
     [AvaloniaFact]
-    public void MeasuredLossProducesProportionalStripsAlongsideLatencyMarkers()
+    public void MeasuredLossProducesProportionalBarsBehindLatencyMarkers()
     {
         var rows = new[]
         {
@@ -22,14 +22,19 @@ public sealed class V05LossVisualizationTests
         };
         var plot = new HopLatencyPlot { Rows = rows };
         var drawing = Record(plot);
-        var strips = Filled(drawing, "#F57161").ToArray();
+        var strips = Filled(drawing, "#AAD44843").ToArray();
         Assert.Equal(2, strips.Length);
         Assert.Equal(strips[1].Geometry!.Bounds.Width / 4, strips[0].Geometry!.Bounds.Width, 5);
-        Assert.All(strips, strip => Assert.Equal(3, strip.Geometry!.Bounds.Height));
+        Assert.All(strips, strip => Assert.Equal(14, strip.Geometry!.Bounds.Height));
+        var ordered = Geometry(drawing).ToArray();
+        var finalBar = Array.FindLastIndex(ordered, g => g.Brush is ISolidColorBrush b && b.Color == Color.Parse("#AAD44843"));
+        var firstMark = Array.FindIndex(ordered, g => g.Pen?.Brush is ISolidColorBrush b && b.Color == Color.Parse("#E27768"));
+        var firstWhisker = Array.FindIndex(ordered, g => g.Pen?.Brush is ISolidColorBrush b && b.Color == Color.Parse("#A8B8A0"));
+        Assert.True(finalBar < firstMark && finalBar < firstWhisker);
         Assert.Equal(2, Geometry(drawing).Count(g => g.Pen?.Brush is ISolidColorBrush brush
             && brush.Color == Color.Parse("#E27768")));
         plot.ShowPacketLoss = false;
-        Assert.Empty(Filled(Record(plot), "#F57161"));
+        Assert.Empty(Filled(Record(plot), "#AAD44843"));
         Assert.Same(rows, plot.Rows);
     }
 
@@ -40,7 +45,7 @@ public sealed class V05LossVisualizationTests
         {
             Rows = [new(1, null, null, null, null, double.NaN), new(2, null, null, null, null, -10), new(3, null, null, null, null, 200)]
         };
-        var strip = Assert.Single(Filled(Record(plot), "#F57161"));
+        var strip = Assert.Single(Filled(Record(plot), "#AAD44843"));
         Assert.Equal(586, strip.Geometry!.Bounds.Width);
     }
 

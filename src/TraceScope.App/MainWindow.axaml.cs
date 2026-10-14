@@ -40,6 +40,8 @@ public partial class MainWindow : Window
     public MainWindow(string[] args, TraceEngine? engine = null)
     {
         InitializeComponent();
+        VersionLabel.Text = $"pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.0"}";
+        ApplicationMenuBar.IsVisible = OperatingSystem.IsWindows();
         if (OperatingSystem.IsMacOS())
         {
             SettingsButton.IsVisible = false;
@@ -48,7 +50,7 @@ public partial class MainWindow : Window
         }
         if (OperatingSystem.IsWindows())
         {
-            using var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://TraceScope/Assets/Icons/tracescope-windows.png"));
+            using var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://pngr/Assets/Icons/pngr-windows.png"));
             Icon = new WindowIcon(icon);
         }
         _args = args;
@@ -70,8 +72,9 @@ public partial class MainWindow : Window
             ((ComboBoxItem)TimeoutInput.Items[0]!).IsEnabled = false;
             ToolTip.SetTip(TimeoutInput, "The macOS traceroute tool has a minimum timeout of one second.");
         }
-        ToolTip.SetTip(HopTable, "Intermediate routers may limit ICMP replies while forwarding traffic normally. Use destination loss to assess end-to-end delivery. Latency values are milliseconds.");
-        ToolTip.SetTip(RoutePlot, "Markers show mean latency; whiskers show minimum and maximum latency. Thin red strips show the proportion of probes without a response.");
+        ToolTip.SetTip(HopTable, "Statistics are per router identity and configuration. Response loss is not proven forwarding loss.");
+        ToolTip.SetTip(RoutePlot, "Markers show average latency; whiskers show min/max. Red bars show response loss.");
+        ToolTip.SetTip(IntervalInput, "Minimum time between round starts. Rounds never overlap; longer rounds delay the next start.");
         IntervalInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         TimeoutInput.SelectionChanged += (_, _) => ApplySelectedOptions();
         MaxHopsInput.ValueChanged += (_, _) => ApplySelectedOptions();
@@ -93,6 +96,7 @@ public partial class MainWindow : Window
         InitializeProfessional(dataDirectory, engine is null);
         InitializeAllTargets();
         InitializeHistoricalAnalysis();
+        InitializeMainWindowLayout();
         KeyDown += SettingsShortcut;
         _clock.Start();
         Opened += OnOpened;
@@ -111,6 +115,8 @@ public partial class MainWindow : Window
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "TraceScope.slnx")))
                 return Path.Combine(directory.FullName, "artifacts", "data");
+        // Keep the legacy TraceScope folder and tracescope.db filename for compatibility.
+        // Renaming the app must not split existing history or require moving an open database.
         // Installed application bundles/Program Files can be read-only; keep standalone user
         // data in the normal per-user location instead of modifying the executable directory.
         return OperatingSystem.IsMacOS()
@@ -124,6 +130,14 @@ public partial class MainWindow : Window
         {
             await InitializeProfessionalOnOpenAsync();
             if (_closing) return;
+            _windowLayoutReady = true;
+            RememberMainWindowLayout();
+            // Capture-only sizing keeps native visual verification repeatable.
+            if (_args.Contains("--capture"))
+            {
+                if (int.TryParse(ArgumentValue("--capture-width"), out var width)) Width = Math.Max(MinWidth, width);
+                if (int.TryParse(ArgumentValue("--capture-height"), out var height)) Height = Math.Max(MinHeight, height);
+            }
             for (var i = 0; i < _args.Length - 1; i++)
                 if (_args[i] == "--target") await AddTarget(_args[++i]);
             if (_args.Contains("--all-targets")) OpenAllTargets(null, new RoutedEventArgs());
@@ -132,18 +146,46 @@ public partial class MainWindow : Window
                 OpenSettings(null, new RoutedEventArgs());
                 _settingsWindow?.SelectPage(page);
             }
+            if (_args.Contains("--probe-configuration")) OpenProbeConfiguration(null, new RoutedEventArgs());
+            if (ArgumentValue("--profile-menu") is { } profileOperation)
+            {
+                if (profileOperation == "load") ExecuteAppMenuCommand("Load Profile…");
+                else if (profileOperation == "save") ExecuteAppMenuCommand("Save Current Configuration…");
+                else if (profileOperation == "manage") ExecuteAppMenuCommand("Manage/Delete Profiles…");
+            }
             if (ArgumentValue("--capture") is { } capture)
             {
                 await Task.Delay(TimeSpan.FromSeconds(int.TryParse(ArgumentValue("--capture-after"), out var secs) ? secs : 15), _applicationCancellation.Token);
-                var visual = (Control)(_settingsWindow?.Content ?? Content!);
+                ToolTip? capturedTip = null;
+                Control? tipOwner = null;
+                if (ArgumentValue("--capture-tooltip") is { } tipName && _probeConfigurationWindow is { } probeWindow)
+                {
+                    tipOwner = probeWindow.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == tipName);
+                    if (tipOwner is not null && ToolTip.GetTip(tipOwner) is { } tipText)
+                    {
+                        capturedTip = new ToolTip { Content = new TextBlock { Text = tipText.ToString(), TextWrapping = TextWrapping.Wrap, MaxWidth = 340 } };
+                        ToolTip.SetTip(tipOwner, capturedTip);
+                        ToolTip.SetIsOpen(tipOwner, true);
+                        await Task.Delay(150, _applicationCancellation.Token);
+                    }
+                }
+                var visual = (Control)(_profileWindow?.Content ?? _probeConfigurationWindow?.Content ?? _settingsWindow?.Content ?? Content!);
                 var size = visual.Bounds.Size;
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height), new Vector(96, 96));
                 bitmap.Render(visual);
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(capture))!);
                 bitmap.Save(capture);
+                if (capturedTip is { Bounds.Width: > 0, Bounds.Height: > 0 })
+                {
+                    var tipSize = capturedTip.Bounds.Size;
+                    using var tipBitmap = new RenderTargetBitmap(new PixelSize((int)Math.Ceiling(tipSize.Width), (int)Math.Ceiling(tipSize.Height)), new Vector(96, 96));
+                    tipBitmap.Render(capturedTip);
+                    tipBitmap.Save(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(capture))!, Path.GetFileNameWithoutExtension(capture) + "-tooltip.png"));
+                    ToolTip.SetIsOpen(tipOwner!, false);
+                }
                 var details = new { Targets = _targets.Select(x => new { x.Target, x.StateLabel, x.Summary, Round = x.Snapshot?.Round, HopCount = x.Snapshot?.Hops.Count }), Rows = _rows.Count, Title = TargetTitle.Text, SettingsWindowOpen = _settingsWindow?.IsVisible == true };
                 await File.WriteAllTextAsync(Path.ChangeExtension(capture, ".json"), System.Text.Json.JsonSerializer.Serialize(details));
-                if (_args.Contains("--exit-after-capture")) Close();
+                if (_args.Contains("--exit-after-capture")) { _profileWindow?.Close(); _probeConfigurationWindow?.Close(); Close(); }
             }
         }
         catch (Exception ex) { StatusText.Text = ex.Message; }
@@ -153,13 +195,17 @@ public partial class MainWindow : Window
     {
         var basis = !_creatingTarget ? _selected?.Session?.Options ?? _draftOptions : _draftOptions;
         var source = SourceInput.SelectedItem as SourceChoice;
+        var selectedProtocol = ProtocolInput.SelectedItem is ProbeProtocol p ? p : basis.Protocol;
         return basis with
         {
-            Interval = IntervalInput.SelectedIndex >= 0 ? TimeSpan.FromSeconds(new[] { 1d, 2.5, 5, 10 }[Math.Clamp(IntervalInput.SelectedIndex, 0, 3)]) : basis.Interval,
-            Timeout = TimeoutInput.SelectedIndex >= 0 ? TimeSpan.FromMilliseconds(Math.Max(OperatingSystem.IsMacOS() ? 1000 : 500, new[] { 500, 1000, 2000 }[Math.Clamp(TimeoutInput.SelectedIndex, 0, 2)])) : basis.Timeout,
+            Interval = IntervalInput.SelectedIndex >= 0 ? TimeSpan.FromSeconds(ProbeIntervalSeconds[Math.Clamp(IntervalInput.SelectedIndex, 0, ProbeIntervalSeconds.Length - 1)]) : basis.Interval,
+            Timeout = TimeoutInput.SelectedIndex >= 0 ? TimeSpan.FromMilliseconds(Math.Max(OperatingSystem.IsMacOS() && selectedProtocol == ProbeProtocol.Icmp ? 1000 : 500, new[] { 500, 1000, 2000 }[Math.Clamp(TimeoutInput.SelectedIndex, 0, 2)])) : basis.Timeout,
             MaxHops = (int)(MaxHopsInput.Value ?? 30),
-            Protocol = ProtocolInput.SelectedItem is ProbeProtocol protocol ? protocol : basis.Protocol,
+            UdpPacketSize = _packetSizeCommit ?? basis.UdpPacketSize,
+            Protocol = selectedProtocol,
             DestinationPort = (int)(PortInput.Value ?? 443),
+            UdpPortMode = UdpModeInput.SelectedIndex == 1 ? UdpPortMode.Range : UdpPortMode.Fixed,
+            UdpEndPort = (int)(UdpEndPortInput.Value ?? 33625),
             SourceAddress = source?.Source, InterfaceId = source?.Interface
         };
     }
@@ -168,6 +214,8 @@ public partial class MainWindow : Window
     {
         if (_settingOptions || _engine is null) return;
         var options = ReadOptions();
+        try { (_configuration with { DefaultProbeOptions = options }).Validate(); }
+        catch (ArgumentException ex) { StatusText.Text = ex.Message; return; }
         if (_creatingTarget || _selected is null) _newTargetOverride = true;
         RememberProbeOptions(options);
         if (!_creatingTarget && _selected?.Session is { } session)
@@ -177,6 +225,8 @@ public partial class MainWindow : Window
             CurrentHistoryView.LoadedKey = null;
             StatusText.Text = $"Settings updated for {session.Target}; changes apply to the next measurement round.";
         }
+        UpdateProbeDetailsAvailability();
+        UpdateProbeSummary();
         ScheduleWorkspaceSave();
     }
 
@@ -270,7 +320,7 @@ public partial class MainWindow : Window
             _settingOptions = true;
             try
             {
-                IntervalInput.SelectedIndex = Array.IndexOf(new[] { 1d, 2.5, 5, 10 }, session.Options.Interval.TotalSeconds);
+                IntervalInput.SelectedIndex = Array.IndexOf(ProbeIntervalSeconds, session.Options.Interval.TotalSeconds);
                 TimeoutInput.SelectedIndex = Array.IndexOf(new[] { 500d, 1000, 2000 }, session.Options.Timeout.TotalMilliseconds);
                 MaxHopsInput.Value = session.Options.MaxHops;
             }
@@ -288,10 +338,10 @@ public partial class MainWindow : Window
         if (_selected is null)
         {
             _refreshing = true;
-            try { _rows.Clear(); HopTable.SelectedItem = null; }
+            try { _rows.Clear(); HopTable.SelectedItem = null; ClearRoutePresentation(); }
             finally { _refreshing = false; }
             TargetTitle.Text = "Ready to trace";
-            TargetSubtitle.Text = "Continuous route monitoring";
+            TargetSubtitle.Text = "";
             RoutePlot.Rows = [];
             RoutePlot.SelectedHop = null;
             RoutePlot.VerticalOffset = 0;
@@ -299,7 +349,6 @@ public partial class MainWindow : Window
             Timeline.EndTime = null;
             Timeline.SelectedTime = null;
             Timeline.Title = "No active target";
-            GraphHeading.Text = "Latency history";
             FocusRange.Text = "Focus: Auto";
             HistoryPosition.Text = "LIVE";
             LatencyValue.Text = LossValue.Text = JitterValue.Text = MosValue.Text = ShortAverageValue.Text = LongAverageValue.Text = "—";
@@ -309,14 +358,13 @@ public partial class MainWindow : Window
             UpdateButtons();
             return;
         }
-        TargetTitle.Text = _selected.Target;
-        TargetSubtitle.Text = _selected.Snapshot is { } snapshot
-            ? $"{snapshot.DestinationAddress}  ·  {_selected.StateLabel}  ·  round {snapshot.Round}  ·  {snapshot.Hops.Count} hops"
-            : $"{_selected.Address}  ·  {_selected.StateLabel}  ·  discovering route…";
+        TargetTitle.Text = _selected.StateLabel;
+        TargetSubtitle.Text = "";
         _refreshing = true;
         try
         {
-            var hops = _selectionStatistics?.Where(h => h.Hop > 0).ToArray() ?? _selected.Snapshot?.Hops ?? [];
+            var allHops = _selectionStatistics?.Where(h => h.Hop > 0).ToArray() ?? _selected.Snapshot?.Hops ?? [];
+            var hops = PresentRoute(allHops);
             var selectedNumber = _selectedHop;
             while (_rows.Count > hops.Count) _rows.RemoveAt(_rows.Count - 1);
             for (var i = 0; i < hops.Count; i++)
@@ -332,14 +380,20 @@ public partial class MainWindow : Window
             RoutePlot.SelectedHop = chosen?.Hop.Hop;
         }
         finally { _refreshing = false; }
-        var destination = _selectionStatistics?.FirstOrDefault(h => h.Hop == 0) ?? (_selectionStatistics is null ? _selected.Snapshot?.Destination : null);
+        var selectedEndpoints = _selectionStatistics?.Where(h => h.Hop == 0).ToArray();
+        var mixedConfigurations = selectedEndpoints is { Length: > 1 };
+        var destination = mixedConfigurations ? null : selectedEndpoints?.SingleOrDefault()
+            ?? (_selectionStatistics is null ? _selected.Snapshot?.Destination : null);
         FooterCount.Text = destination?.Sent.ToString(CultureInfo.InvariantCulture) ?? "—";
         FooterAverage.Text = Number(destination?.AverageMs);
         FooterMinimum.Text = Number(destination?.MinimumMs);
         FooterCurrent.Text = Number(destination?.LastMs);
         LatencyValue.Text = Number(destination?.LastMs, " ms");
-        LossValue.Text = destination is null ? "—" : $"{destination.LossPercent:0.#}%";
+        LossValue.Text = destination is { Sent: > 0 } ? $"{destination.LossPercent:0.#}%" : "—";
         LossValue.Foreground = destination?.LossPercent > 0 ? Brushes.IndianRed : Brush.Parse("#D5D8DE");
+        var endpointPort = _selectionStatistics is null ? _selected.Snapshot?.Measurements.FirstOrDefault(m => m.Hop == 255)?.Options.DestinationPort : null;
+        ToolTip.SetTip(LossValue, "Response loss counts failed diagnostic attempts, not proven forwarding loss."
+            + (endpointPort is { } port ? $" Latest endpoint port: {port}." : ""));
         var now = _selected.IsHistorical ? _selected.Snapshot?.Timestamp ?? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow;
         var shortStats = MonitoringStatistics.Calculate(destination?.History ?? [], TimeSpan.FromSeconds(30), now);
         var longStats = MonitoringStatistics.Calculate(destination?.History ?? [], TimeSpan.FromMinutes(5), now);
@@ -354,10 +408,15 @@ public partial class MainWindow : Window
                 && CurrentHistoryView.StatisticsRange == (start, end);
             StatusText.Text = !loaded ? "Loading selected interval from stored measurements…"
                 : _selectionStatistics.Count == 0 ? "No stored measurements in the selected interval"
-                : "Selected interval · exact raw statistics · route addresses shown separately";
+                : mixedConfigurations ? "Selected interval spans different probing configurations; destination summary unavailable. Router statistics are separated by configuration."
+                : "Selected interval · exact raw statistics · router identities and configurations shown separately";
+            if (_selected.HistoricalConfigurationUnknown) StatusText.Text += " · legacy probing configurations were not recorded";
         }
         else if (_selected.Snapshot is { } s)
-            StatusText.Text = s.Warning ?? $"{s.Timestamp.ToLocalTime():HH:mm:ss} · round {s.Round} took {s.RoundDuration.TotalSeconds:0.##} s · statistics cover this session · saved locally";
+            StatusText.Text = $"Round {s.Round} · {(_selected.Session?.Capability?.HopDiscoveryAvailable == false ? "endpoint monitoring; hop discovery unavailable" : $"{s.Hops.Count} probed TTL positions")} · {(s.DestinationReached ? "destination replied" : s.RouteBoundIsHistorical ? "incomplete; retained terminal bound" : "incomplete route")} · {s.RoundDuration.TotalSeconds:0.##} s duration"
+                + (s.SamplingInterval is { } actual ? $" · actual interval {actual.TotalSeconds:0.##} s" : "")
+                + $" · counters per router identity/configuration {s.MeasurementEpoch + 1}"
+                + (s.Warning is { } warning ? " · " + warning : " · saved locally");
         RefreshGraph();
         UpdateButtons();
     }
@@ -432,6 +491,7 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         if (_engine is null) return;
+        UpdateProbeSummary();
         var state = _selected?.Session?.State;
         var busy = _addingTarget || (_selected is not null && (_monitoringOperations.Contains(_selected.Id) || _closingTargets.Contains(_selected.Id)));
         var adding = _creatingTarget || !string.IsNullOrWhiteSpace(TargetInput.Text) || _selected is null;
@@ -506,7 +566,7 @@ public partial class MainWindow : Window
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Export measured samples", SuggestedFileName = $"tracescope-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+                Title = "Export measured samples", SuggestedFileName = $"pngr-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
                 DefaultExtension = "csv", FileTypeChoices = [new FilePickerFileType("CSV") { Patterns = ["*.csv"] }]
             });
             if (file is null) return;
@@ -547,16 +607,22 @@ public partial class MainWindow : Window
         if (live is not null) { TargetList.SelectedItem = live; return; }
         var range = await Task.Run(() => _engine.Storage.LoadTimeRangeAsync(session.Id));
         var samples = await Task.Run(() => _engine.Storage.LoadSamplesAsync(session.Id, from: range?.Last - TimeSpan.FromMinutes(15)));
+        var configurations = await _engine.Storage.LoadMeasurementOptionsAsync(session.Id);
         if (samples.Count == 0) { StatusText.Text = "This session has no saved samples."; return; }
-        var hops = samples.Where(x => x.Hop > 0).GroupBy(x => x.Hop).Select(g =>
+        var latestEpoch = samples.Max(x => x.MeasurementEpoch);
+        var latestRound = samples.Max(x => x.Round);
+        var currentPositions = samples.Where(x => x.Round == latestRound && x.Hop > 0).Select(x => x.Hop).ToHashSet();
+        var epochSamples = samples.Where(x => x.MeasurementEpoch == latestEpoch).ToArray();
+        var hops = epochSamples.Where(x => x.Hop > 0 && currentPositions.Contains(x.Hop)).GroupBy(x => x.Hop).Select(g =>
         {
             var latestAddress = g.OrderBy(x => x.Timestamp).Last().Address;
-            return Aggregate(g.Key, latestAddress, g.Where(x => x.Address == latestAddress));
+            return Aggregate(g.Key, latestAddress, g);
         }).OrderBy(x => x.Hop).ToArray();
-        var destSamples = samples.Where(x => x.Hop == 0).ToArray();
+        var destSamples = epochSamples.Where(x => x.Hop == 0).ToArray();
         var destination = destSamples.Length > 0 ? Aggregate(0, session.DestinationAddress, destSamples) : hops.LastOrDefault(x => x.IsDestination) ?? Aggregate(0, session.DestinationAddress, []);
-        var warning = samples.Count < session.SampleCount ? $"Hop table covers the latest 15 minutes. Navigate the graph to query older saved measurements; CSV exports the entire session." : null;
-        var item = new TargetItem(session) { Snapshot = new RoundSnapshot(session.Id, session.Target, session.DestinationAddress, samples.Max(x => x.Timestamp), samples.Max(x => x.Round), hops.Any(x => x.IsDestination), hops, destination, TimeSpan.Zero, warning) };
+        var warning = "Saved hop table shows the latest probing configuration and route, within the latest 15 minutes. Select a historical interval to inspect earlier measurements.";
+        var item = new TargetItem(session) { HistoricalConfigurationUnknown = configurations.Count == 0, Snapshot = new RoundSnapshot(session.Id, session.Target, session.DestinationAddress, samples.Max(x => x.Timestamp), samples.Max(x => x.Round), hops.Any(x => x.IsDestination && x.Status == ProbeStatus.Success && x.LastMs.HasValue), hops, destination, TimeSpan.Zero, warning) };
+        if (item.HistoricalConfigurationUnknown) item.Snapshot = item.Snapshot! with { Warning = warning + " Legacy probing configurations were not recorded." };
         item.Refresh(); _targets.Add(item); TargetList.SelectedItem = item; TargetCount.Text = _targets.Count.ToString();
         _settingHistoryViewport = true;
         try { CurrentHistoryView.Viewport.First = range?.First; CurrentHistoryView.Viewport.Last = range?.Last; }
@@ -566,13 +632,19 @@ public partial class MainWindow : Window
 
     private static HopSnapshot Aggregate(int hop, string? address, IEnumerable<StoredSample> source)
     {
-        var samples = source.OrderBy(x => x.Timestamp).ToArray();
-        var replies = samples.Where(x => x.LatencyMs.HasValue).Select(x => x.LatencyMs!.Value).ToArray();
-        var diffs = replies.Zip(replies.Skip(1), (a, b) => Math.Abs(a - b)).ToArray();
-        return new HopSnapshot(hop, address, null, samples.LastOrDefault()?.LatencyMs, replies.Length > 0 ? replies.Average() : null,
-            replies.Length > 0 ? replies.Min() : null, replies.Length > 0 ? replies.Max() : null, diffs.Length > 0 ? diffs.Average() : null,
-            samples.LongCount(x => x.Status != ProbeStatus.Error), replies.Length, samples.Any(x => x.Status != ProbeStatus.Error) ? samples.Count(x => x.Status != ProbeStatus.Error && !x.LatencyMs.HasValue) * 100d / samples.Count(x => x.Status != ProbeStatus.Error) : 0,
-            samples.Any(x => x.IsDestination), samples.Select(x => new LatencySample(x.Timestamp, x.LatencyMs, x.Status)).ToArray(), samples.LastOrDefault()?.Status ?? ProbeStatus.Timeout);
+        var statistics = new HopStatistics();
+        StoredSample? previous = null;
+        foreach (var sample in source.OrderBy(x => x.Timestamp))
+        {
+            if (previous is not null && (previous.Address != sample.Address || previous.MeasurementEpoch != sample.MeasurementEpoch))
+                statistics.Suspend();
+            if (sample.Address != address) { statistics.Suspend(); previous = sample; continue; }
+            statistics.Add(sample.Timestamp, new ProbeResult(sample.Address, sample.LatencyMs, sample.Status, sample.Detail)
+                { ResponseKind = sample.ResponseKind, Transmission = sample.Transmission }, 1800);
+            previous = sample;
+        }
+        return statistics.Snapshot(hop, address, null, hop == 0 || previous?.IsDestination == true)
+            with { MeasurementEpoch = previous?.MeasurementEpoch ?? 0 };
     }
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
@@ -622,13 +694,14 @@ public sealed class TargetItem : INotifyPropertyChanged
     public int UdpPort { get; set; } = 33434;
     public string? ProfileName { get; set; }
     public bool IsHistorical => Session is null;
+    public bool HistoricalConfigurationUnknown { get; set; }
     public RoundSnapshot? Snapshot { get; set; }
     public string StateLabel => IsHistorical ? "Saved session" : Session!.State.ToString();
     public IBrush StatusBrush => Brush.Parse(IsHistorical ? "#8C95A4" : Session!.State == SessionState.Paused ? "#DCB75D"
-        : Session.State != SessionState.Running ? "#9E7474" : Snapshot?.Destination.Status == ProbeStatus.Error ? "#8C95A4"
+        : Session.State != SessionState.Running ? "#9E7474" : Snapshot is null || Snapshot.Destination.Sent == 0 || Snapshot.Destination.Status == ProbeStatus.Error ? "#8C95A4"
         : Snapshot?.Destination.Sent > 0 && Snapshot.Destination.LastMs is null ? "#D65B5B"
         : Snapshot?.Destination.LossPercent > 5 ? "#DCB75D" : "#3CC659");
-    public string Summary => Snapshot is null ? "Waiting for first round" : $"{MainWindow.Number(Snapshot.Destination.LastMs, " ms")}  ·  {Snapshot.Destination.LossPercent:0.#}% loss";
+    public string Summary => Snapshot is null ? "Waiting for first round" : $"{MainWindow.Number(Snapshot.Destination.LastMs, " ms")}  ·  {Snapshot.Destination.LossPercent:0.#}% response loss";
     public event PropertyChangedEventHandler? PropertyChanged;
     public void Refresh() { PropertyChanged?.Invoke(this, new(nameof(StateLabel))); PropertyChanged?.Invoke(this, new(nameof(Summary))); PropertyChanged?.Invoke(this, new(nameof(StatusBrush))); }
 }
@@ -651,13 +724,16 @@ public sealed class HopItem(HopSnapshot hop) : INotifyPropertyChanged
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public IBrush GraphBrush => Brush.Parse(GraphVisible ? "#9FD5FF" : "#646C77");
+    public string GraphHint => Hop.IsDestination ? "Show or hide independent destination endpoint history" : "Show or hide this TTL position history";
+    public string StatisticsHint => $"{Hop.Sent} eligible attempts for this router/context · configuration {Hop.MeasurementEpoch + 1}."
+        + (Hop.Detail is { Length: > 0 } detail ? "\n" + detail : "");
     public string HopLabel => Hop.Hop.ToString();
     public string AddressLabel => Hop.Address is null ? "*  No response" : !string.IsNullOrWhiteSpace(Hop.Hostname) && Hop.Hostname != Hop.Address ? $"{Hop.Address}  {Hop.Hostname}" : Hop.Address;
     public string IpLabel => Hop.Address ?? "*";
     public string NameLabel => Hop.Status == ProbeStatus.Error ? "Probe unavailable" : Hop.Address is null ? "No response" : Hop.Hostname ?? Hop.Address;
-    public IBrush StatusBrush => Brush.Parse(Hop.LastMs.HasValue ? "#35C756" : Hop.LossPercent >= 100 ? "#CF6767" : "#D9B662");
+    public IBrush StatusBrush => Brush.Parse(Hop.Status == ProbeStatus.Error || Hop.Sent == 0 ? "#8C95A4" : Hop.LastMs.HasValue ? "#35C756" : Hop.LossPercent >= 100 ? "#CF6767" : "#D9B662");
     public long Sent => Hop.Sent;
-    public string LossLabel => $"{Hop.LossPercent:0.#}";
+    public string LossLabel => Hop.Sent > 0 ? $"{Hop.LossPercent:0.#}" : "—";
     public string AverageLabel => MainWindow.Number(Hop.AverageMs);
     public string MinimumLabel => MainWindow.Number(Hop.MinimumMs);
     public string MaximumLabel => MainWindow.Number(Hop.MaximumMs);

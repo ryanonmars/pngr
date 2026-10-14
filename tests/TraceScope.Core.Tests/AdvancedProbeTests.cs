@@ -91,7 +91,8 @@ public sealed class AdvancedProbeTests
             new ProbeOptions { Protocol = ProbeProtocol.Udp, DestinationPort = port,
                 Timeout = TimeSpan.FromSeconds(2) }, CancellationToken.None);
         Assert.True(result.Responded, result.Detail);
-        Assert.Contains("ICMP port-unreachable", result.Detail);
+        Assert.Equal(ProbeResponseKind.UdpPortUnreachable, result.ResponseKind);
+        Assert.Contains("Matched ICMP", result.Detail);
     }
 
     [Fact]
@@ -143,7 +144,7 @@ public sealed class AdvancedProbeTests
     }
 
     [LiveNetworkFact]
-    public async Task PublicTcp443AndUdpGatewayProvideActualMeasurements()
+    public async Task PublicTcp443AndUdpGatewayPreserveActualOutcomes()
     {
         var transport = new AdvancedProbeTransport();
         var target = IPAddress.Parse("1.1.1.1");
@@ -156,8 +157,11 @@ public sealed class AdvancedProbeTests
         var udp = await transport.ProbeAsync(target, 1,
             options with { Protocol = ProbeProtocol.Udp, DestinationPort = 33434 }, CancellationToken.None);
         _output.WriteLine($"Public UDP TTL1: {udp.Status}; {udp.Address}; {udp.LatencyMs:F3} ms; {udp.Detail}");
-        Assert.True(udp.Responded, udp.Detail);
-        Assert.Equal(ProbeStatus.TimeExceeded, udp.Status);
+        // Intermediate routers may legitimately rate-limit diagnostics. A silent
+        // gateway must remain a timeout, rather than be manufactured into success.
+        Assert.Contains(udp.Status, new[] { ProbeStatus.TimeExceeded, ProbeStatus.Timeout, ProbeStatus.Unreachable });
+        if (udp.Responded) Assert.Equal(ProbeResponseKind.IcmpTimeExceeded, udp.ResponseKind);
+        else Assert.Null(udp.LatencyMs);
         await Task.Delay(1200); // Do not consume the gateway's ICMP error rate limit back-to-back.
         var tcpHop = await transport.ProbeAsync(target, 1, options, CancellationToken.None);
         _output.WriteLine($"Public TCP TTL1: {tcpHop.Status}; {tcpHop.Address}; {tcpHop.LatencyMs:F3} ms; {tcpHop.Detail}");

@@ -103,11 +103,11 @@ public sealed class V04AppIntegrationTests
         await Until(() => events.ItemsSource!.Cast<MonitoringEvent>().Single(e => e.Id == entry.Id).AcknowledgedAt is not null);
         var updated = events.ItemsSource!.Cast<MonitoringEvent>().Single(e => e.Id == entry.Id);
         Assert.InRange(updated.AcknowledgedAt!.Value, clickedAt.AddSeconds(-1), DateTimeOffset.UtcNow.AddSeconds(1));
-        Assert.Equal("Acknowledged in TraceScope", updated.AcknowledgmentNote);
+        Assert.Equal("Acknowledged in pngr", updated.AcknowledgmentNote);
         Assert.Equal(entry.Timestamp, updated.Timestamp);
         var stored = Assert.Single(await fixture.Engine.Storage.LoadEventsAsync(session.Id), e => e.Id == entry.Id);
         Assert.NotNull(stored.AcknowledgedAt);
-        Assert.Equal("Acknowledged in TraceScope", stored.AcknowledgmentNote);
+        Assert.Equal("Acknowledged in pngr", stored.AcknowledgmentNote);
         Assert.Equal(entry.Timestamp, stored.Timestamp);
         alerts.Close();
     }

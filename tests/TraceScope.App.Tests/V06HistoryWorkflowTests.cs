@@ -17,6 +17,50 @@ namespace TraceScope.App.Tests;
 public sealed class V06HistoryWorkflowTests
 {
     [AvaloniaFact]
+    public async Task LiveTimeoutRefreshAndDiskLoadNeverRewindTheSharedTimeline()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var target = await fixture.AddTarget("127.0.0.1");
+        fixture.Engine.Pause(target.Id);
+        await fixture.LoadGraph();
+        Invoke(fixture.Window, "ToggleHistoryGraph", 1);
+        var other = Field<Dictionary<int, LatencyTimeline>>(fixture.Window, "_additionalGraphs")[1];
+        var original = target.Snapshot!;
+        var last = fixture.Timeline.Viewport!.Last!.Value;
+        var horizon = fixture.Timeline.Horizon;
+        var shared = fixture.Timeline.Viewport;
+        foreach (var lost in new[] { false, true, true, false })
+        {
+            last = last.AddSeconds(2.5);
+            var sample = new LatencySample(last, lost ? null : 12, lost ? ProbeStatus.Timeout : ProbeStatus.Success);
+            target.Snapshot = original with
+            {
+                Timestamp = last.AddSeconds(lost ? 4 : .02),
+                Destination = original.Destination with { History = original.Destination.History.Append(sample).ToArray() }
+            };
+            Invoke(fixture.Window, "RefreshSelected");
+            Assert.Equal(last, shared.EffectiveEnd);
+            var coordinate = fixture.Timeline.TimestampAt(200);
+            // The database deliberately still contains the previous round: an
+            // asynchronous history read must not roll back a newer live frame.
+            await fixture.LoadGraph();
+            Invoke(fixture.Window, "RefreshSelected");
+            Assert.Equal(last, shared.EffectiveEnd);
+            Assert.Equal(coordinate, fixture.Timeline.TimestampAt(200));
+            Assert.Same(shared, other.Viewport);
+            Assert.Equal(last, other.EndTime);
+            Assert.Equal(horizon, fixture.Timeline.Horizon);
+            Assert.Null(shared.EndTime);
+        }
+        shared.Pan(TimeSpan.FromSeconds(-1));
+        var held = shared.EffectiveEnd;
+        await fixture.LoadGraph();
+        Assert.Equal(held, shared.EffectiveEnd);
+        shared.GoLive();
+        Assert.Equal(last, shared.EffectiveEnd);
+    }
+
+    [AvaloniaFact]
     public async Task RepeatedHeldWindowRefreshesReuseLoadedDataInsteadOfIssuingAnotherQuery()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -88,6 +132,8 @@ public sealed class V06HistoryWorkflowTests
         await using var fixture = await Fixture.CreateAsync();
         var target = await fixture.AddTarget("127.0.0.1");
         var before = await fixture.Engine.Storage.LoadSamplesAsync(target.Id);
+        Assert.Equal("127.0.0.1 — Destination", Find<TextBlock>(fixture.Window, "PrimaryGraphHeader").Text);
+        Assert.Contains("Independent destination probe", ToolTip.GetTip(Find<TextBlock>(fixture.Window, "PrimaryGraphHeader"))!.ToString());
         var panel = Find<StackPanel>(fixture.Window, "HistoryGraphsPanel");
         LatencyTimeline[] VisibleGraphs() => panel.GetVisualDescendants().OfType<LatencyTimeline>()
             .Where(g => g.IsEffectivelyVisible).ToArray();
@@ -164,10 +210,12 @@ public sealed class V06HistoryWorkflowTests
         var target = await fixture.AddTarget("127.0.0.1");
         await Until(() => target.Session!.LatestSnapshot!.Round >= 3);
         var stored = await fixture.Engine.Storage.LoadSamplesAsync(target.Id);
-        var timestamp = stored.First().Timestamp;
-        fixture.Timeline.Viewport!.SelectRange(timestamp, timestamp);
+        var firstRound = stored.Where(x => x.Round == stored.Min(s => s.Round)).ToArray();
+        var timestamp = firstRound.Min(x => x.Timestamp);
+        var endTimestamp = firstRound.Max(x => x.Timestamp);
+        fixture.Timeline.Viewport!.SelectRange(timestamp, endTimestamp);
         await fixture.LoadGraph();
-        var expected = await fixture.Engine.Storage.LoadSelectionStatisticsAsync(target.Id, timestamp, timestamp);
+        var expected = await fixture.Engine.Storage.LoadSelectionStatisticsAsync(target.Id, timestamp, endTimestamp);
         var rows = fixture.Rows;
         Assert.Equal(expected.Count(x => x.Hop > 0), rows.Length);
         foreach (var row in rows)

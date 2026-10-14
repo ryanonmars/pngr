@@ -109,18 +109,13 @@ public sealed class LatencyTimeline : Control
         var showJitterPlot = ShowJitter && !compact;
         context.DrawRectangle(Brush("#202226"), null, new Rect(Bounds.Size));
         var plot = PlotBounds();
-        var jitterPlot = new Rect(plot.Left, 27, plot.Width, 25);
+        var jitterPlot = new Rect(plot.Left, 8, plot.Width, 25);
         var end = EffectiveEnd();
         var start = end - Horizon;
         var visible = Samples.Where(s => s.Time >= start && s.Time <= end).OrderBy(s => s.Time).ToArray();
         var maxValue = visible.Where(IsResponse).Select(s => s.Latency!.Value).DefaultIfEmpty(0).Max();
         var ceiling = FixedMaximumMs > 0 ? FixedMaximumMs : AxisMaximum(maxValue);
         var critical = Math.Max(WarningLatencyMs, CriticalLatencyMs);
-        var latest = visible.LastOrDefault();
-        if (!compact) Text(context, Title, new Point(10, 7), 11, Ink);
-        var latestLabel = latest is null ? "Waiting for measurements" : !IsResponse(latest) ? "Latest: no reply" : $"{(latest.IsAggregated ? "Latest bin mean" : "Latest")} {latest.Latency:0.0} ms";
-        var latestText = Label(latestLabel, 10, Muted);
-        if (!compact) context.DrawText(latestText, new Point(Math.Max(170, Bounds.Width - latestText.Width - 12), 8));
         double X(DateTimeOffset time) => plot.Left + (time - start).TotalSeconds / Horizon.TotalSeconds * plot.Width;
         double Y(double value) => plot.Bottom - Math.Clamp(value / ceiling, 0, 1) * plot.Height;
 
@@ -143,20 +138,27 @@ public sealed class LatencyTimeline : Control
             context.DrawLine(Grid, new Point(plot.Left, y), new Point(plot.Right, y));
             var label = Label($"{ceiling * i / divisions:0}" + (compact && i == divisions ? " ms" : ""), compact ? 9 : 10, Muted);
             context.DrawText(label, new Point(plot.Left - label.Width - 7, y - label.Height / 2));
-            if (ShowPacketLoss)
-            {
-                var lossLabel = Label($"{i * 100 / divisions}" + (compact && i == divisions ? "%" : ""), 9, Brush("#DE7772"));
-                context.DrawText(lossLabel, new Point(plot.Right + 5, y - lossLabel.Height / 2));
-            }
         }
         var latencyAxis = Label("Latency (ms)", 9, Muted);
-        var lossAxis = Label("Loss %", 9, Brush("#DE7772"));
+
         if (!compact)
         {
             Text(context, "ms", new Point(10, plot.Top - 15), 9, Muted);
             using (context.PushTransform(Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(10, plot.Top + (plot.Height + latencyAxis.Width) / 2)))
                 context.DrawText(latencyAxis, new Point(0, 0));
-            if (ShowPacketLoss) Text(context, "Loss %", new Point(Math.Max(plot.Left, plot.Right - lossAxis.Width), plot.Top - 15), 9, Brush("#DE7772"));
+
+        }
+        if (ShowPacketLoss)
+        {
+            var axis = Label("Packet Loss %", 9, Brush("#DE7772"));
+            // Reserve a fixed margin, independent of measurements and display settings.
+            // Fit compact graphs and clip to the latency panel, below the jitter band.
+            if (axis.Width > plot.Height)
+                axis = Label("Packet Loss %", 9 * plot.Height / axis.Width, Brush("#DE7772"));
+            using (context.PushClip(new Rect(plot.Right + 4, plot.Top, Bounds.Width - plot.Right - 4, plot.Height)))
+            using (context.PushTransform(Matrix.CreateRotation(-Math.PI / 2) * Matrix.CreateTranslation(
+                Bounds.Width - 15, plot.Top + (plot.Height + axis.Width) / 2)))
+                context.DrawText(axis, new Point(0, 0));
         }
         foreach (var time in AxisTicks(start, end, plot.Width))
         {
@@ -231,12 +233,13 @@ public sealed class LatencyTimeline : Control
             {
                 var nearEvent = ShowEventMarkers ? Markers.FirstOrDefault(m => Math.Abs((m.Time - cursor).TotalSeconds) < Math.Max(1, Horizon.TotalSeconds * 5 / plot.Width)) : null;
                 var before = visible.LastOrDefault(s => s.Time < nearest.Time);
-                var measuredJitter = nearest.JitterMs ?? (before is not null && SameAddress(before, nearest) && IsResponse(before) && IsResponse(nearest)
-                    && (nearest.Time - before.Time).TotalSeconds <= intervalSeconds * 3.5 ? Math.Abs(nearest.Latency!.Value - before.Latency!.Value) : (double?)null);
+                var measuredJitter = nearest.JitterMs ?? (before is not null
+                    && (nearest.Time - before.Time).TotalSeconds <= intervalSeconds * 3.5 ? PairJitter(before, nearest) : null);
                 var text = $"{nearest.Time.ToLocalTime():yyyy-MM-dd HH:mm:ss.fff}  ·  " + (nearest.IsError ? "Probe unavailable" : !IsResponse(nearest) ? "No reply" : $"{nearest.Latency:0.0} ms")
-                      + (ShowPacketLoss ? $" · {nearest.LossPercent ?? (nearest.Lost ? 100 : 0):0.#}% loss" : "")
+                      + (ShowPacketLoss && !nearest.IsError ? $" · {nearest.LossPercent ?? (nearest.Lost ? 100 : 0):0.#}% response loss" : "")
                       + (measuredJitter is { } jitter ? $" · jitter {jitter:0.0} ms" : "")
                       + (nearest.IsAggregated ? $" · aggregated ({nearest.SampleCount} probes)" : "")
+                      + (nearest.MeasurementEpoch < 0 ? " · mixed probing configurations" : $" · configuration {nearest.MeasurementEpoch + 1}")
                       + (nearEvent is not null ? $"\n{nearEvent.Time.ToLocalTime():HH:mm:ss.fff} · {nearEvent.Kind}: {nearEvent.Message}" : "");
                 var label = Label(text, 10, Ink);
                 label.MaxTextWidth = Math.Max(80, plot.Width - 16);
@@ -267,13 +270,14 @@ public sealed class LatencyTimeline : Control
             {
                 differences.Add((point.Time, aggregatedJitter, point.Address)); previous = point; continue;
             }
-            if (previous is not null && SameAddress(previous, point) && (point.Time - previous.Time).TotalSeconds <= interval * 3.5)
-                differences.Add((point.Time, Math.Abs(point.Latency!.Value - previous.Latency!.Value), point.Address));
+            if (previous is not null && (point.Time - previous.Time).TotalSeconds <= interval * 3.5
+                && PairJitter(previous, point) is { } measured)
+                differences.Add((point.Time, measured, point.Address));
             previous = point;
         }
         var ceiling = Math.Max(5, differences.Select(p => p.Value).DefaultIfEmpty(0).Max() * 1.15);
         var mean = differences.Count == 0 ? 0 : differences.Average(p => p.Value);
-        var label = Label($"Jitter (ms) · mean {mean:0.0}", 9, Brush("#DF9576"));
+        var label = Label($"Jitter (ms) · mean {(differences.Count == 0 ? "—" : mean.ToString("0.0"))}", 9, Brush("#DF9576"));
         context.DrawText(label, new Point(plot.Left + 6, plot.Top + 3));
         using (context.PushClip(plot))
         {
@@ -402,13 +406,17 @@ public sealed class LatencyTimeline : Control
     private Rect PlotBounds()
     {
         var compact = Bounds.Height < 140;
-        var top = compact ? 8 : ShowJitter ? 64 : 37;
-        var rightMargin = ShowPacketLoss ? 36 : 12;
+        var top = compact ? 18 : ShowJitter ? 43 : 18;
+        const double rightMargin = 26;
         return new Rect(46, top, Math.Max(1, Bounds.Width - 46 - rightMargin), Math.Max(1, Bounds.Height - top - (compact ? 18 : 30)));
     }
     private DateTimeOffset EffectiveEnd() => Viewport?.EffectiveEnd ?? EndTime ?? (Samples.Count > 0 ? Samples.Max(s => s.Time) : DateTimeOffset.UtcNow);
+    private static double? PairJitter(GraphPoint first, GraphPoint second)
+        => !first.IsAggregated && !second.IsAggregated && SameAddress(first, second) && IsResponse(first) && IsResponse(second)
+            ? Math.Abs(second.Latency!.Value - first.Latency!.Value) : null;
     private static bool SameAddress(GraphPoint first, GraphPoint second)
-        => first.Address is null || second.Address is null || string.Equals(first.Address, second.Address, StringComparison.OrdinalIgnoreCase);
+        => first.MeasurementEpoch >= 0 && first.MeasurementEpoch == second.MeasurementEpoch
+            && (first.Address is null || second.Address is null || string.Equals(first.Address, second.Address, StringComparison.OrdinalIgnoreCase));
     private static bool IsResponse(GraphPoint sample) => !sample.IsError && !sample.Lost && sample.Latency is >= 0 && double.IsFinite(sample.Latency.Value);
     private static double AxisMaximum(double maximum)
     {

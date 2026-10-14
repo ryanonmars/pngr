@@ -54,12 +54,17 @@ public sealed class LocalWebServer(TraceEngine engine) : IAsyncDisposable
             app.MapGet("/api/targets", () => Results.Json(engine.Sessions.Select(session => new
             {
                 session.Id, session.Target, session.ResolvedAddress, session.State, session.StartedAt, session.Group,
-                session.Options, session.Error,
+                session.Options, session.Error, session.Capability,
+                LossAccounting = "Failed eligible probe attempts / eligible attempts. Sent includes explicit network failures; local setup errors are excluded. Sent transmission records probe submission/attempt evidence, not verified delivery. Diagnostic failures do not prove forwarding loss.",
                 Health = GetHealth(session),
+                Measurement = (session.LatestSnapshot?.MeasurementOptions ?? session.Options).Protocol == ProbeProtocol.Udp
+                    ? "UDP host reachability; ICMP Port Unreachable does not establish UDP service availability."
+                    : (session.LatestSnapshot?.MeasurementOptions ?? session.Options).Protocol == ProbeProtocol.Tcp ? "TCP connect/RST host reachability." : "ICMP echo reachability.",
                 Snapshot = session.LatestSnapshot is { } snapshot ? new
                 {
                     snapshot.Timestamp, snapshot.Round, snapshot.DestinationReached,
-                    snapshot.RoundDuration, snapshot.Warning, snapshot.RouteChanged, snapshot.RouteDescription,
+                    snapshot.RoundDuration, snapshot.SamplingInterval, snapshot.MeasurementEpoch, snapshot.MeasurementOptions, snapshot.RouteBoundIsHistorical,
+                    snapshot.Warning, snapshot.RouteChanged, snapshot.RouteDescription,
                     Destination = CompactHop(snapshot.Destination), Hops = snapshot.Hops.Select(CompactHop)
                 } : null
             })));
@@ -124,7 +129,15 @@ public sealed class LocalWebServer(TraceEngine engine) : IAsyncDisposable
         if (session.State is SessionState.Stopped or SessionState.Paused) return session.State.ToString();
         var snapshot = session.LatestSnapshot;
         if (session.State == SessionState.Error || snapshot?.Destination.Status is ProbeStatus.Error) return "Error";
-        if (snapshot is null) return "Waiting";
+        if (snapshot is null || snapshot.Destination.Sent == 0) return "Waiting";
+        if ((snapshot.MeasurementOptions ?? session.Options).Protocol == ProbeProtocol.Udp)
+        {
+            if (snapshot.Destination.Status == ProbeStatus.Timeout) return "NoResponse";
+            if (snapshot.Destination.Status == ProbeStatus.Unreachable) return "ProbeRejected";
+            if (snapshot.Destination.Status == ProbeStatus.Success && snapshot.Destination.LastMs.HasValue)
+                return snapshot.Destination.ResponseKind == ProbeResponseKind.UdpPortUnreachable ? "Reachable" : "Responded";
+            return "Unavailable";
+        }
         if (snapshot.Destination.Status is ProbeStatus.Timeout or ProbeStatus.Unreachable) return "Unreachable";
         return snapshot.Destination.LossPercent >= 5 || snapshot.Destination.AverageMs >= 150
             || snapshot.Destination.JitterMs >= 30 ? "Degraded" : "Healthy";
@@ -132,7 +145,11 @@ public sealed class LocalWebServer(TraceEngine engine) : IAsyncDisposable
     private static object CompactHop(HopSnapshot hop) => new
     {
         hop.Hop, hop.Address, hop.Hostname, hop.LastMs, hop.AverageMs, hop.MinimumMs, hop.MaximumMs,
-        hop.JitterMs, hop.Sent, hop.Received, hop.LossPercent, hop.IsDestination, hop.Status
+        hop.JitterMs, hop.Sent, hop.Received, hop.LossPercent, LossAvailable = hop.Sent > 0, hop.IsDestination, hop.Status,
+        hop.Detail, hop.ResponseKind, hop.Transmission, hop.MeasurementEpoch,
+        ApplicationServiceAvailable = hop.Status != ProbeStatus.Success || hop.LastMs is null ? (bool?)null
+            : hop.ResponseKind is ProbeResponseKind.UdpReply or ProbeResponseKind.TcpConnected
+            ? (bool?)true : hop.ResponseKind is ProbeResponseKind.UdpPortUnreachable or ProbeResponseKind.TcpReset ? false : null
     };
 
     public async ValueTask DisposeAsync()
@@ -160,13 +177,13 @@ public sealed class LocalWebServer(TraceEngine engine) : IAsyncDisposable
     }
 
     private const string Dashboard = """
-        <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TraceScope · Local monitor</title>
+        <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>pngr · Local monitor</title>
         <style>:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#191a1d;color:#d8d9dc;font:12px system-ui}header{padding:12px 18px;background:#24262b;border-bottom:1px solid #40434b;display:flex;gap:20px;align-items:center}h1{font-size:17px;margin:0}small{color:#9b9da7}main{padding:12px 18px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th,td{padding:5px 8px;border-bottom:1px solid #303239;text-align:right;white-space:nowrap}th{background:#24262b;color:#a7a9b2;font-weight:500}th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}tr:hover{background:#282b33}button,select,input{background:#292b31;color:#ddd;border:1px solid #474953;padding:5px 8px;border-radius:3px}button{cursor:pointer}.healthy{color:#58cf88}.degraded{color:#f2bf55}.unreachable,.error{color:#ee6868}.panel{display:none}.toolbar{display:flex;align-items:center;gap:8px;margin:12px 0}canvas{width:100%;height:220px;background:#212328;border:1px solid #3a3d46}#message{color:#aeb1ba}a{color:#80b6f5}.latency{height:3px;background:#6cc48c;min-width:1px;max-width:200px}#hops th:nth-child(3),#hops td:nth-child(3){text-align:left}footer{padding:10px 18px;color:#989ba7}</style></head>
-        <body><header><h1>TraceScope</h1><small>LOCAL MONITOR · READ ONLY</small><span id="message">Connecting…</span></header><main>
-        <table><thead><tr><th>Target</th><th>Health</th><th>Protocol</th><th>Current</th><th>Average</th><th>Loss</th><th>Jitter</th><th>Round</th><th>Route</th></tr></thead><tbody id="targets"></tbody></table>
+        <body><header><h1>pngr</h1><small>LOCAL MONITOR · READ ONLY</small><span id="message">Connecting…</span></header><main>
+        <table><thead><tr><th>Target</th><th>Health</th><th>Protocol</th><th>Current</th><th>Average</th><th>Response loss</th><th>Jitter</th><th>Round</th><th>Route</th></tr></thead><tbody id="targets"></tbody></table>
         <div id="detail" class="panel"><div class="toolbar"><strong id="title"></strong><label>Hop <select id="hop"></select></label><label>History <select id="range"><option value="5">5 minutes</option><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="360">6 hours</option><option value="1440">24 hours</option></select></label><button id="older">← Earlier</button><button id="newer">Later →</button><button id="live">Live</button></div>
-        <table id="hops"><thead><tr><th>Hop</th><th>Address</th><th>Name</th><th>Avg</th><th>Min</th><th>Max</th><th>Loss</th><th>Jitter</th><th>Latency</th></tr></thead><tbody></tbody></table><canvas id="chart"></canvas><small id="chartInfo"></small></div>
-        <details><summary>Saved monitoring sessions</summary><div id="sessions"></div></details></main><footer>Measurements from the desktop instance. Red history bands indicate packet loss. <a href="/api/targets">Targets API</a> · <a href="/api/interfaces">Interfaces API</a></footer>
+        <table id="hops"><thead><tr><th>Hop</th><th>Address</th><th>Name</th><th>Avg</th><th>Min</th><th>Max</th><th>Response loss</th><th>Jitter</th><th>Latency</th></tr></thead><tbody></tbody></table><canvas id="chart"></canvas><small id="chartInfo"></small></div>
+        <details><summary>Saved monitoring sessions</summary><div id="sessions"></div></details></main><footer>Measurements from the desktop instance. Red history bands indicate diagnostic response loss, not proven forwarding loss. <a href="/api/targets">Targets API</a> · <a href="/api/interfaces">Interfaces API</a></footer>
         <script>
         const $=id=>document.getElementById(id),fmt=v=>v==null?'—':Number(v).toFixed(1),escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let targets=[],selected=null,end=null;
         function choose(id){selected=id;end=null;$('detail').style.display='block';updateDetail();history()}

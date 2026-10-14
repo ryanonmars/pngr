@@ -8,6 +8,7 @@ public sealed record AggregatedSample(DateTimeOffset Timestamp, double? AverageM
 {
     public long Errors { get; init; }
     public long Received { get; init; }
+    public int MeasurementEpoch { get; init; }
 }
 
 public sealed partial class HistoryStore
@@ -95,7 +96,7 @@ public sealed partial class HistoryStore
         if (limit is < 1 or > 1_000_000) throw new ArgumentOutOfRangeException(nameof(limit));
         await using var connection = await OpenHistoryReadAsync(cancellationToken);
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT session_id,round,hop,address,is_destination,timestamp,latency_ms,status FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to ORDER BY timestamp,id LIMIT $limit";
+        command.CommandText = "SELECT session_id,round,hop,address,is_destination,timestamp,latency_ms,status,detail,response_kind,transmission,measurement_epoch FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to ORDER BY timestamp,id LIMIT $limit";
         AddRange(command, sessionId, from, to);
         command.Parameters.AddWithValue("$hop", hop);
         command.Parameters.AddWithValue("$limit", limit);
@@ -104,7 +105,9 @@ public sealed partial class HistoryStore
         while (await reader.ReadAsync(cancellationToken)) result.Add(new(Guid.Parse(reader.GetString(0)),
             reader.GetInt64(1), reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.GetInt32(4) != 0, DateTimeOffset.Parse(reader.GetString(5), CultureInfo.InvariantCulture),
-            reader.IsDBNull(6) ? null : reader.GetDouble(6), (ProbeStatus)reader.GetInt32(7)));
+            reader.IsDBNull(6) ? null : reader.GetDouble(6), (ProbeStatus)reader.GetInt32(7))
+            { Detail = reader.IsDBNull(8) ? null : reader.GetString(8), ResponseKind = (ProbeResponseKind)reader.GetInt32(9),
+                Transmission = (ProbeTransmission)reader.GetInt32(10), MeasurementEpoch = reader.GetInt32(11) });
         return result;
     }
 
@@ -124,13 +127,13 @@ public sealed partial class HistoryStore
                 MIN($maxBucket,MAX(0,CAST((unixepoch(timestamp,'subsec')-$origin)/$bucket AS INTEGER))) AS bucket
               FROM samples WHERE session_id=$id AND hop=$hop AND timestamp >= $from AND timestamp <= $to
             ), sequenced AS (
-              SELECT *,LAG(response) OVER (ORDER BY timestamp,id) AS previous_response,
-                LAG(address) OVER (ORDER BY timestamp,id) AS previous_address FROM filtered
+              SELECT *,LAG(response) OVER (PARTITION BY measurement_epoch ORDER BY timestamp,id) AS previous_response,
+                LAG(address) OVER (PARTITION BY measurement_epoch ORDER BY timestamp,id) AS previous_address FROM filtered
             )
             SELECT MIN(timestamp),AVG(response),MIN(response),MAX(response),
               SUM(CASE WHEN status<>4 THEN 1 ELSE 0 END) AS sent,COUNT(response) AS received,
               AVG(CASE WHEN address IS previous_address AND response IS NOT NULL AND previous_response IS NOT NULL THEN ABS(response-previous_response) END),
-              MAX(address),SUM(CASE WHEN status=4 THEN 1 ELSE 0 END)
+              MAX(address),SUM(CASE WHEN status=4 THEN 1 ELSE 0 END),CASE WHEN COUNT(DISTINCT measurement_epoch)=1 THEN MIN(measurement_epoch) ELSE -1 END
             FROM sequenced GROUP BY bucket ORDER BY bucket
             """;
         AddRange(command, sessionId, from, to);
@@ -147,8 +150,8 @@ public sealed partial class HistoryStore
             result.Add(new(DateTimeOffset.Parse(reader.GetString(0), CultureInfo.InvariantCulture),
                 reader.IsDBNull(1) ? null : reader.GetDouble(1), reader.IsDBNull(2) ? null : reader.GetDouble(2),
                 reader.IsDBNull(3) ? null : reader.GetDouble(3), sent == 0 ? 0 : 100.0 * (sent - received) / sent,
-                reader.IsDBNull(6) ? received == 0 ? null : 0 : reader.GetDouble(6), sent,
-                reader.IsDBNull(7) ? null : reader.GetString(7)) { Received = received, Errors = reader.GetInt64(8) });
+                reader.IsDBNull(6) ? null : reader.GetDouble(6), sent,
+                reader.IsDBNull(7) ? null : reader.GetString(7)) { Received = received, Errors = reader.GetInt64(8), MeasurementEpoch = reader.GetInt32(9) });
         }
         return result;
     }
@@ -177,6 +180,10 @@ public sealed partial class HistoryStore
                 more = count == 5000;
                 command.CommandText = "DELETE FROM monitoring_events WHERE id IN (SELECT id FROM monitoring_events WHERE timestamp < $cutoff LIMIT 5000)";
                 more |= await command.ExecuteNonQueryAsync(cancellationToken) == 5000;
+                command.CommandText = "DELETE FROM probe_attempts WHERE id IN (SELECT id FROM probe_attempts WHERE timestamp < $cutoff LIMIT 5000)";
+                more |= await command.ExecuteNonQueryAsync(cancellationToken) == 5000;
+                command.CommandText = "DELETE FROM measurement_configurations WHERE NOT EXISTS (SELECT 1 FROM samples WHERE samples.session_id=measurement_configurations.session_id AND samples.measurement_epoch=measurement_configurations.epoch) AND NOT EXISTS (SELECT 1 FROM probe_attempts WHERE probe_attempts.session_id=measurement_configurations.session_id AND probe_attempts.measurement_epoch=measurement_configurations.epoch)";
+                await command.ExecuteNonQueryAsync(cancellationToken);
                 command.CommandText = "DELETE FROM event_acknowledgments WHERE event_id NOT IN (SELECT id FROM monitoring_events)";
                 await command.ExecuteNonQueryAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);

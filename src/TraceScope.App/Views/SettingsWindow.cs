@@ -33,6 +33,10 @@ public sealed class SettingsWindow : Window
     private readonly ComboBox _protocol = new() { Name = "SettingsProtocol", Width = 160, ItemsSource = Enum.GetValues<ProbeProtocol>() };
     private readonly ComboBox _source = new() { Name = "SettingsSource", MinWidth = 310, MaxWidth = 440 };
     private readonly NumericUpDown _port = Number("SettingsDestinationPort", 1, 65535);
+    private readonly ComboBox _udpMode = new() { Name = "SettingsUdpPortMode", Width = 165, ItemsSource = new[] { "Fixed port", "Port range" } };
+    private readonly NumericUpDown _udpEndPort = Number("SettingsUdpEndPort", 1, 65535);
+    private readonly NumericUpDown _udpSize = Number("SettingsUdpPacketSize", 56, 65535);
+    private readonly CheckBox _udpFragmentation = Toggle("SettingsUdpAllowFragmentation", "Allow UDP IP fragmentation (path MTU may still restrict delivery)");
     private readonly NumericUpDown _interval = Number("SettingsInterval", .1m, 3600, .1m);
     private readonly NumericUpDown _timeout = Number("SettingsTimeout", .1m, 30, .1m);
     private readonly NumericUpDown _hops = Number("SettingsMaxHops", 1, 64);
@@ -41,7 +45,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _resolve = Toggle("SettingsResolveHostnames", "Resolve router hostnames");
     private readonly CheckBox _useDefaults = Toggle("SettingsUseDefaults", "Use saved defaults for every new target");
     private readonly CheckBox _restore = Toggle("SettingsRestore", "Restore monitored targets and paused states at startup");
-    private readonly CheckBox _toasts = Toggle("SettingsInAppNotifications", "Show alerts inside TraceScope");
+    private readonly CheckBox _toasts = Toggle("SettingsInAppNotifications", "Show alerts inside pngr");
     private readonly CheckBox _native = Toggle("SettingsNativeNotifications", "Enable native desktop notifications");
     private readonly CheckBox _recoveries = Toggle("SettingsIncludeRecovery", "Notify when a connection recovers");
     private readonly NumericUpDown _spacing = Number("SettingsNotificationSpacing", 0, 86400);
@@ -82,7 +86,7 @@ public sealed class SettingsWindow : Window
         _initialSelected = selectedOptions;
         _profileDraft = configuration.Profiles.ToList();
         _apply = apply; _permission = permission; _openTool = openTool;
-        Title = "TraceScope Settings"; Width = 830; Height = 650; MinWidth = 760; MinHeight = 580;
+        Title = "pngr Settings"; Width = 830; Height = 650; MinWidth = 760; MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         _source.ItemsSource = sources.ToList();
         _scope.ItemsSource = selectedOptions is null ? new[] { "Defaults for new targets" }
@@ -106,12 +110,16 @@ public sealed class SettingsWindow : Window
         LoadProbe(_defaults); ReloadProfiles();
 
         _pages["General"] = Page("General", "Preferences are saved locally with your workspace.", _restore,
-            Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing TraceScope stops them."),
+            Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing pngr stops them."),
             ToolButton("Apply & manage workspaces…", "workspace"),
             Heading("Local files"), Note(dataDirectory), Note("Settings: workspace.json   ·   Measurements: tracescope.db"));
         _pages["Monitoring"] = Page("Monitoring engine", "Edit defaults or the selected target. Existing targets keep their own settings.",
             _useDefaults, Note("When unchecked, new targets inherit the last-used probing configuration."),
-            Row("Configuration scope", _scope), Row("Packet type", _protocol), Row("Destination port", _port),
+            Row("Configuration scope", _scope), Row("Packet type", _protocol), Row("Destination / starting port", _port),
+            Row("UDP port mode", _udpMode), Row("UDP ending port (inclusive)", _udpEndPort),
+            Row("UDP packet size (bytes)", _udpSize), _udpFragmentation,
+            Note("Response loss counts failed eligible diagnostic attempts, not proven forwarding loss. Local errors are excluded. Hop counters track router identity and configuration; unanswered probes use the last-known address context."),
+            Note("UDP size includes IP and UDP headers: IPv4 20 + 8 bytes; IPv6 40 + 8 bytes. The remaining bytes are payload. No silent truncation. UDP Port Unreachable establishes destination reachability, not service availability."),
             Row("Network source", _source), Row("Interval (seconds)", _interval), Row("Timeout (seconds)", _timeout),
             Row("Maximum hops", _hops), Row("Concurrent hop probes", _concurrency), Row("In-memory samples / hop", _memory), _resolve,
             Note("Port applies to TCP / UDP. macOS ICMP traceroute uses a minimum one-second timeout. Stored history is independent of the memory limit."),
@@ -142,7 +150,7 @@ public sealed class SettingsWindow : Window
             Note("Email, webhooks and executable actions stay disabled until explicitly configured in the action editor."));
         _pages["Local web / API"] = Page("Local web interface and API", "Optional access from a browser on this computer. Disabled by default.",
             _web, Row("Local port", _webPort), Note("Address: http://127.0.0.1:<port>   ·   Read-only REST endpoints: /api/targets, /api/history/<session-id>"),
-            Note("Apply starts or stops the listener immediately. No separate server is installed. The listener closes completely when TraceScope exits."),
+            Note("Apply starts or stops the listener immediately. No separate server is installed. The listener closes completely when pngr exits."),
             ToolButton("Apply & open local dashboard controls…", "web"));
         var nav = new ListBox { Name = "SettingsNavigation", ItemsSource = _pages.Keys.ToArray(), SelectedIndex = 0, Background = Brushes.Transparent };
         _navigation = nav;
@@ -172,8 +180,9 @@ public sealed class SettingsWindow : Window
             var next = (ProbeProtocol)_protocol.SelectedItem!;
             _port.Value = next == ProbeProtocol.Udp ? ports.Udp : next == ProbeProtocol.Tcp ? ports.Tcp : _port.Value;
             _portProtocol = next;
-            _port.IsEnabled = next != ProbeProtocol.Icmp;
+            UpdateUdpControls();
         };
+        _udpMode.SelectionChanged += (_, _) => UpdateUdpControls();
         _profiles.SelectionChanged += (_, _) =>
         {
             if (!_loading && _profiles.SelectedItem is string name && _profileDraft.FirstOrDefault(p => p.Name == name) is { } profile)
@@ -211,7 +220,10 @@ public sealed class SettingsWindow : Window
         return basis with
         {
             Protocol = _protocol.SelectedItem is ProbeProtocol p ? p : throw new InvalidDataException("Select a packet type."),
-            DestinationPort = (int)Value(_port), SourceAddress = source?.Address, InterfaceId = source?.Interface,
+            DestinationPort = (int)Value(_port),
+            UdpPortMode = _udpMode.SelectedIndex == 1 ? UdpPortMode.Range : UdpPortMode.Fixed,
+            UdpEndPort = (int)Value(_udpEndPort), UdpPacketSize = (int)Value(_udpSize),
+            UdpAllowFragmentation = _udpFragmentation.IsChecked == true, SourceAddress = source?.Address, InterfaceId = source?.Interface,
             Interval = TimeSpan.FromSeconds((double)Value(_interval)), Timeout = TimeSpan.FromSeconds((double)Value(_timeout)),
             MaxHops = (int)Value(_hops), Concurrency = (int)Value(_concurrency), HistoryLimit = (int)Value(_memory), ResolveHostnames = _resolve.IsChecked == true
         };
@@ -223,7 +235,10 @@ public sealed class SettingsWindow : Window
         {
             _protocol.SelectedItem = options.Protocol; _port.Value = options.DestinationPort;
             _portProtocol = options.Protocol;
-            _port.IsEnabled = options.Protocol != ProbeProtocol.Icmp;
+            _udpMode.SelectedIndex = options.UdpPortMode == UdpPortMode.Range ? 1 : 0;
+            _udpEndPort.Value = options.UdpEndPort; _udpSize.Value = options.UdpPacketSize;
+            _udpFragmentation.IsChecked = options.UdpAllowFragmentation;
+            UpdateUdpControls();
             RememberPort();
             var sources = _source.ItemsSource!.Cast<ProbeSourceChoice>().ToList();
             var source = sources.FirstOrDefault(s => s.Address == options.SourceAddress && s.Interface == options.InterfaceId);
@@ -237,6 +252,13 @@ public sealed class SettingsWindow : Window
             _hops.Value = options.MaxHops; _concurrency.Value = options.Concurrency; _memory.Value = options.HistoryLimit; _resolve.IsChecked = options.ResolveHostnames;
         }
         finally { _loading = false; }
+    }
+    private void UpdateUdpControls()
+    {
+        var udp = _protocol.SelectedItem is ProbeProtocol.Udp;
+        _port.IsEnabled = _protocol.SelectedItem is not ProbeProtocol.Icmp;
+        _udpMode.IsEnabled = _udpSize.IsEnabled = _udpFragmentation.IsEnabled = udp;
+        _udpEndPort.IsEnabled = udp && _udpMode.SelectedIndex == 1;
     }
     private async Task<bool> SaveAsync(bool close)
     {

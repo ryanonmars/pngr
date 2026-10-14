@@ -49,9 +49,9 @@ public sealed partial class HistoryStore
               SELECT *,CASE WHEN status IN (0,2) AND latency_ms >= 0 THEN latency_ms END AS response
               FROM samples WHERE session_id=$id AND timestamp >= $from AND timestamp <= $to
             ), sequenced AS (
-              SELECT *,LAG(response) OVER (PARTITION BY hop ORDER BY timestamp,id) AS previous_response,
-                LAG(address) OVER (PARTITION BY hop ORDER BY timestamp,id) AS previous_address,
-                ROW_NUMBER() OVER (PARTITION BY hop,address ORDER BY timestamp DESC,id DESC) AS last_row
+              SELECT *,LAG(response) OVER (PARTITION BY hop,measurement_epoch ORDER BY timestamp,id) AS previous_response,
+                LAG(address) OVER (PARTITION BY hop,measurement_epoch ORDER BY timestamp,id) AS previous_address,
+                ROW_NUMBER() OVER (PARTITION BY hop,address,measurement_epoch ORDER BY timestamp DESC,id DESC) AS last_row
               FROM filtered
             )
             SELECT hop,address,MAX(is_destination),
@@ -59,8 +59,10 @@ public sealed partial class HistoryStore
               AVG(response),MIN(response),MAX(response),
               AVG(CASE WHEN address IS previous_address AND response IS NOT NULL AND previous_response IS NOT NULL
                 THEN ABS(response-previous_response) END),
-              MAX(CASE WHEN last_row=1 THEN response END),MAX(CASE WHEN last_row=1 THEN status END)
-            FROM sequenced GROUP BY hop,address ORDER BY hop,address
+              MAX(CASE WHEN last_row=1 THEN response END),MAX(CASE WHEN last_row=1 THEN status END),
+              MAX(CASE WHEN last_row=1 THEN detail END),MAX(CASE WHEN last_row=1 THEN response_kind END),
+              MAX(CASE WHEN last_row=1 THEN transmission END),measurement_epoch
+            FROM sequenced GROUP BY hop,address,measurement_epoch ORDER BY hop,address,measurement_epoch
             """;
         AddRange(command, sessionId, from, to);
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -73,7 +75,9 @@ public sealed partial class HistoryStore
             result.Add(new(reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1), null,
                 Value(9), Value(5), Value(6), Value(7), Value(8), sent, received,
                 sent == 0 ? 0 : 100d * (sent - received) / sent, reader.GetInt32(2) != 0,
-                Array.Empty<LatencySample>(), (ProbeStatus)reader.GetInt32(10)));
+                Array.Empty<LatencySample>(), (ProbeStatus)reader.GetInt32(10))
+                { Detail = reader.IsDBNull(11) ? null : reader.GetString(11), ResponseKind = (ProbeResponseKind)reader.GetInt32(12),
+                    Transmission = (ProbeTransmission)reader.GetInt32(13), MeasurementEpoch = reader.GetInt32(14) });
         }
         return result;
     }

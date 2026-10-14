@@ -48,7 +48,7 @@ public sealed class AllTargetsTests
             var viewport = window.FindControl<LatencyTimeline>("Timeline")!.Viewport!;
             Assert.NotNull(viewport.EndTime);
             Assert.InRange(viewport.EndTime!.Value, viewport.First!.Value, heldTime!.Value);
-            Assert.Equal("127.0.0.1", window.FindControl<TextBlock>("TargetTitle")!.Text);
+            Assert.Contains("127.0.0.1", window.FindControl<TextBlock>("PrimaryGraphHeader")!.Text);
             Assert.All(window.FindControl<LatencyTimeline>("Timeline")!.Samples, p => Assert.Equal(12, p.Latency));
             Click(window.FindControl<Button>("StartButton")!);
             Assert.Equal(SessionState.Paused, first.Item.Session!.State);
@@ -69,7 +69,7 @@ public sealed class AllTargetsTests
             Click(close);
             await Until(() => pane.Rows.Count == 1);
             Assert.True(pane.IsVisible);
-            Assert.Equal("127.0.0.2", window.FindControl<TextBlock>("TargetTitle")!.Text);
+            Assert.Contains("127.0.0.2", window.FindControl<TextBlock>("PrimaryGraphHeader")!.Text);
             Assert.Equal(SessionState.Running, second.Item.Session.State);
             await (Task)add.Invoke(window, ["127.0.0.3", options, null, false])!;
             Assert.True(pane.IsVisible);

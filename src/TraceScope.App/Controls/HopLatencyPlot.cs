@@ -13,7 +13,7 @@ namespace TraceScope.App.Controls;
 public sealed class HopLatencyPlot : Control
 {
     private static readonly Typeface Font = new("Inter, Segoe UI, Helvetica Neue, Arial");
-    private static readonly IBrush Background = Brush("#202226");
+    private static readonly IBrush Background = Brush("#191A1D");
     private static readonly IBrush Header = Brush("#303236");
     private static readonly IBrush Ink = Brush("#BBC1C8");
     private static readonly Pen Range = new(Brush("#A8B8A0"), 1);
@@ -42,7 +42,7 @@ public sealed class HopLatencyPlot : Control
     public double CriticalLatencyMs { get => _criticalLatencyMs; set { _criticalLatencyMs = Nonnegative(value, _criticalLatencyMs); InvalidateVisual(); } }
     /// <summary>Zero scales automatically to the measured latency range.</summary>
     public double FixedMaximumMs { get => _fixedMaximumMs; set { _fixedMaximumMs = Nonnegative(value, _fixedMaximumMs); InvalidateVisual(); } }
-    /// <summary>A separate thin strip encodes loss from zero to 100 percent across each row.</summary>
+    /// <summary>A translucent row bar encodes response loss from zero to 100 percent, behind latency marks.</summary>
     public bool ShowPacketLoss { get => _showPacketLoss; set { _showPacketLoss = value; InvalidateVisual(); } }
     /// <summary>Table scroll offset; the axis remains fixed above the rows.</summary>
     public double VerticalOffset
@@ -72,7 +72,11 @@ public sealed class HopLatencyPlot : Control
         var ceiling = FixedMaximumMs > 0 ? FixedMaximumMs : Math.Max(50, Math.Ceiling(highest * 1.08 / 10) * 10);
         var critical = Math.Max(WarningLatencyMs, CriticalLatencyMs);
         double X(double value) => left + Math.Clamp(value / ceiling, 0, 1) * (right - left);
-        var rowsBounds = new Rect(0, HeaderHeight, Bounds.Width, Math.Max(0, Bounds.Height - HeaderHeight));
+        // The plot stretches beside the table, but its row content does not. Clip all
+        // row shading and measurements to that content, adjusted by the table scroll.
+        var visibleRowsHeight = Math.Clamp(Rows.Count * RowHeight - VerticalOffset,
+            0, Math.Max(0, Bounds.Height - HeaderHeight));
+        var rowsBounds = new Rect(0, HeaderHeight, Bounds.Width, visibleRowsHeight);
         using (context.PushClip(rowsBounds))
         {
             Band(0, WarningLatencyMs, "#3B5E36");
@@ -81,8 +85,23 @@ public sealed class HopLatencyPlot : Control
             for (var i = 1; i < 4; i++)
             {
                 var x = left + (right - left) * i / 4;
-                context.DrawLine(new Pen(Brush("#0CFFFFFF"), 1), new Point(x, HeaderHeight), new Point(x, Bounds.Height));
+                context.DrawLine(new Pen(Brush("#0CFFFFFF"), 1), new Point(x, HeaderHeight), new Point(x, rowsBounds.Bottom));
             }
+            // Response loss has its own percentage scale across the usable width.
+            // Draw every bar before any latency geometry, including connecting lines.
+            if (ShowPacketLoss)
+                for (var index = 0; index < Rows.Count; index++)
+                {
+                    var loss = Rows[index].LossPercent;
+                    if (!double.IsFinite(loss) || loss <= 0) continue;
+                    var top = HeaderHeight + index * RowHeight - VerticalOffset;
+                    if (top + RowHeight < HeaderHeight) continue;
+                    if (top >= Bounds.Height) break;
+                    var width = (right - left) * Math.Clamp(loss / 100, 0, 1);
+                    var height = Math.Min(14, RowHeight - 4);
+                    context.DrawRectangle(Brush("#AAD44843"), null,
+                        new Rect(right - width, top + (RowHeight - height) / 2, width, height));
+                }
             Point? previous = null;
             for (var index = 0; index < Rows.Count; index++)
             {
@@ -105,13 +124,6 @@ public sealed class HopLatencyPlot : Control
                 {
                     if (previous is { } before) context.DrawLine(Route, before, p);
                     context.DrawEllipse(Brush("#3B5E36"), Marker, p, 2.4, 2.4);
-                }
-                if (ShowPacketLoss && double.IsFinite(row.LossPercent) && row.LossPercent > 0)
-                {
-                    // The row's bottom edge is a percent scale, independent of the latency axis.
-                    // Keep whiskers and markers visible even when some probes receive no reply.
-                    var width = (right - left) * Math.Clamp(row.LossPercent / 100, 0, 1);
-                    context.DrawRectangle(Brush("#F57161"), null, new Rect(right - width, top + RowHeight - 4, width, 3));
                 }
                 previous = point;
             }

@@ -12,10 +12,13 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2" />
     <ProjectReference Include="../../src/TraceScope.Core/TraceScope.Core.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <None Include="../../artifacts/native/tests/tracescope-tcp-hop" Link="tracescope-tcp-hop" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <Target Name="BuildMacTcpProbeForTests" BeforeTargets="PrepareForBuild"
           Condition="$([MSBuild]::IsOSPlatform('OSX'))"
-          Inputs="../../src/TraceScope.Native/tcp-hop.c" Outputs="../../artifacts/native/tracescope-tcp-hop">
-    <MakeDir Directories="../../artifacts/native" />
-    <Exec Command="xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 &quot;../../src/TraceScope.Native/tcp-hop.c&quot; -o &quot;../../artifacts/native/tracescope-tcp-hop&quot;" />
+          Inputs="../../src/TraceScope.Native/tcp-hop.c" Outputs="../../artifacts/native/tests/tracescope-tcp-hop">
+    <MakeDir Directories="../../artifacts/native/tests" />
+    <Exec Command="xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 &quot;../../src/TraceScope.Native/tcp-hop.c&quot; -o &quot;../../artifacts/native/tests/tracescope-tcp-hop&quot;" />
   </Target>
 </Project>

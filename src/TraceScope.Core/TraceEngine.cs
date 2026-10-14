@@ -62,7 +62,8 @@ public sealed class TraceEngine : IAsyncDisposable
         var address = addresses.FirstOrDefault(a => a.AddressFamily == preferredFamily)
             ?? addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetworkV6)
             ?? throw new ArgumentException("The target has no usable IPv4 or IPv6 address.", nameof(target));
-        var session = new TargetSession(Guid.NewGuid(), target, address.ToString(), options);
+        var session = new TargetSession(Guid.NewGuid(), target, address.ToString(), options)
+        { Capability = ProtocolCapabilities.Get(options.Protocol, address.AddressFamily) };
         await Storage.InitializeProfessionalAsync(cancellationToken);
         await Storage.AddSessionAsync(session, cancellationToken);
         _sessions.TryAdd(session.Id, session);
@@ -84,7 +85,11 @@ public sealed class TraceEngine : IAsyncDisposable
     public void UpdateOptions(Guid sessionId, ProbeOptions options)
     {
         options.Validate();
-        if (_sessions.TryGetValue(sessionId, out var session)) session.Options = options;
+        if (_sessions.TryGetValue(sessionId, out var session))
+        {
+            session.Options = options;
+            session.Capability = ProtocolCapabilities.Get(options.Protocol, IPAddress.Parse(session.ResolvedAddress).AddressFamily);
+        }
     }
 
     /// <summary>Reset current measurement counters without interrupting probes or changing saved history.</summary>
@@ -126,33 +131,87 @@ public sealed class TraceEngine : IAsyncDisposable
         var statisticsGeneration = 0L;
         int? destinationHop = null;
         var route = new RouteTracker();
-        var probeIdentity = (session.Options.Protocol, session.Options.DestinationPort, session.Options.SourceAddress, session.Options.InterfaceId);
+        // Display-only preferences do not create a new measurement configuration.
+        static object Identity(ProbeOptions o) => o with { HistoryLimit = 0, ResolveHostnames = false };
+        var probeIdentity = Identity(session.Options);
+        var udpPorts = new UdpPortSequence();
+        var udpRoute = new UdpRouteDiscovery();
+        var measurementEpoch = 0;
+        long? previousStart = null;
         try
         {
             while (!token.IsCancellationRequested)
             {
                 while (session.State == SessionState.Paused) await Task.Delay(100, token);
+                var started = Stopwatch.GetTimestamp();
+                var samplingInterval = previousStart is { } previous ? Stopwatch.GetElapsedTime(previous, started) : (TimeSpan?)null;
+                previousStart = started;
                 var stopwatch = Stopwatch.StartNew();
                 var options = session.Options;
-                var currentIdentity = (options.Protocol, options.DestinationPort, options.SourceAddress, options.InterfaceId);
-                if (probeIdentity != currentIdentity)
+                var currentIdentity = Identity(options);
+                if (!probeIdentity.Equals(currentIdentity))
                 {
+                    measurementEpoch++;
                     statistics.Clear(); lastAddresses.Clear(); destinationStatistics = new HopStatistics();
-                    destinationHop = null; route.Reset(); probeIdentity = currentIdentity;
+                    destinationHop = null; route.Reset(); probeIdentity = currentIdentity; udpPorts = new UdpPortSequence(); udpRoute = new UdpRouteDiscovery();
                 }
-                // Refresh beyond the known endpoint periodically so changes to a longer route are discovered.
+                // Retain existing ICMP/TCP refresh behavior; UDP uses evidence-driven discovery below.
                 var cap = destinationHop.HasValue && round % 10 != 0
                     ? Math.Min(options.MaxHops, destinationHop.Value + 2) : options.MaxHops;
                 using var roundLimiter = new SemaphoreSlim(options.Concurrency);
-                var hopTasks = Enumerable.Range(1, cap).Select(async hop =>
+                var measurements = new ConcurrentQueue<ProbeMeasurement>();
+                ProbeOptions NextOptions() => options.Protocol == ProbeProtocol.Udp
+                    ? options with { DestinationPort = udpPorts.Next(options), UdpPortMode = UdpPortMode.Fixed }
+                    : options;
+                async Task<ProbeResult> InRoundAsync(int ttl, ProbeOptions configuredOptions)
                 {
                     await roundLimiter.WaitAsync(token);
-                    try { return (Hop: hop, Result: await ProbeAsync(destination, hop, options, token)); }
+                    var admittedAt = DateTimeOffset.UtcNow;
+                    try
+                    {
+                        var result = await ProbeAsync(destination, ttl, configuredOptions, token);
+                        if (options.Protocol == ProbeProtocol.Udp)
+                            measurements.Enqueue(new(ttl, result.MeasuredAt ?? DateTimeOffset.UtcNow, result, configuredOptions));
+                        return result;
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        if (options.Protocol == ProbeProtocol.Udp)
+                            measurements.Enqueue(new(ttl, admittedAt, new ProbeResult(null, null, ProbeStatus.Error,
+                                "Monitoring canceled this attempt before a complete measurement was available; transmission unknown."), configuredOptions) { Canceled = true });
+                        throw;
+                    }
                     finally { roundLimiter.Release(); }
-                }).ToArray();
-                var destinationTask = ProbeAsync(destination, 255, options, token);
-                var results = await Task.WhenAll(hopTasks);
+                }
+                // The independent endpoint shares the budgets but never defines route length.
+                var destinationTask = InRoundAsync(255, NextOptions());
+                async Task<(int Hop, ProbeResult Result)[]> DiscoverAsync()
+                {
+                    if (options.Protocol == ProbeProtocol.Udp)
+                        return await udpRoute.DiscoverAsync(options.MaxHops, options.Concurrency,
+                            session.ResolvedAddress, hop => InRoundAsync(hop, NextOptions()));
+                    var tasks = Enumerable.Range(1, cap).Select(async hop =>
+                        (Hop: hop, Result: await InRoundAsync(hop, options))).ToArray();
+                    return await Task.WhenAll(tasks);
+                }
+                var discoveryTask = DiscoverAsync();
+                // Observe both branches on cancellation/failure; no probe outlives its round.
+                try { await Task.WhenAll(discoveryTask, destinationTask); }
+                catch
+                {
+                    // Completed replies and explicitly canceled attempts remain auditable. Never
+                    // turn monitoring cancellation into remote loss or invent a completed round.
+                    if (measurements.Count > 0)
+                        try { await Storage.AppendProbeAuditAsync(session.Id, round + 1, measurementEpoch, options,
+                            measurements.OrderBy(m => m.Timestamp).ToArray()); }
+                        catch (Exception ex) { session.Error = "Incomplete round audit could not be saved: " + ex.Message; }
+                    throw;
+                }
+                var results = await discoveryTask;
                 var endpoint = await destinationTask;
+                if (endpoint.Responded && (endpoint.Status != ProbeStatus.Success || endpoint.Address != session.ResolvedAddress))
+                    endpoint = endpoint with { Status = ProbeStatus.Unreachable, LatencyMs = null,
+                        Detail = $"Endpoint probe received {endpoint.Status} from {endpoint.Address}; destination response was not established. {endpoint.Detail}" };
                 // Reset only measurement counters: route identity, round IDs and graph history survive.
                 // An in-flight round becomes the first sample after a requested reset.
                 lock (session.StatisticsGate)
@@ -166,34 +225,41 @@ public sealed class TraceEngine : IAsyncDisposable
                 }
                 var timestamp = DateTimeOffset.UtcNow;
                 round++;
-                var reached = results.Where(r => r.Result.Status == ProbeStatus.Success
+                var reached = results.Where(r => r.Result.Responded && r.Result.Status == ProbeStatus.Success
                     && r.Result.Address == session.ResolvedAddress).Select(r => (int?)r.Hop).Min();
-                destinationHop = reached;
+                destinationHop = options.Protocol == ProbeProtocol.Udp ? udpRoute.TerminalHop : reached;
                 var hops = new List<HopSnapshot>();
                 foreach (var (hop, result) in results)
                 {
-                    if (reached.HasValue && hop > reached) break;
+                    if (options.Protocol != ProbeProtocol.Udp && reached.HasValue && hop > reached) break;
                     if (result.Address is { } address) lastAddresses[hop] = address;
                     var currentAddress = result.Address ?? lastAddresses.GetValueOrDefault(hop);
                     var key = (hop, currentAddress ?? "?");
                     if (!statistics.TryGetValue(key, out var stats)) statistics[key] = stats = new HopStatistics();
-                    stats.Add(timestamp, result, options.HistoryLimit);
+                    stats.Add(result.MeasuredAt ?? timestamp, result, options.HistoryLimit);
                     if (options.ResolveHostnames && currentAddress is { } ip) BeginResolve(ip);
                     hops.Add(stats.Snapshot(hop, currentAddress,
                         currentAddress is { } current ? _hostnames.GetValueOrDefault(current) : null,
-                        currentAddress == session.ResolvedAddress));
+                        currentAddress == session.ResolvedAddress && (options.Protocol != ProbeProtocol.Udp || hop == destinationHop)) with { MeasurementEpoch = measurementEpoch });
                 }
-                // Historic routes remain on disk; retain only the current route's statistics in memory.
+                // Retain cumulative per-router counters across revisits; release inactive history buffers.
                 var currentKeys = hops.Select(h => (h.Hop, h.Address ?? "?")).ToHashSet();
-                foreach (var key in statistics.Keys.Where(k => !currentKeys.Contains(k)).ToArray()) statistics.Remove(key);
-                destinationStatistics.Add(timestamp, endpoint, options.HistoryLimit);
+                foreach (var key in statistics.Keys.Where(k => !currentKeys.Contains(k)).ToArray()) statistics[key].Suspend();
+                destinationStatistics.Add(endpoint.MeasuredAt ?? timestamp, endpoint, options.HistoryLimit);
                 if (options.ResolveHostnames) BeginResolve(session.ResolvedAddress);
                 var endpointSnapshot = destinationStatistics.Snapshot(0, session.ResolvedAddress,
-                    _hostnames.GetValueOrDefault(session.ResolvedAddress), true);
+                    _hostnames.GetValueOrDefault(session.ResolvedAddress), true) with { MeasurementEpoch = measurementEpoch };
                 var warning = results.Select(r => r.Result).Append(endpoint)
                     .FirstOrDefault(r => r.Status == ProbeStatus.Error)?.Detail;
+                if (session.Capability is { HopDiscoveryAvailable: false } capability)
+                    warning ??= capability.Detail;
+                if (options.Protocol == ProbeProtocol.Udp && endpoint.ResponseKind == ProbeResponseKind.UdpPortUnreachable)
+                    warning ??= "UDP destination reachability confirmed by ICMP Port Unreachable; UDP service availability is not established.";
                 var snapshot = new RoundSnapshot(session.Id, session.Target, session.ResolvedAddress,
-                    timestamp, round, reached.HasValue, hops, endpointSnapshot, stopwatch.Elapsed, warning);
+                    timestamp, round, reached.HasValue, hops, endpointSnapshot, stopwatch.Elapsed, warning)
+                { MeasurementEpoch = measurementEpoch, MeasurementOptions = options,
+                    Measurements = measurements.OrderBy(m => m.Timestamp).ToArray(), SamplingInterval = samplingInterval,
+                    RouteBoundIsHistorical = options.Protocol == ProbeProtocol.Udp && !reached.HasValue && destinationHop.HasValue };
                 var routeChange = route.Observe(hops);
                 snapshot = snapshot with { RouteChanged = routeChange is not null, RouteDescription = routeChange };
                 try { await Storage.AppendAsync(snapshot, token); }
@@ -230,9 +296,15 @@ public sealed class TraceEngine : IAsyncDisposable
     private async Task<ProbeResult> ProbeAsync(IPAddress destination, int ttl, ProbeOptions options, CancellationToken token)
     {
         await _probes.WaitAsync(token);
-        try { return _transport is IConfiguredProbeTransport configured
-            ? await configured.ProbeAsync(destination, ttl, options, token)
-            : await _transport.ProbeAsync(destination, ttl, options.Timeout, token); }
+        try
+        {
+            // UTC dispatch time, after concurrency admission; RTT/deadlines remain monotonic in transports.
+            var measuredAt = DateTimeOffset.UtcNow;
+            var result = _transport is IConfiguredProbeTransport configured
+                ? await configured.ProbeAsync(destination, ttl, options, token)
+                : await _transport.ProbeAsync(destination, ttl, options.Timeout, token);
+            return result with { MeasuredAt = measuredAt };
+        }
         finally { _probes.Release(); }
     }
 

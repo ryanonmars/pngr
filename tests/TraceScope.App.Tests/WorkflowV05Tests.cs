@@ -123,11 +123,11 @@ public sealed class WorkflowV05Tests
         Assert.Equal(8443m, port.Value);
         protocol.SelectedItem = ProbeProtocol.Udp;
         Assert.Equal(33625m, port.Value);
-        Assert.True(port.Width >= 108);
-        f.Window.UpdateLayout();
-        var editor = port.GetVisualDescendants().OfType<TextBox>().Single();
-        Assert.Equal("33625", editor.Text);
-        Assert.True(editor.Bounds.Width >= 60, $"Five-digit port editor only has {editor.Bounds.Width} pixels.");
+        Assert.False(port.ShowButtonSpinner);
+        Assert.InRange(port.Width, 60, 80);
+        Assert.False(port.IsEffectivelyVisible);
+        Assert.Equal("UDP · 33625", f.Find<TextBlock>("ProbeSummary").Text);
+
     }
 
     [AvaloniaFact]
@@ -136,7 +136,7 @@ public sealed class WorkflowV05Tests
         await using var f = new Fixture();
         await f.Add("127.0.0.1", UdpOptions());
         f.Find<NumericUpDown>("PortInput").Value = 33625;
-        f.Find<ComboBox>("IntervalInput").SelectedIndex = 1;
+        f.Find<ComboBox>("IntervalInput").SelectedIndex = 2;
         f.Find<NumericUpDown>("MaxHopsInput").Value = 12;
         var expected = f.Selected.Session!.Options;
         await Assert.IsAssignableFrom<Task>(f.Invoke("SaveWorkspaceNowAsync"));

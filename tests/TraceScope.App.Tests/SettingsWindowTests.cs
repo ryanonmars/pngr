@@ -352,6 +352,116 @@ public sealed class SettingsWindowTests
         Assert.Equal(8443, saved.Targets.Single().TcpPort);
     }
 
+    [AvaloniaFact]
+    public async Task UdpRangeToolbarSwitchesImmediatelyAndRetainsPerTargetConfiguration()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var first = fixture.Engine.Sessions.Single();
+        var protocol = fixture.Window.FindControl<ComboBox>("ProtocolInput")!;
+        var mode = fixture.Window.FindControl<ComboBox>("UdpModeInput")!;
+        var end = fixture.Window.FindControl<NumericUpDown>("UdpEndPortInput")!;
+        var port = fixture.Window.FindControl<NumericUpDown>("PortInput")!;
+        Assert.False(mode.IsVisible);
+        protocol.SelectedItem = ProbeProtocol.Udp;
+        Assert.True(mode.IsVisible);
+        Assert.False(end.IsVisible);
+        mode.SelectedIndex = 1;
+        end.Value = 33625;
+        Assert.True(end.IsVisible);
+        Assert.Equal(UdpPortMode.Range, first.Options.UdpPortMode);
+        Assert.Equal(33625, first.Options.UdpEndPort);
+        protocol.SelectedItem = ProbeProtocol.Tcp;
+        Assert.False(mode.IsVisible);
+        Assert.False(end.IsVisible);
+        port.Value = 8443;
+        protocol.SelectedItem = ProbeProtocol.Icmp;
+        Assert.False(port.IsVisible);
+        protocol.SelectedItem = ProbeProtocol.Udp;
+        Assert.True(end.IsVisible);
+        Assert.Equal(33434m, port.Value);
+        Assert.Equal(33625m, end.Value);
+        var firstItem = Assert.IsType<TargetItem>(fixture.Window.FindControl<ListBox>("TargetList")!.SelectedItem);
+        await fixture.AddTarget("127.0.0.2");
+        Assert.False(mode.IsVisible);
+        fixture.Window.FindControl<ListBox>("TargetList")!.SelectedItem = firstItem;
+        Assert.Equal(1, mode.SelectedIndex);
+        Assert.True(end.IsVisible);
+        Assert.False(end.ShowButtonSpinner);
+        Assert.InRange(end.Width, 60, 80);
+        Assert.False(end.IsEffectivelyVisible);
+        Assert.Equal("UDP · 33434–33625", fixture.Window.FindControl<TextBlock>("ProbeSummary")!.Text);
+
+    }
+
+    [AvaloniaFact]
+    public async Task UdpAdvancedSettingsProfilesWorkspaceAndRestartPreserveExactConfiguration()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var session = fixture.Engine.Sessions.Single();
+        var dialog = fixture.OpenSettings();
+        dialog.SelectPage("Monitoring");
+        Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
+        Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Udp;
+        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 33434;
+        Find<ComboBox>(dialog, "SettingsUdpPortMode").SelectedIndex = 1;
+        Find<NumericUpDown>(dialog, "SettingsUdpEndPort").Value = 33625;
+        Find<NumericUpDown>(dialog, "SettingsUdpPacketSize").Value = 1280;
+        Find<CheckBox>(dialog, "SettingsUdpAllowFragmentation").IsChecked = true;
+        Find<TextBox>(dialog, "SettingsProfileName").Text = "UDP range 1280";
+        Click(Find<Button>(dialog, "SettingsSaveProfile"));
+        await Apply(dialog);
+        var expected = session.Options;
+        Assert.Equal(UdpPortMode.Range, expected.UdpPortMode);
+        Assert.Equal(1280, expected.UdpPacketSize);
+        Assert.True(expected.UdpAllowFragmentation);
+        var workspace = await fixture.LoadWorkspace();
+        Assert.Equal(expected, workspace.Targets.Single().Options);
+        Assert.Equal(expected, workspace.LastUsedProbeOptions);
+        Assert.Equal(expected, workspace.Profiles.Single(p => p.Name == "UDP range 1280").Options);
+        dialog.Close();
+        var target = Assert.IsType<TargetItem>(fixture.Window.FindControl<ListBox>("TargetList")!.SelectedItem);
+        await InvokeTask(fixture.Window, "RestartTargetAsync", target);
+        var restarted = fixture.Engine.Sessions.Single();
+        Assert.NotEqual(session.Id, restarted.Id);
+        Assert.Equal(expected, restarted.Options);
+    }
+
+    [AvaloniaFact]
+    public async Task NativeUdpAndTcpToolbarHonorSubsecondTimeoutPreset()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var session = fixture.Engine.Sessions.Single();
+        var protocol = fixture.Window.FindControl<ComboBox>("ProtocolInput")!;
+        var timeout = fixture.Window.FindControl<ComboBox>("TimeoutInput")!;
+        foreach (var packetType in new[] { ProbeProtocol.Udp, ProbeProtocol.Tcp })
+        {
+            protocol.SelectedItem = packetType;
+            timeout.SelectedIndex = 1;
+            timeout.SelectedIndex = 0;
+            Assert.Equal(TimeSpan.FromMilliseconds(500), session.Options.Timeout);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task InvalidUdpRangeDoesNotApplyDraftOrOverwriteLiveOptions()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var original = fixture.Engine.Sessions.Single().Options;
+        var dialog = fixture.OpenSettings();
+        dialog.SelectPage("Monitoring");
+        Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
+        Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Udp;
+        Find<ComboBox>(dialog, "SettingsUdpPortMode").SelectedIndex = 1;
+        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 40000;
+        Find<NumericUpDown>(dialog, "SettingsUdpEndPort").Value = 33434;
+        await Apply(dialog, expectSuccess: false);
+        Assert.Equal(original, fixture.Engine.Sessions.Single().Options);
+    }
+
     private static async Task Apply(SettingsWindow dialog, bool expectSuccess = true)
     {
         var status = Find<TextBlock>(dialog, "SettingsStatus");

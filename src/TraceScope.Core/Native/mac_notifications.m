@@ -26,7 +26,7 @@ static BOOL waitForCompletion(dispatch_semaphore_t semaphore, int seconds) {
 
 static UNUserNotificationCenter *getCenter(char *error, int capacity) {
     if (![NSBundle mainBundle].bundleIdentifier.length) {
-        snprintf(error, capacity, "Native notifications require launching the packaged TraceScope.app bundle.");
+        snprintf(error, capacity, "Native notifications require launching the packaged pngr.app bundle.");
         return nil;
     }
     static TraceScopeNotificationDelegate *delegate;
@@ -61,7 +61,7 @@ __attribute__((visibility("default"))) int ts_notifications_permission(int reque
             if (!waitForCompletion(semaphore, request ? 30 : 3)) {
                 snprintf(error, capacity, "Notification authorization did not finish within 30 seconds."); return 0;
             }
-            if (!allowed) snprintf(error, capacity, "%s", detail.UTF8String ?: "Notification permission is disabled. Enable TraceScope in macOS notification settings.");
+            if (!allowed) snprintf(error, capacity, "%s", detail.UTF8String ?: "Notification permission is disabled. Enable pngr in macOS notification settings.");
             return allowed ? 1 : 0;
         } @catch (NSException *exception) {
             snprintf(error, capacity, "%s", exception.reason.UTF8String); return 0;

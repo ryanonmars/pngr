@@ -14,7 +14,9 @@ public sealed partial class SystemProbeTransport : IProbeTransport
     public async Task<ProbeResult> ProbeAsync(IPAddress destination, int ttl, TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        if (OperatingSystem.IsMacOS() && ttl < 255)
+        // On macOS use the same native packet RTT for hops and the independent
+        // endpoint. The managed raw-Ping timer includes additional socket/call overhead.
+        if (OperatingSystem.IsMacOS())
             return await ProbeMacHopAsync(destination, ttl, timeout, cancellationToken);
         try
         {
@@ -40,7 +42,9 @@ public sealed partial class SystemProbeTransport : IProbeTransport
             IPStatus.TtlExpired => ProbeStatus.TimeExceeded,
             IPStatus.TimedOut => ProbeStatus.Timeout,
             IPStatus.DestinationHostUnreachable or IPStatus.DestinationNetworkUnreachable
-                or IPStatus.DestinationUnreachable or IPStatus.DestinationPortUnreachable => ProbeStatus.Unreachable,
+                or IPStatus.DestinationUnreachable or IPStatus.DestinationPortUnreachable
+                or IPStatus.DestinationProtocolUnreachable or IPStatus.PacketTooBig or IPStatus.BadRoute
+                or IPStatus.DestinationScopeMismatch => ProbeStatus.Unreachable,
             _ => ProbeStatus.Error
         };
         var address = replyAddress is null || replyAddress.Equals(IPAddress.Any)
@@ -54,7 +58,11 @@ public sealed partial class SystemProbeTransport : IProbeTransport
             _ => null
         };
         return new ProbeResult(address, latency, status, status == ProbeStatus.TimeExceeded
-            ? "TTL expired; estimated RTT includes .NET call overhead" : replyStatus.ToString());
+            ? "TTL expired; estimated RTT includes .NET call overhead" : replyStatus.ToString())
+            { ResponseKind = status == ProbeStatus.Success ? ProbeResponseKind.IcmpEchoReply
+                : status == ProbeStatus.TimeExceeded ? ProbeResponseKind.IcmpTimeExceeded
+                : status == ProbeStatus.Unreachable ? ProbeResponseKind.NetworkRejection : ProbeResponseKind.None,
+                Transmission = status == ProbeStatus.Error ? ProbeTransmission.NotSent : ProbeTransmission.Unknown };
     }
 
     private static async Task<ProbeResult> ProbeMacHopAsync(IPAddress destination, int ttl,
@@ -86,7 +94,10 @@ public sealed partial class SystemProbeTransport : IProbeTransport
             await process.WaitForExitAsync(deadline.Token);
             var output = await stdout;
             var error = await stderr;
-            return ParseMacTraceroute(output, destination.ToString(), process.ExitCode, error);
+            var result = ParseMacTraceroute(output, destination.ToString(), process.ExitCode, error);
+            return result.Responded && result.LatencyMs >= timeout.TotalMilliseconds
+                ? new ProbeResult(null, null, ProbeStatus.Timeout, "ICMP reply RTT exceeded the configured deadline.") { Transmission = ProbeTransmission.Sent }
+                : result;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         { return new ProbeResult(null, null, ProbeStatus.Timeout); }
@@ -115,9 +126,14 @@ public sealed partial class SystemProbeTransport : IProbeTransport
             && double.TryParse(match.Groups[2].Value, NumberStyles.Float,
                 CultureInfo.InvariantCulture, out var rtt))
         {
-            var status = match.Groups[3].Success ? ProbeStatus.Unreachable
+            // A bare ! is a low return TTL, not an ICMP unreachable rejection.
+            var status = match.Groups[3].Value.Length > 1 ? ProbeStatus.Unreachable
                 : address.ToString() == destination ? ProbeStatus.Success : ProbeStatus.TimeExceeded;
-            return new ProbeResult(address.ToString(), status == ProbeStatus.Unreachable ? null : rtt, status);
+            return new ProbeResult(address.ToString(), status == ProbeStatus.Unreachable ? null : rtt, status,
+                "macOS native ICMP packet RTT; utility startup is excluded. Utility-default packet size.")
+            { ResponseKind = status == ProbeStatus.Success ? ProbeResponseKind.IcmpEchoReply
+                : status == ProbeStatus.TimeExceeded ? ProbeResponseKind.IcmpTimeExceeded : ProbeResponseKind.NetworkRejection,
+                Transmission = ProbeTransmission.Sent };
         }
         return exitCode == 0 ? new ProbeResult(null, null, ProbeStatus.Timeout)
             : new ProbeResult(null, null, ProbeStatus.Error, error?.Trim());

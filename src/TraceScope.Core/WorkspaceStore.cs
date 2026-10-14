@@ -7,6 +7,17 @@ namespace TraceScope.Core;
 public sealed record WorkspaceTarget(string Target, ProbeOptions Options, string Group = "Default", bool Paused = false,
     int TcpPort = 443, int UdpPort = 33434, string? ProfileName = null);
 public sealed record MonitoringProfile(string Name, ProbeOptions Options);
+/// <summary>Desktop layout only: dimensions in DIPs, position in physical pixels.</summary>
+public sealed record MainWindowLayout
+{
+    public double Width { get; init; } = 1200;
+    public double Height { get; init; } = 800;
+    public int? X { get; init; }
+    public int? Y { get; init; }
+    public double Scaling { get; init; } = 1;
+    public bool Maximized { get; init; }
+}
+
 public sealed record WorkspaceConfiguration
 {
     public int Version { get; init; } = 1;
@@ -24,6 +35,7 @@ public sealed record WorkspaceConfiguration
     public int LastUdpPort { get; init; } = 33434;
     public string? LastUsedProfile { get; init; }
     public DisplayConfiguration Display { get; init; } = new();
+    public MainWindowLayout? WindowLayout { get; init; }
     public HistoryLayoutPreferences HistoryLayout { get; init; } = new();
     public IReadOnlyList<WorkspaceTarget> Targets { get; init; } = [];
     public IReadOnlyList<MonitoringProfile> Profiles { get; init; } = [];
@@ -33,7 +45,7 @@ public sealed record WorkspaceConfiguration
 
     public void Validate()
     {
-        if (Version != 1) throw new InvalidDataException("Unsupported TraceScope configuration version.");
+        if (Version != 1) throw new InvalidDataException("Unsupported pngr configuration version.");
         if (RetentionDays is < 1 or > 3650) throw new InvalidDataException("Retention must be between 1 and 3650 days.");
         if (AggregationSeconds is < 1 or > 3600) throw new InvalidDataException("Aggregation must be between 1 and 3600 seconds.");
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");

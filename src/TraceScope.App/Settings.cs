@@ -51,6 +51,9 @@ public partial class MainWindow
             case "Web": OpenWeb(null, args); break;
             case "Alerts": OpenAlerts(null, args); break;
             case "Workspace": OpenWorkspace(null, args); break;
+            case "Load Profile…": OpenLoadProfileMenu(); break;
+            case "Save Current Configuration…": OpenSaveCurrentProfileMenu(); break;
+            case "Manage/Delete Profiles…": OpenManageProfilesMenu(); break;
         }
     }
 
@@ -103,6 +106,7 @@ public partial class MainWindow
             }
             var saved = configuration with
             {
+                WindowLayout = CaptureMainWindowLayout(),
                 LastUsedProbeOptions = options ?? configuration.LastUsedProbeOptions,
                 LastTcpPort = options?.Protocol == ProbeProtocol.Tcp ? options.DestinationPort : configuration.LastTcpPort,
                 LastUdpPort = options?.Protocol == ProbeProtocol.Udp ? options.DestinationPort : configuration.LastUdpPort,
@@ -157,11 +161,11 @@ public partial class MainWindow
         RoutePlot.CriticalLatencyMs = Timeline.CriticalLatencyMs = display.CriticalLatencyMs;
         RoutePlot.FixedMaximumMs = Timeline.FixedMaximumMs = display.FixedMaximumMs;
         RoutePlot.ShowPacketLoss = display.ShowPacketLoss;
-        LossStripLegend.IsVisible = display.ShowPacketLoss;
         Timeline.ShowJitter = display.ShowJitter; Timeline.ShowPacketLoss = display.ShowPacketLoss; Timeline.ShowEventMarkers = display.ShowEventMarkers;
         LatencyLegend.Text = $"{display.WarningLatencyMs:0.#} ms   {display.CriticalLatencyMs:0.#} ms";
         if (resetTimeRange) HorizonInput.SelectedIndex = Array.IndexOf(SettingsWindow.TimeRanges, display.DefaultTimeRangeMinutes);
         if (_selected is null) SynchronizeProbeControls(_draftOptions);
+        UpdateProbeSummary();
     }
 
     private void SynchronizeProbeControls(ProbeOptions options)
@@ -170,8 +174,10 @@ public partial class MainWindow
         try
         {
             ProtocolInput.SelectedItem = options.Protocol; PortInput.Value = options.DestinationPort;
+            UdpModeInput.SelectedIndex = options.UdpPortMode == UdpPortMode.Range ? 1 : 0;
+            UdpEndPortInput.Value = options.UdpEndPort;
             UpdateProtocolControls();
-            IntervalInput.SelectedIndex = Array.IndexOf(new[] { 1d, 2.5, 5, 10 }, options.Interval.TotalSeconds);
+            IntervalInput.SelectedIndex = Array.IndexOf(ProbeIntervalSeconds, options.Interval.TotalSeconds);
             TimeoutInput.SelectedIndex = Array.IndexOf(new[] { 500d, 1000, 2000 }, options.Timeout.TotalMilliseconds);
             MaxHopsInput.Value = options.MaxHops;
             var choices = SourceInput.ItemsSource!.Cast<SourceChoice>().ToList();
@@ -186,5 +192,6 @@ public partial class MainWindow
                 ?? SourceInput.ItemsSource!.Cast<SourceChoice>().First();
         }
         finally { _settingOptions = false; }
+        UpdateProbeSummary();
     }
 }

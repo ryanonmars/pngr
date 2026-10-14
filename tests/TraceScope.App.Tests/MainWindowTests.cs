@@ -14,6 +14,73 @@ namespace TraceScope.App.Tests;
 
 public sealed class MainWindowTests
 {
+    [Fact]
+    public void GraphDoesNotInventRawJitterFromAggregateBinMeans()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var method = typeof(LatencyTimeline).GetMethod("PairJitter", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var first = new GraphPoint(now, 10, false);
+        var second = new GraphPoint(now.AddSeconds(1), 30, false);
+        Assert.Equal(20d, method.Invoke(null, new object[] { first, second }));
+        Assert.Null(method.Invoke(null, new object[] { first with { IsAggregated = true }, second with { IsAggregated = true } }));
+        Assert.Null(method.Invoke(null, new object[] { first, second with { MeasurementEpoch = 1 } }));
+        Assert.Null(method.Invoke(null, new object[] { first, second with { Lost = true, Latency = null } }));
+    }
+
+    [AvaloniaFact]
+    public async Task MixedConfigurationSelectionDoesNotSummarizeOnlyTheFirstEpoch()
+    {
+        await using var fixture = new WindowFixture();
+        await fixture.Start("127.0.0.1");
+        var destination = fixture.Engine.Sessions.Single().LatestSnapshot!.Destination;
+        typeof(MainWindow).GetField("_selectionStatistics", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(fixture.Window, new[] { destination with { MeasurementEpoch = 0 }, destination with { MeasurementEpoch = 1 } });
+        typeof(MainWindow).GetMethod("RefreshSelected", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(fixture.Window, null);
+        Assert.Equal("—", Control<TextBlock>(fixture.Window, "FooterCount").Text);
+        Assert.Equal("—", Control<TextBlock>(fixture.Window, "LossValue").Text);
+        Assert.Contains("Rounds never overlap", ToolTip.GetTip(Control<ComboBox>(fixture.Window, "IntervalInput"))!.ToString());
+        Assert.Contains("not proven forwarding loss", ToolTip.GetTip(Control<DataGrid>(fixture.Window, "HopTable"))!.ToString());
+    }
+
+    [Fact]
+    public void SavedStatisticsAndGraphJitterDoNotBridgeLossOrConfigurationChanges()
+    {
+        var id = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
+        StoredSample Sample(int seconds, double? latency, int epoch = 0) => new(id, seconds + 1, 0,
+            "1.1.1.1", true, now.AddSeconds(seconds), latency, latency.HasValue ? ProbeStatus.Success : ProbeStatus.Timeout)
+            { MeasurementEpoch = epoch };
+        var source = new[] { Sample(0, 10), Sample(1, null), Sample(2, 30) };
+        var aggregate = (HopSnapshot)typeof(MainWindow).GetMethod("Aggregate", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, new object[] { 0, "1.1.1.1", source })!;
+        Assert.Equal(3, aggregate.Sent); Assert.Equal(2, aggregate.Received);
+        Assert.Null(aggregate.JitterMs);
+        var points = (GraphPoint[])typeof(MainWindow).GetMethod("RawGraphPoints", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, new object[] { new[] { Sample(0, 10), Sample(1, 30, 1) } })!;
+        Assert.Null(points[1].JitterMs);
+        Assert.Equal(1, points[1].MeasurementEpoch);
+    }
+
+    [AvaloniaFact]
+    public async Task WaitingAndLocalFailuresDoNotShowConfirmedReachabilityColors()
+    {
+        await using var fixture = new WindowFixture();
+        await fixture.Start("127.0.0.1");
+        var target = Assert.Single(Control<ListBox>(fixture.Window, "TargetList").ItemsSource!.Cast<TargetItem>());
+        var snapshot = target.Snapshot!;
+        target.Snapshot = null;
+        Assert.Equal("#ff8c95a4", target.StatusBrush.ToString());
+        target.Snapshot = snapshot with { Destination = snapshot.Destination with { Sent = 0, Received = 0 } };
+        Assert.Equal("#ff8c95a4", target.StatusBrush.ToString());
+        typeof(MainWindow).GetMethod("RefreshSelected", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(fixture.Window, null);
+        Assert.Equal("—", Control<TextBlock>(fixture.Window, "LossValue").Text);
+        Assert.Equal("—", new HopItem(target.Snapshot.Destination).LossLabel);
+        target.Snapshot = snapshot;
+        Assert.Equal("#ff3cc659", target.StatusBrush.ToString());
+        var error = new HopItem(snapshot.Destination with { Status = ProbeStatus.Error, LastMs = null });
+        Assert.Equal("#ff8c95a4", error.StatusBrush.ToString());
+        Assert.Equal("Probe unavailable", error.NameLabel);
+    }
+
     [AvaloniaFact]
     public async Task ClosingTabsStopsOnlyTheirTracePreservesHistoryAndClearsTheLastTarget()
     {
@@ -77,7 +144,8 @@ public sealed class MainWindowTests
         var timeline = Control<LatencyTimeline>(window, "Timeline");
         var plot = Control<HopLatencyPlot>(window, "RoutePlot");
 
-        Assert.Equal("127.0.0.1", Control<TextBlock>(window, "TargetTitle").Text);
+        Assert.Equal("Running", Control<TextBlock>(window, "TargetTitle").Text);
+        Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(window, "TargetList").SelectedItem).Target);
         Assert.Equal("1", Control<TextBlock>(window, "TargetCount").Text);
         var rows = table.ItemsSource!.Cast<HopItem>().ToArray();
         Assert.Equal(3, rows.Length);
@@ -90,7 +158,7 @@ public sealed class MainWindowTests
 
         table.SelectedItem = rows[1];
         Assert.Equal(2, plot.SelectedHop);
-        Assert.StartsWith("Hop 2", Control<TextBlock>(window, "GraphHeading").Text);
+        Assert.StartsWith("Hop 2 —", Control<TextBlock>(window, "PrimaryGraphHeader").Text);
         Assert.NotEmpty(timeline.Samples);
         Assert.All(timeline.Samples, sample => { Assert.True(sample.Lost); Assert.Null(sample.Latency); });
 
@@ -153,11 +221,13 @@ public sealed class MainWindowTests
         Assert.Equal(SessionState.Paused, items[1].Session!.State);
         Assert.Equal(SessionState.Running, items[0].Session!.State);
         list.SelectedItem = items[0];
-        Assert.Equal("127.0.0.1", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("Running", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(fixture.Window, "TargetList").SelectedItem).Target);
         Assert.Equal("Ⅱ", Control<Button>(fixture.Window, "StartButton").Content);
         Assert.All(timeline.Samples, sample => Assert.Equal(12d, sample.Latency));
         list.SelectedItem = items[1];
-        Assert.Equal("127.0.0.2", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("Paused", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("127.0.0.2", Assert.IsType<TargetItem>(Control<ListBox>(fixture.Window, "TargetList").SelectedItem).Target);
         Assert.Equal("▶", Control<Button>(fixture.Window, "StartButton").Content);
         Assert.All(timeline.Samples, sample => Assert.Equal(22d, sample.Latency));
     }
@@ -290,7 +360,7 @@ public sealed class MainWindowTests
         list.SelectedItem = items[0];
         // The injected engine's 100 ms interval has no matching production dropdown item.
         Assert.Equal(-1, interval.SelectedIndex);
-        interval.SelectedIndex = 2;
+        interval.SelectedIndex = 3;
         timeout.SelectedIndex = 2;
         maxHops.Value = 4;
         Assert.Equal(TimeSpan.FromSeconds(5), items[0].Session!.Options.Interval);
@@ -304,7 +374,7 @@ public sealed class MainWindowTests
         Assert.Equal(3m, maxHops.Value);
         Assert.Equal(secondOptions, items[1].Session!.Options);
         list.SelectedItem = items[0];
-        Assert.Equal(2, interval.SelectedIndex);
+        Assert.Equal(3, interval.SelectedIndex);
         Assert.Equal(2, timeout.SelectedIndex);
         Assert.Equal(4m, maxHops.Value);
         Assert.Equal(TimeSpan.FromSeconds(5), items[0].Session!.Options.Interval);
@@ -339,7 +409,8 @@ public sealed class MainWindowTests
         Assert.True(item.IsHistorical);
         Assert.Null(item.Session);
         Assert.Equal(saved.Id, item.Id);
-        Assert.Equal("127.0.0.1", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("Saved session", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(fixture.Window, "TargetList").SelectedItem).Target);
         Assert.False(Control<Button>(fixture.Window, "StartButton").IsEnabled);
         Assert.False(Control<MenuItem>(fixture.Window, "StopTraceAction").IsEnabled);
         Assert.True(Control<Button>(fixture.Window, "ExportButton").IsEnabled);
@@ -368,7 +439,7 @@ public sealed class MainWindowTests
         Click(live);
         Assert.Equal(100d, Control<Slider>(fixture.Window, "HistorySlider").Value);
         Assert.Equal("SAVED", Control<TextBlock>(fixture.Window, "HistoryPosition").Text);
-        Assert.Equal(timeline.Samples[^1].Time, timeline.EndTime);
+        Assert.Equal((await fixture.Engine.Storage.LoadTimeRangeAsync(item.Id))!.Value.Last, timeline.EndTime);
     }
 
     private static T Control<T>(MainWindow window, string name) where T : Avalonia.Controls.Control
@@ -413,7 +484,7 @@ public sealed class MainWindowTests
             Engine = new TraceEngine(Path.Combine(_directory, "history.db"), transport: new MeasuredRouteTransport());
             Window = new MainWindow(["--data-dir", _directory], Engine);
             Control<NumericUpDown>(Window, "MaxHopsInput").Value = 3;
-            Control<ComboBox>(Window, "IntervalInput").SelectedIndex = 0;
+            Control<ComboBox>(Window, "IntervalInput").SelectedIndex = 1;
             Window.Show();
         }
 
@@ -422,7 +493,7 @@ public sealed class MainWindowTests
             Control<TextBox>(Window, "TargetInput").Text = target;
             Click(Control<Button>(Window, "StartButton"));
             await Until(() => Engine.Sessions.Any(s => s.Target == target && s.LatestSnapshot is not null)
-                && Control<TextBlock>(Window, "TargetTitle").Text == target
+                && Control<ListBox>(Window, "TargetList").SelectedItem is TargetItem selected && selected.Target == target
                 && Control<LatencyTimeline>(Window, "Timeline").Samples.Count > 0);
             var session = Engine.Sessions.Single(s => s.Target == target);
             Engine.UpdateOptions(session.Id, session.Options with { Interval = TimeSpan.FromMilliseconds(100), ResolveHostnames = false });

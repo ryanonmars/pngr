@@ -32,7 +32,7 @@ internal sealed class MacDesktopNotifier : IDesktopNotifier
     {
         if (_library != 0) return;
         var path = Path.Combine(AppContext.BaseDirectory, "libTraceScopeNotifications.dylib");
-        if (!File.Exists(path)) throw new IOException("Native macOS notifications require the packaged TraceScope.app.");
+        if (!File.Exists(path)) throw new IOException("Native macOS notifications require the packaged pngr.app.");
         _library = NativeLibrary.Load(path);
         _permission = Marshal.GetDelegateForFunctionPointer<Permission>(NativeLibrary.GetExport(_library, "ts_notifications_permission"));
         _send = Marshal.GetDelegateForFunctionPointer<Send>(NativeLibrary.GetExport(_library, "ts_notifications_send"));
@@ -85,7 +85,7 @@ internal sealed class WindowsDesktopNotifier : IDesktopNotifier
         lock (_gate)
         {
             if (_disposed) return Task.FromResult(new NotificationResult(false, "Notifier has shut down."));
-            if (_thread is null) { _thread = new Thread(Loop) { IsBackground = true, Name = "TraceScope native notifications" }; if (OperatingSystem.IsWindows()) _thread.SetApartmentState(ApartmentState.STA); _thread.Start(); }
+            if (_thread is null) { _thread = new Thread(Loop) { IsBackground = true, Name = "pngr native notifications" }; if (OperatingSystem.IsWindows()) _thread.SetApartmentState(ApartmentState.STA); _thread.Start(); }
             var result = new TaskCompletionSource<NotificationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (_requests.IsAddingCompleted || !_requests.TryAdd((title, message, result))) return Task.FromResult(new NotificationResult(false, "Notification queue is full."));
             return result.Task.WaitAsync(ct);
@@ -98,10 +98,10 @@ internal sealed class WindowsDesktopNotifier : IDesktopNotifier
         bool added = false;
         try
         {
-            window = CreateWindowExW(0, "STATIC", "TraceScope notifications", 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            window = CreateWindowExW(0, "STATIC", "pngr notifications", 0, 0, 0, 0, 0, 0, 0, 0, 0);
             if (window == 0) throw new IOException("Windows notification window could not be created.");
             data = new NotifyIconData { Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = window, Id = 1,
-                Flags = 2 | 4, Icon = LoadIconW(0, (nint)32516), Tooltip = "TraceScope", Info = "", InfoTitle = "" };
+                Flags = 2 | 4, Icon = LoadIconW(0, (nint)32516), Tooltip = "pngr", Info = "", InfoTitle = "" };
             added = Shell_NotifyIconW(0, ref data);
             if (!added) throw new IOException("Windows notification-area icon could not be created.");
             while (!_requests.IsCompleted)

@@ -39,15 +39,28 @@ static unsigned short *port_field(struct sockaddr_storage *address) {
     return address->ss_family == AF_INET
         ? &((struct sockaddr_in *)address)->sin_port : &((struct sockaddr_in6 *)address)->sin6_port;
 }
+static int loopback(struct sockaddr_storage *address) {
+    const unsigned char *bytes = ip_bytes(address);
+    if (address->ss_family == AF_INET) return bytes[0] == 127;
+    static const unsigned char localhost[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+    return !memcmp(bytes, localhost, 16);
+}
+static int network_error(int error) {
+    return error == ECONNREFUSED || error == ECONNRESET || error == EHOSTUNREACH
+        || error == ENETUNREACH || error == ENETDOWN || error == EHOSTDOWN || error == ETIMEDOUT;
+}
 static int reply_matches(const unsigned char *b, ssize_t n, int ipv6,
-        struct sockaddr_storage *destination, unsigned short source_port, int *unreachable) {
+        struct sockaddr_storage *destination, struct sockaddr_storage *local,
+        struct sockaddr_storage *router, unsigned short source_port, int *unreachable) {
     int outer = 0;
     if (!ipv6) {
         if (n < 20 || b[0] >> 4 != 4 || b[9] != IPPROTO_ICMP) return 0;
         outer = (b[0] & 15) * 4;
-        if (outer < 20) return 0;
+        if (outer < 20 || memcmp(b + 12, ip_bytes(router), 4)
+            || memcmp(b + 16, ip_bytes(local), 4)) return 0;
     } else if (n >= 40 && b[0] >> 4 == 6) {
-        if (b[6] != IPPROTO_ICMPV6) return 0;
+        if (b[6] != IPPROTO_ICMPV6 || memcmp(b + 8, ip_bytes(router), 16)
+            || memcmp(b + 24, ip_bytes(local), 16)) return 0;
         outer = 40;
     }
     if (n < outer + 8) return 0;
@@ -58,7 +71,8 @@ static int reply_matches(const unsigned char *b, ssize_t n, int ipv6,
     const unsigned char *inner = b + outer + 8;
     int remaining = (int)n - outer - 8, header, protocol;
     if (ipv6) {
-        if (remaining < 40 || inner[0] >> 4 != 6 || memcmp(inner + 24, ip_bytes(destination), 16)) return 0;
+        if (remaining < 40 || inner[0] >> 4 != 6 || memcmp(inner + 24, ip_bytes(destination), 16)
+            || memcmp(inner + 8, ip_bytes(local), 16)) return 0;
         header = 40; protocol = inner[6];
         for (int i = 0; i < 8 && (protocol == 0 || protocol == 43 || protocol == 44 || protocol == 51 || protocol == 60); i++) {
             if (remaining < header + 2) return 0;
@@ -70,7 +84,8 @@ static int reply_matches(const unsigned char *b, ssize_t n, int ipv6,
             header += length; protocol = next;
         }
     } else {
-        if (remaining < 20 || inner[0] >> 4 != 4 || memcmp(inner + 16, ip_bytes(destination), 4)) return 0;
+        if (remaining < 20 || inner[0] >> 4 != 4 || memcmp(inner + 16, ip_bytes(destination), 4)
+            || memcmp(inner + 12, ip_bytes(local), 4)) return 0;
         if ((inner[6] << 8 | inner[7]) & 0x1fff) return 0;
         header = (inner[0] & 15) * 4; protocol = inner[9];
         if (header < 20) return 0;
@@ -104,13 +119,26 @@ int main(int argc, char **argv) {
     if (getsockname(tcp, (struct sockaddr *)&local, &length)) { perror("getsockname"); goto finish; }
     unsigned short source_port = *port_field(&local);
     double start = now_ms();
-    if (connect(tcp, (struct sockaddr *)&destination, length) < 0 && errno != EINPROGRESS) {
-        if (errno == ECONNREFUSED || errno == ECONNRESET) {
+    int rejection = 0, submitted = 1;
+    int connected = connect(tcp, (struct sockaddr *)&destination, length);
+    if (connected < 0 && errno != EINPROGRESS) {
+        int error = errno;
+        if ((error == ECONNREFUSED || error == ECONNRESET) && loopback(&destination)) {
+            fprintf(stderr, "TCP_RESET_LOOPBACK\n");
             printf("%d %s %.3f ms\n", ttl, argv[1], now_ms() - start); result = 0;
-        } else perror("connect");
+            goto finish;
+        }
+        if (!network_error(error)) { errno = error; perror("connect"); goto finish; }
+        rejection = error; submitted = 0;
+    } else if (connected == 0) {
+        fprintf(stderr, "TCP_CONNECTED\n");
+        printf("%d %s %.3f ms\n", ttl, argv[1], now_ms() - start); result = 0;
         goto finish;
     }
-    struct pollfd fds[2] = {{ .fd = icmp, .events = POLLIN }, { .fd = tcp, .events = POLLOUT }};
+    // After connect, getsockname returns the routed source rather than 0.0.0.0.
+    if (getsockname(tcp, (struct sockaddr *)&local, &length)) { perror("getsockname"); goto finish; }
+    struct pollfd fds[2] = {{ .fd = icmp, .events = POLLIN },
+        { .fd = rejection ? -1 : tcp, .events = POLLOUT }};
     while (now_ms() - start < timeout) {
         // If the desktop crashes or is force-quit, this probe exits within 50 ms.
         if (getppid() != parent) { result = 3; goto finish; }
@@ -120,15 +148,17 @@ int main(int argc, char **argv) {
             if (errno == EINTR) continue;
             perror("poll"); goto finish;
         }
+        if (now_ms() - start >= timeout) break;
         if (fds[0].revents & POLLIN) {
             unsigned char buffer[4096]; struct sockaddr_storage router;
             socklen_t router_length = sizeof(router);
             ssize_t count = recvfrom(icmp, buffer, sizeof(buffer), 0, (struct sockaddr *)&router, &router_length);
             int unreachable;
             if (count < 0) { if (errno == EINTR || errno == EAGAIN) continue; perror("recvfrom"); goto finish; }
-            if (reply_matches(buffer, count, ipv6, &destination, source_port, &unreachable)) {
+            if (reply_matches(buffer, count, ipv6, &destination, &local, &router, source_port, &unreachable)) {
                 char address[INET6_ADDRSTRLEN];
                 if (!inet_ntop(family, ip_bytes(&router), address, sizeof(address))) { perror("inet_ntop"); goto finish; }
+                fprintf(stderr, "%s\n", unreachable ? "TCP_ICMP_UNREACHABLE" : "TCP_ICMP_TIME_EXCEEDED");
                 printf("%d %s %.3f ms%s\n", ttl, address, now_ms() - start, unreachable ? " !H" : "");
                 result = 0; goto finish;
             }
@@ -136,13 +166,18 @@ int main(int argc, char **argv) {
         if (fds[1].revents & (POLLOUT | POLLERR | POLLHUP)) {
             int error = 0; socklen_t error_length = sizeof(error);
             if (getsockopt(tcp, SOL_SOCKET, SO_ERROR, &error, &error_length)) { perror("SO_ERROR"); goto finish; }
-            if (error == 0 || error == ECONNREFUSED || error == ECONNRESET) {
+            if (error == 0 || ((error == ECONNREFUSED || error == ECONNRESET) && loopback(&destination))) {
+                fprintf(stderr, "%s\n", error == 0 ? "TCP_CONNECTED" : "TCP_RESET_LOOPBACK");
                 printf("%d %s %.3f ms\n", ttl, argv[1], now_ms() - start); result = 0; goto finish;
             }
-            // Socket errors cannot identify routers; wait for matched ICMP.
+            // Socket errors cannot identify routers or establish destination
+            // RST origin; retain diagnostics and wait for a matched ICMP quote.
+            if (!network_error(error)) { errno = error; perror("connect"); goto finish; }
+            rejection = error;
             fds[1].fd = -1;
         }
     }
+    if (rejection) fprintf(stderr, "TCP_SOCKET_REJECTION %d %d\n", rejection, submitted);
     printf("%d *\n", ttl); result = 0;
 finish:
     if (tcp >= 0) close(tcp);

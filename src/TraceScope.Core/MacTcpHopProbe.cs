@@ -54,12 +54,13 @@ internal static class MacTcpHopProbe
                 var stdout = process.StandardOutput.ReadToEndAsync(deadline.Token);
                 var stderr = process.StandardError.ReadToEndAsync(deadline.Token);
                 await process.WaitForExitAsync(deadline.Token);
-                return AdvancedProbeTransport.ParseTraceroute(await stdout, destination, process.ExitCode, await stderr)
-                    with { Detail = process.ExitCode == 0 ? "Bundled unprivileged TCP socket probe; measured response includes socket-call overhead."
-                        : (await stderr).Trim() };
+                var result = ParseHelperResult(await stdout, destination, process.ExitCode, await stderr);
+                return result.Responded && result.LatencyMs >= options.Timeout.TotalMilliseconds
+                    ? new ProbeResult(null, null, ProbeStatus.Timeout, "TCP response processed after the configured deadline.") { Transmission = ProbeTransmission.Sent }
+                    : result;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            { return new ProbeResult(null, null, ProbeStatus.Timeout); }
+            { return new ProbeResult(null, null, ProbeStatus.Timeout) { Transmission = ProbeTransmission.Sent }; }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
             { return new ProbeResult(null, null, ProbeStatus.Error, ex.Message); }
@@ -75,4 +76,43 @@ internal static class MacTcpHopProbe
         }
         finally { Slots.Release(); }
     }
+    internal static ProbeResult ParseHelperResult(string output, IPAddress destination, int exitCode, string error)
+    {
+        var result = AdvancedProbeTransport.ParseTraceroute(output, destination, exitCode, error);
+        var detail = "Bundled TCP socket probe; RTT includes socket-call overhead. " + error.Trim();
+        if (result.Status == ProbeStatus.Timeout && error.Contains("TCP_SOCKET_REJECTION ", StringComparison.Ordinal))
+        {
+            var fields = error.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var sent = fields.Length >= 3 && fields[^1] == "1";
+            // Darwin ETIMEDOUT is 60. All other retained network socket errors
+            // represent explicit failure with an unverified origin.
+            var timeout = fields.Length >= 3 && fields[^2] == "60";
+            return result with { Status = timeout ? ProbeStatus.Timeout : ProbeStatus.Unreachable,
+                Detail = "TCP socket rejection; no independently validated destination response. " + error.Trim(),
+                Transmission = sent ? ProbeTransmission.Sent : ProbeTransmission.NotSent,
+                ResponseKind = timeout ? ProbeResponseKind.None : ProbeResponseKind.NetworkRejection };
+        }
+        if (error.Contains("TCP_ICMP_TIME_EXCEEDED", StringComparison.Ordinal))
+            return result with { Status = ProbeStatus.TimeExceeded, Detail = detail,
+                Transmission = ProbeTransmission.Sent, ResponseKind = ProbeResponseKind.IcmpTimeExceeded };
+        if (error.Contains("TCP_ICMP_UNREACHABLE", StringComparison.Ordinal))
+            return result with { Status = ProbeStatus.Unreachable, LatencyMs = null, Detail = detail,
+                Transmission = ProbeTransmission.Sent, ResponseKind = ProbeResponseKind.NetworkRejection };
+        if (error.Contains("TCP_CONNECTED", StringComparison.Ordinal))
+            return result with { Detail = detail, Transmission = ProbeTransmission.Sent,
+                ResponseKind = ProbeResponseKind.TcpConnected };
+        if (IPAddress.IsLoopback(destination) && error.Contains("TCP_RESET_LOOPBACK", StringComparison.Ordinal))
+            return result with { Detail = detail, Transmission = ProbeTransmission.Sent,
+                ResponseKind = ProbeResponseKind.TcpReset };
+        // Legacy helpers cannot authenticate a socket-error shortcut. Preserve
+        // measured router replies, but never invent destination success.
+        if (result.Status == ProbeStatus.Success)
+            return new ProbeResult(null, null, ProbeStatus.Unreachable,
+                "TCP helper did not provide validated destination-response evidence; rebuild the helper.")
+                { Transmission = ProbeTransmission.Sent, ResponseKind = ProbeResponseKind.NetworkRejection };
+        return result with { Detail = detail,
+            Transmission = result.Status == ProbeStatus.Error ? ProbeTransmission.NotSent : ProbeTransmission.Sent,
+            ResponseKind = result.Status == ProbeStatus.TimeExceeded ? ProbeResponseKind.IcmpTimeExceeded : ProbeResponseKind.None };
+    }
+
 }

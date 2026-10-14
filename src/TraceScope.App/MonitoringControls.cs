@@ -48,6 +48,13 @@ public partial class MainWindow
     {
         _displayedProtocol = ProtocolInput.SelectedItem is ProbeProtocol protocol ? protocol : ProbeProtocol.Icmp;
         PortInput.IsVisible = PortInput.IsEnabled = _displayedProtocol != ProbeProtocol.Icmp;
+        UdpModeInput.IsVisible = _displayedProtocol == ProbeProtocol.Udp;
+        var range = _displayedProtocol == ProbeProtocol.Udp && UdpModeInput.SelectedIndex == 1;
+        UdpEndPortInput.IsVisible = UdpRangeSeparator.IsVisible = range;
+        ToolTip.SetTip(ProtocolInput, _displayedProtocol == ProbeProtocol.Udp
+            ? "UDP replies measure reachability, not necessarily service availability."
+            : "Monitoring packet type");
+        UpdateProbeDetailsAvailability();
     }
 
     private void ProtocolChanged()

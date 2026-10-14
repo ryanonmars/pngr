@@ -22,6 +22,9 @@ public sealed partial class AdvancedProbeTransport : IConfiguredProbeTransport
             && string.IsNullOrWhiteSpace(options.InterfaceId))
             return await _icmp.ProbeAsync(destination, ttl, options.Timeout, cancellationToken);
 
+        if (options.Protocol == ProbeProtocol.Udp)
+            return await SocketHopProbe.ProbeAsync(destination, ttl, options, cancellationToken);
+
         if (ttl == 255 && options.Protocol != ProbeProtocol.Icmp)
             return await ProbeEndpointAsync(destination, options, cancellationToken);
 
@@ -30,9 +33,9 @@ public sealed partial class AdvancedProbeTransport : IConfiguredProbeTransport
         // protocol, target and port tuples associate a router reply with its probe.
         if (OperatingSystem.IsMacOS() && options.Protocol == ProbeProtocol.Tcp)
             return await MacTcpHopProbe.ProbeAsync(destination, ttl, options, cancellationToken);
-        if (OperatingSystem.IsMacOS() && options.Protocol == ProbeProtocol.Udp
-            && destination.AddressFamily == AddressFamily.InterNetwork)
-            return await SocketHopProbe.ProbeAsync(destination, ttl, options, cancellationToken);
+
+        if (OperatingSystem.IsWindows() && options.Protocol == ProbeProtocol.Tcp)
+            return await WindowsTcpHopProbe.ProbeAsync(destination, ttl, options, cancellationToken);
 
         if (!OperatingSystem.IsMacOS())
             return new ProbeResult(null, null, ProbeStatus.Error,
@@ -46,51 +49,56 @@ public sealed partial class AdvancedProbeTransport : IConfiguredProbeTransport
     private static async Task<ProbeResult> ProbeEndpointAsync(IPAddress destination, ProbeOptions options,
         CancellationToken cancellationToken)
     {
-        var tcp = options.Protocol == ProbeProtocol.Tcp;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(options.Timeout);
-        using var socket = new Socket(destination.AddressFamily,
-            tcp ? SocketType.Stream : SocketType.Dgram, tcp ? ProtocolType.Tcp : ProtocolType.Udp);
+        Socket? socket = null;
         var stopwatch = new Stopwatch();
         try
         {
+            socket = new Socket(destination.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             if (!string.IsNullOrWhiteSpace(options.SourceAddress))
             {
                 if (!IPAddress.TryParse(options.SourceAddress, out var source)
                     || source.AddressFamily != destination.AddressFamily)
                     return new ProbeResult(null, null, ProbeStatus.Error,
-                        "Source address must be a local numeric address matching the destination address family.");
+                        "Source address must be a local numeric address matching the destination address family.") { Transmission = ProbeTransmission.NotSent };
                 socket.Bind(new IPEndPoint(source, 0));
             }
             else if (!string.IsNullOrWhiteSpace(options.InterfaceId))
                 return new ProbeResult(null, null, ProbeStatus.Error,
-                    "Select a source address for this interface to bind endpoint probes.");
+                    "Select a source address for this interface to bind endpoint probes.") { Transmission = ProbeTransmission.NotSent };
 
             stopwatch.Start();
             await socket.ConnectAsync(new IPEndPoint(destination, options.DestinationPort), deadline.Token);
-            if (tcp)
-                return new ProbeResult(destination.ToString(), stopwatch.Elapsed.TotalMilliseconds,
-                    ProbeStatus.Success, $"TCP connect port {options.DestinationPort}; RTT includes connect-call overhead.");
-
-            // A connected UDP receive reports actual ICMP port-unreachable on supported OSes.
-            // Successful SendAsync alone does not establish reachability.
-            await socket.SendAsync(new byte[16], SocketFlags.None, deadline.Token);
-            var response = new byte[2048];
-            await socket.ReceiveAsync(response, SocketFlags.None, deadline.Token);
+            ProbeDeadline.Verify(stopwatch.Elapsed, options.Timeout, deadline.Token);
             return new ProbeResult(destination.ToString(), stopwatch.Elapsed.TotalMilliseconds,
-                ProbeStatus.Success, $"UDP application response on port {options.DestinationPort}.");
+                    ProbeStatus.Success, $"TCP connect port {options.DestinationPort}; RTT includes connect-call overhead.")
+                    { Transmission = ProbeTransmission.Sent, ResponseKind = ProbeResponseKind.TcpConnected };
         }
-        catch (SocketException ex) when (ex.SocketErrorCode is SocketError.ConnectionRefused or SocketError.ConnectionReset)
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused && IPAddress.IsLoopback(destination))
         {
             return new ProbeResult(destination.ToString(), stopwatch.Elapsed.TotalMilliseconds,
-                ProbeStatus.Success, tcp ? $"TCP RST: port {options.DestinationPort} closed; host responded."
-                    : $"ICMP port-unreachable: UDP port {options.DestinationPort} closed; host responded.");
+                ProbeStatus.Success, $"TCP RST: port {options.DestinationPort} closed; host responded.")
+                { Transmission = ProbeTransmission.Sent, ResponseKind = ProbeResponseKind.TcpReset };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        { return new ProbeResult(null, null, ProbeStatus.Timeout, $"No {options.Protocol} endpoint response within timeout."); }
+        { return new ProbeResult(null, null, ProbeStatus.Timeout, $"No {options.Protocol} endpoint response within timeout.")
+            { Transmission = ProbeTransmission.Sent }; }
         catch (OperationCanceledException) { throw; }
         catch (SocketException ex)
-        { return new ProbeResult(null, null, ProbeStatus.Error, ex.Message); }
+        {
+            var status = ex.SocketErrorCode switch
+            {
+                SocketError.TimedOut => ProbeStatus.Timeout,
+                SocketError.NetworkUnreachable or SocketError.HostUnreachable or SocketError.NetworkDown
+                    or SocketError.HostDown or SocketError.ConnectionReset or SocketError.ConnectionRefused => ProbeStatus.Unreachable,
+                _ => ProbeStatus.Error
+            };
+            return new ProbeResult(null, null, status, $"TCP socket {ex.SocketErrorCode}: {ex.Message}. A socket rejection without validated origin does not establish a destination response.")
+                { Transmission = status == ProbeStatus.Error ? ProbeTransmission.NotSent : ProbeTransmission.Unknown,
+                    ResponseKind = status == ProbeStatus.Unreachable ? ProbeResponseKind.NetworkRejection : ProbeResponseKind.None };
+        }
+        finally { socket?.Dispose(); }
     }
 
     private static async Task<ProbeResult> ProbeMacHopAsync(IPAddress destination, int ttl,

@@ -41,7 +41,7 @@ public sealed class SummaryWindow : Window
         foreach (var definition in _definitions) definition.Validate();
         if (_definitions.Count > 100 || _definitions.Select(d => d.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != _definitions.Count)
             throw new InvalidDataException("Invalid summary collection.");
-        Title = "TraceScope · Professional Summaries";
+        Title = "pngr · Professional Summaries";
         Width = 1280; Height = 560; MinWidth = 800; MinHeight = 350;
         Background = Brush.Parse("#191A1D");
         Foreground = Brush.Parse("#D5D8DE");

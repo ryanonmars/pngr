@@ -12,6 +12,32 @@ namespace TraceScope.App.Tests;
 public sealed class ProfessionalIntegrationTests
 {
     [AvaloniaFact]
+    public async Task GroupContextMenuPreservesOtherTargetsAndSavesAssignmentsWithoutToolbarRow()
+    {
+        await using var fixture = new Fixture();
+        await fixture.Add("127.0.0.1");
+        await fixture.Add("127.0.0.2");
+        var list = Control<ListBox>(fixture.Window, "TargetList");
+        var targets = list.ItemsSource!.Cast<TargetItem>().ToArray();
+        var first = targets[0];
+        var menu = new MenuItem { DataContext = first };
+        Invoke(fixture.Window, "OpenTargetGroup", menu, new Avalonia.Interactivity.RoutedEventArgs());
+        var dialog = fixture.Window.OwnedWindows.Single(w => w.Title == "Assign group");
+        ((TextBox)((Panel)dialog.Content!).Children[1]).Text = "Office";
+        var buttons = (Panel)((Panel)dialog.Content!).Children[2];
+        ((Button)buttons.Children[1]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal("Office", first.Group);
+        Assert.Equal("Office", first.Session!.Group);
+        Assert.Equal("Default", targets[1].Group);
+        Assert.False(Control<TextBox>(fixture.Window, "GroupInput").IsEffectivelyVisible);
+        await InvokeTask(fixture.Window, "SaveWorkspaceNowAsync");
+        var stored = (await new WorkspaceStore(Path.Combine(fixture.Directory, "workspace.json")).LoadAsync())!;
+        Assert.Equal("Office", stored.Targets.Single(t => t.Target == first.Target).Group);
+        Assert.Equal(1200, fixture.Window.Width);
+        Assert.Equal(800, fixture.Window.Height);
+    }
+
+    [AvaloniaFact]
     public async Task ProbeProtocolPortAndGroupControlsApplyOnlyToSelectedTarget()
     {
         await using var fixture = new Fixture();

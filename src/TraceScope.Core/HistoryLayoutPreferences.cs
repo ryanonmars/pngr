@@ -6,7 +6,7 @@ public sealed record TargetHistoryLayout(string Target, int PrimaryHop = 0, bool
 /// <summary>Workspace presentation preferences, independent of probe configuration.</summary>
 public sealed record HistoryLayoutPreferences
 {
-    public double PanelFraction { get; init; } = .6;
+    public double PanelFraction { get; init; } = .68;
     public IReadOnlyList<TargetHistoryLayout> Targets { get; init; } = [];
 
     public void Validate()

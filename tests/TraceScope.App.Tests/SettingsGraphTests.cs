@@ -58,9 +58,9 @@ public sealed class SettingsGraphTests
         Assert.Empty(Filled(after, "#3D3F40"));
         Assert.Empty(Filled(after, "#AED44843"));
         Assert.Empty(Stroked(after, "#E7B95D"));
-        Assert.Equal(beforeBand.Geometry!.Bounds.Top - 27, afterBand.Geometry!.Bounds.Top);
-        Assert.Equal(beforeBand.Geometry.Bounds.Height + 27, afterBand.Geometry.Bounds.Height);
-        Assert.Equal(beforeBand.Geometry.Bounds.Width + 24, afterBand.Geometry.Bounds.Width);
+        Assert.Equal(beforeBand.Geometry!.Bounds.Top - 25, afterBand.Geometry!.Bounds.Top);
+        Assert.Equal(beforeBand.Geometry.Bounds.Height + 25, afterBand.Geometry.Bounds.Height);
+        Assert.Equal(beforeBand.Geometry.Bounds.Width, afterBand.Geometry.Bounds.Width);
         Assert.Same(samples, timeline.Samples);
         Assert.Same(markers, timeline.Markers);
         Assert.Equal(end, timeline.EndTime);
@@ -129,7 +129,7 @@ public sealed class SettingsGraphTests
         using (var context = drawing.Open()) graph.Render(context);
         Assert.Single(Filled(drawing, "#3B5E36"));
         var loss = Assert.Single(Filled(drawing, "#AED44843"));
-        Assert.InRange(loss.Geometry!.Bounds.Height, 35, 37);
+        Assert.Equal(26, loss.Geometry!.Bounds.Height);
         Assert.Single(Filled(drawing, "#354DA4D8"));
         Assert.NotEmpty(Stroked(drawing, "#E7B95D"));
         Assert.Empty(Filled(drawing, "#3D3F40"));

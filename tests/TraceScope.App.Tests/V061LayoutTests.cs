@@ -62,7 +62,7 @@ public sealed class V061LayoutTests
         fixture.Window.MouseDown(point, MouseButton.Left); fixture.Window.MouseUp(point, MouseButton.Left);
         fixture.Layout();
         var configuration = Assert.IsType<WorkspaceConfiguration>(Invoke(fixture.Window, "CaptureWorkspace"));
-        Assert.Equal(.6, configuration.HistoryLayout.PanelFraction, 3);
+        Assert.Equal(.68, configuration.HistoryLayout.PanelFraction, 3);
         await Task.Delay(550); // Start a fresh click sequence after the double-click reset.
         Drag(fixture.Window, divider, -30);
         fixture.Layout();
@@ -112,7 +112,7 @@ public sealed class V061LayoutTests
         fixture.Layout();
         var configuration = Assert.IsType<WorkspaceConfiguration>(Invoke(fixture.Window, "CaptureWorkspace"));
         var layout = configuration.GetType().GetProperty("HistoryLayout")!.GetValue(configuration)!;
-        Assert.Equal(.6, (double)layout.GetType().GetProperty("PanelFraction")!.GetValue(layout)!);
+        Assert.Equal(.68, (double)layout.GetType().GetProperty("PanelFraction")!.GetValue(layout)!);
         AssertFitted(fixture, 1);
     }
 
@@ -182,6 +182,31 @@ public sealed class V061LayoutTests
         var restoredRatio = ((Control)fixture.Timeline.Parent!).Bounds.Height / ((Control)fixture.Graphs.Single(g => !ReferenceEquals(g, fixture.Timeline)).Parent!).Bounds.Height;
         Assert.Equal(expectedRatio, restoredRatio, 2);
         Assert.Single(fixture.Engine.Sessions);
+    }
+
+    [AvaloniaFact]
+    public async Task SharedTimeControlsStayInFirstVisibleGraphHeaderAfterCloseAndResize()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        Invoke(fixture.Window, "ToggleHistoryGraph", 1);
+        Invoke(fixture.Window, "ToggleHistoryGraph", 2);
+        fixture.Layout();
+        var controls = Find<StackPanel>(fixture.Window, "HistoryTimeControls");
+        Assert.Same(((Grid)fixture.Frames[0]).Children[0], controls.Parent);
+        Assert.Equal(30, ((Grid)fixture.Frames[0]).RowDefinitions[0].ActualHeight);
+        Assert.Null(fixture.Window.FindControl<TextBlock>("GraphHeading"));
+        Invoke(fixture.Window, "HideHistoryGraph", 0);
+        fixture.Layout();
+        Assert.Same(((Grid)fixture.Frames[0]).Children[0], controls.Parent);
+        Assert.Equal(2, fixture.Graphs.Length);
+        Assert.Single(fixture.Window.GetVisualDescendants().OfType<ComboBox>(), c => c.Name == "HorizonInput");
+        var viewport = fixture.Graphs[0].Viewport;
+        Assert.All(fixture.Graphs, graph => Assert.Same(viewport, graph.Viewport));
+        fixture.Window.Width = 980; fixture.Window.Height = 640;
+        await Task.Delay(30);
+        fixture.Layout();
+        AssertFitted(fixture, 2);
+        Assert.True(controls.Bounds.Width > 0);
     }
 
     private static void AssertFitted(Fixture fixture, int count)

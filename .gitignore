@@ -78,3 +78,20 @@ docs/
 ._*
 Thumbs.db
 Desktop.ini
+
+# Personal exports, capture files, credentials, and signing material
+workspace.json
+*.workspace.json
+*.pcap
+*.pcapng
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+credentials*.json
+secrets*.json
+
+# Python packaging checks
+__pycache__/
+*.py[cod]

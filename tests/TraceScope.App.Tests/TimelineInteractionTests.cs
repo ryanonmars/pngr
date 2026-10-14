@@ -188,10 +188,10 @@ public sealed class TimelineInteractionTests
         }
         GeometryDrawing Fill(Drawing drawing, string color) => Assert.Single(Geometry(drawing), g => g.Pen is null && g.Brush is ISolidColorBrush brush && brush.Color == Color.Parse(color));
         var first = Render(600);
-        Assert.Equal(51.8, Fill(first, "#354DA4D8").Geometry!.Bounds.Width, 5);
-        Assert.Equal((300 - 64 - 30) * .25, Fill(first, "#AED44843").Geometry!.Bounds.Height, 5);
+        Assert.Equal(52.8, Fill(first, "#354DA4D8").Geometry!.Bounds.Width, 5);
+        Assert.Equal((300 - 43 - 30) * .25, Fill(first, "#AED44843").Geometry!.Bounds.Height, 5);
         var resized = Render(1000);
-        Assert.Equal(91.8, Fill(resized, "#354DA4D8").Geometry!.Bounds.Width, 5);
+        Assert.Equal(92.8, Fill(resized, "#354DA4D8").Geometry!.Bounds.Width, 5);
         Assert.Equal(End.AddSeconds(-60), viewport.SelectionStart);
         Assert.Equal(End.AddSeconds(-30), viewport.SelectionEnd);
     }
@@ -237,7 +237,7 @@ public sealed class TimelineInteractionTests
         var graph = new LatencyTimeline { Viewport = viewport };
         graph.Measure(new Size(600, 300));
         graph.Arrange(new Rect(0, 0, 600, 300));
-        Assert.Equal(End.AddSeconds(-150), graph.TimestampAt(305));
+        Assert.Equal(End.AddSeconds(-150), graph.TimestampAt(310));
         viewport.SelectRange(End.AddSeconds(-10.123), End.AddSeconds(-5.456));
         graph.Samples = [new GraphPoint(End, 12, false)];
         Assert.Equal(End.AddSeconds(-10.123), viewport.SelectionStart);

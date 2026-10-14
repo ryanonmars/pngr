@@ -240,7 +240,15 @@ public partial class MainWindow
             var snapshot = _selected.Snapshot;
             var first = snapshot?.Destination.History.FirstOrDefault()?.Timestamp;
             view.Viewport.First ??= first;
-            view.Viewport.Last = snapshot?.Timestamp ?? view.Viewport.Last;
+            // Graph samples are timestamped at probe dispatch, not round completion.
+            // Alternating completion-time and database sample-time bounds made timeout
+            // rounds move every graph forward, then backward when the query finished.
+            var latestMeasurement = snapshot?.Hops.Append(snapshot.Destination)
+                .SelectMany(h => h.History).Select(s => (DateTimeOffset?)s.Timestamp).Max();
+            if (_selected.IsHistorical)
+                view.Viewport.Last ??= latestMeasurement;
+            else if (latestMeasurement is { } latest && (view.Viewport.Last is null || latest > view.Viewport.Last))
+                view.Viewport.Last = latest;
             Timeline.Viewport = view.Viewport;
             _heldEnd = view.Viewport.EndTime;
             var visible = VisibleHistoryHops(view).ToHashSet();
@@ -259,14 +267,14 @@ public partial class MainWindow
             {
                 if (_additionalGraphs.ContainsKey(hop)) continue;
                 var graph = new LatencyTimeline { Viewport = view.Viewport };
-                var frame = new Grid { RowDefinitions = new RowDefinitions("18,*") };
-                var heading = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Background = Brush.Parse("#24262A") };
-                var label = new TextBlock { Text = GraphHeader(hop), Margin = new Thickness(7, 1) };
+                var frame = new Grid { RowDefinitions = new RowDefinitions("30,*") };
+                var heading = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), Background = Brush.Parse("#24262A") };
+                var label = new TextBlock { Text = GraphHeader(hop), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Margin = new Thickness(7, 1), TextTrimming = TextTrimming.CharacterEllipsis };
                 var close = new Button { Content = "×" };
                 close.Classes.Add("close-target");
                 Avalonia.Automation.AutomationProperties.SetName(close, "Close history graph");
                 close.Click += (_, _) => HideHistoryGraph(hop);
-                heading.Children.Add(label); Grid.SetColumn(close, 1); heading.Children.Add(close);
+                heading.Children.Add(label); Grid.SetColumn(close, 2); heading.Children.Add(close);
                 frame.Children.Add(heading); Grid.SetRow(graph, 1); frame.Children.Add(graph);
                 _additionalGraphs.Add(hop, graph); HistoryGraphsPanel.Children.Add(frame);
             }
@@ -276,10 +284,13 @@ public partial class MainWindow
                 graph.Viewport = view.Viewport;
                 PopulateGraph(graph, hop, view);
                 if (graph.Parent is Grid frame && frame.Children[0] is Grid heading && heading.Children[0] is TextBlock label)
+                {
                     label.Text = GraphHeader(hop);
+                    ToolTip.SetTip(label, GraphDetails(hop));
+                }
             }
             PrimaryGraphHeader.Text = GraphHeader(view.PrimaryHop);
-            GraphHeading.Text = _selectedHop.HasValue ? $"Hop {_selectedHop} · {snapshot?.Hops.FirstOrDefault(h => h.Hop == _selectedHop)?.Address ?? "no response"}" : $"Destination · {_selected.Target}";
+            ToolTip.SetTip(PrimaryGraphHeader, GraphDetails(view.PrimaryHop));
             var end = view.Viewport.EffectiveEnd;
             ClearSelectionButton.IsVisible = view.Viewport.SelectionStart.HasValue;
             FocusRange.Text = view.Viewport.SelectionStart is { } selectedStart && view.Viewport.SelectionEnd is { } selectedEnd
@@ -293,13 +304,20 @@ public partial class MainWindow
         finally { _refreshingHistory = false; }
     }
 
+    private string GraphDetails(int hop)
+    {
+        if (hop != 0) return $"History for TTL position {hop}. Navigation is shared across visible graphs.";
+        var terminal = _selected?.Snapshot?.Hops.FirstOrDefault(h => h.IsDestination)?.Hop;
+        var protocol = _selected?.Snapshot?.MeasurementOptions?.Protocol ?? _selected?.Session?.Options.Protocol;
+        return "Independent destination probe" + (terminal is { } ttl ? $" · terminal TTL {ttl}." : ".")
+            + (protocol == ProbeProtocol.Udp ? " UDP Port Unreachable confirms reachability, not service availability." : "");
+    }
+
     private string GraphHeader(int hop)
     {
         if (hop == 0)
         {
-            var destinationHops = _selectionStatistics?.Where(h => h.Hop > 0 && h.IsDestination).Select(h => h.Hop).Distinct().OrderBy(h => h).ToArray()
-                ?? _selected?.Snapshot?.Hops.Where(h => h.IsDestination).Select(h => h.Hop).ToArray() ?? [];
-            return $"{(destinationHops.Length > 0 ? $"Hop {string.Join('/', destinationHops)} · " : "")}Destination — {_selected?.Address}";
+            return $"{_selected?.Address} — Destination";
         }
         var addresses = _selectionStatistics?.Where(h => h.Hop == hop).Select(h => h.Address ?? "no response").Distinct().ToArray();
         if (addresses is null && CurrentHistoryView.Windows.TryGetValue(hop, out var window))
@@ -318,13 +336,13 @@ public partial class MainWindow
             if (!view.Points.TryGetValue(hop, out var cached) || !ReferenceEquals(cached.Window, window))
             {
                 var points = window.IsAggregated ? window.AggregatedSamples.Select(s => new GraphPoint(s.Timestamp, s.AverageMs,
-                s.AverageMs is null && s.Count > 0, s.LossPercent, s.JitterMs, s.Count == 0 && s.Errors > 0, true, s.Count + s.Errors)).ToArray()
+                s.AverageMs is null && s.Count > 0, s.LossPercent, s.JitterMs, s.Count == 0 && s.Errors > 0, true, s.Count + s.Errors, MeasurementEpoch: s.MeasurementEpoch)).ToArray()
                 : RawGraphPoints(window.RawSamples);
                 cached = (window, points);
                 view.Points[hop] = cached;
             }
             if (!ReferenceEquals(graph.Samples, cached.Points)) graph.Samples = cached.Points;
-            graph.Title = $"{window.TotalSamples:N0} probes · {(window.IsAggregated ? "aggregated bins; may include address changes" : "raw measurements")}";
+            graph.Title = $"{window.TotalSamples:N0} probes · {(window.IsAggregated ? "aggregated bins; may include address/configuration changes" : "raw measurements")}";
             graph.Markers = view.Events;
         }
         else
@@ -347,8 +365,8 @@ public partial class MainWindow
             var previousResponse = previous?.LatencyMs.HasValue == true && previous.Status is ProbeStatus.Success or ProbeStatus.TimeExceeded;
             result[i] = new(sample.Timestamp, response ? sample.LatencyMs : null, !response && sample.Status != ProbeStatus.Error,
                 sample.Status == ProbeStatus.Error ? null : response ? 0 : 100,
-                response && previousResponse && previous!.Address == sample.Address ? Math.Abs(sample.LatencyMs!.Value - previous.LatencyMs!.Value) : null,
-                sample.Status == ProbeStatus.Error, Address: sample.Address);
+                response && previousResponse && previous!.Address == sample.Address && previous.MeasurementEpoch == sample.MeasurementEpoch ? Math.Abs(sample.LatencyMs!.Value - previous.LatencyMs!.Value) : null,
+                sample.Status == ProbeStatus.Error, Address: sample.Address, MeasurementEpoch: sample.MeasurementEpoch);
             previous = sample;
         }
         return result;
@@ -370,7 +388,14 @@ public partial class MainWindow
             if (range is { } bounds)
             {
                 _settingHistoryViewport = true;
-                try { view.Viewport.First = bounds.First; view.Viewport.Last = bounds.Last; }
+                try
+                {
+                    view.Viewport.First = bounds.First;
+                    // A disk read can finish after a newer live snapshot has arrived.
+                    // Only saved sessions use disk bounds as an authoritative replacement.
+                    if (item.IsHistorical || view.Viewport.Last is null || bounds.Last > view.Viewport.Last)
+                        view.Viewport.Last = bounds.Last;
+                }
                 finally { _settingHistoryViewport = false; }
             }
             var end = view.Viewport.EffectiveEnd;

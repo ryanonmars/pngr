@@ -1,0 +1,77 @@
+name: Build and test platforms
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Semantic version embedded in the application and packages
+        required: false
+        default: '0.7.0'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.runtime }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            runtime: osx-arm64
+          - runner: macos-15-intel
+            runtime: osx-x64
+          - runner: windows-2022
+            runtime: win-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore TraceScope.slnx
+      - name: Build
+        run: dotnet build TraceScope.slnx -c Release --no-restore
+      - name: Test
+        run: dotnet test TraceScope.slnx -c Release --no-build --logger trx --results-directory artifacts/test-results
+      - name: Test packaging verification
+        run: python -m unittest discover -s tests/packaging -v
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+          PNGR_RUNTIME: ${{ matrix.runtime }}
+        run: scripts/package.sh "$PNGR_RUNTIME" "$PNGR_VERSION"
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+        run: ./scripts/package.ps1 -Version $env:PNGR_VERSION
+      - name: Verify distribution
+        shell: bash
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+          PNGR_RUNTIME: ${{ matrix.runtime }}
+        run: python scripts/verify-package.py "artifacts/pngr-$PNGR_RUNTIME.zip" "$PNGR_RUNTIME" "$PNGR_VERSION"
+      - name: Upload package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pngr-${{ matrix.runtime }}
+          path: artifacts/pngr-${{ matrix.runtime }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-${{ matrix.runtime }}
+          path: artifacts/test-results/*.trx
+          if-no-files-found: warn
+          retention-days: 7
