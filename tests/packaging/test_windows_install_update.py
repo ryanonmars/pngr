@@ -50,6 +50,48 @@ class WindowsLifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'measurements'):
                 LIFECYCLE.assert_preserved(data, baseline)
 
+    def test_uninstall_waits_for_delayed_root_deletion_after_app_disappears(self):
+        with tempfile.TemporaryDirectory() as directory:
+            installation = Path(directory) / 'pngr'
+            installation.mkdir()
+            (installation / 'Update.exe').write_bytes(b'updater')
+            current = installation / 'current'
+            current.mkdir()
+            # No current/pngr.exe remains, but detached self-deletion is still
+            # pending. A fresh setup cannot safely start at this point.
+            polls = []
+            def finish_detached_cleanup(seconds):
+                self.assertTrue(installation.exists())
+                polls.append(seconds)
+                if len(polls) == 3:
+                    (installation / 'Update.exe').unlink()
+                    current.rmdir()
+                    installation.rmdir()
+            with mock.patch.object(LIFECYCLE, 'run') as run:
+                with mock.patch.object(LIFECYCLE.time, 'sleep', side_effect=finish_detached_cleanup):
+                    LIFECYCLE.uninstall(installation)
+            run.assert_called_once_with([installation / 'Update.exe', '--silent', 'uninstall'])
+            self.assertEqual(3, len(polls))
+            self.assertFalse(installation.exists())
+
+    def test_uninstall_deadline_reports_remaining_files_without_deleting_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            installation = Path(directory) / 'pngr'
+            installation.mkdir()
+            residual = installation / 'Update.exe'
+            residual.write_bytes(b'locked updater')
+            with mock.patch.object(LIFECYCLE.time, 'monotonic', side_effect=[0, 0, 61]):
+                with mock.patch.object(LIFECYCLE.time, 'sleep'):
+                    with self.assertRaisesRegex(ValueError, 'installation root.*Update.exe'):
+                        LIFECYCLE.wait_for_uninstall(installation)
+            self.assertEqual(b'locked updater', residual.read_bytes())
+
+    def test_uninstall_of_absent_root_returns_without_delay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(LIFECYCLE.time, 'sleep') as sleep:
+                LIFECYCLE.uninstall(Path(directory) / 'absent')
+            sleep.assert_not_called()
+
     def test_http_download_is_rejected_before_network_access(self):
         with self.assertRaisesRegex(ValueError, 'HTTPS'):
             LIFECYCLE.download('http://example.invalid/setup.exe', 100)

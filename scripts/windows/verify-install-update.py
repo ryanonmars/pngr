@@ -14,6 +14,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -50,6 +51,7 @@ def download(url: str, limit: int):
 
 
 def run(arguments, success=True):
+    print(f'Running {Path(arguments[0]).name}: {" ".join(str(value) for value in arguments[1:])}', flush=True)
     result = subprocess.run([str(value) for value in arguments], timeout=180)
     if success and result.returncode != 0:
         raise ValueError(f'Command failed ({result.returncode}): {arguments[0]}')
@@ -122,15 +124,26 @@ def assert_preserved(data: Path, baseline):
         raise ValueError('Target configuration changed or optional API was enabled.')
 
 
+def wait_for_uninstall(installation: Path, timeout: float = 60):
+    # Velopack 1.2.161 schedules a detached, three-second delayed rmdir of
+    # the complete install root after Update.exe exits. Disappearance of the
+    # app executable is too early: that rmdir can destroy a new installation.
+    # Wait for the actual final lifecycle condition, not an arbitrary delay.
+    deadline = time.monotonic() + timeout
+    while installation.exists():
+        if time.monotonic() >= deadline:
+            remaining = sorted(str(path.relative_to(installation))
+                               for path in installation.rglob('*'))[:20]
+            raise ValueError(f'Velopack uninstall did not remove its installation root: {remaining}')
+        time.sleep(.25)
+
+
 def uninstall(installation: Path):
     updater = installation / 'Update.exe'
     if updater.is_file():
         run([updater, '--silent', 'uninstall'])
-    for _ in range(40):
-        if not (installation / 'current/pngr.exe').exists():
-            return
-        time.sleep(.25)
-    raise ValueError('Velopack uninstall did not remove the installed executable.')
+    print('Waiting for Velopack installation-root cleanup before any reinstall.', flush=True)
+    wait_for_uninstall(installation)
 
 
 def verify(setup: Path, package: Path, expected_version: str, evidence: Path):
@@ -181,7 +194,15 @@ def verify(setup: Path, package: Path, expected_version: str, evidence: Path):
                 'CorruptUpdateRejected': True, 'HistorySettingsProfilesPreserved': True,
                 'InteractiveWizardManuallyVerified': False}, indent=2))
         finally:
-            uninstall(installation)
+            original_failure = sys.exc_info()[1]
+            try:
+                uninstall(installation)
+            except Exception as cleanup_failure:
+                if original_failure is None:
+                    raise
+                # Retain the real assertion/installer failure in CI rather than
+                # hiding it behind a secondary cleanup failure.
+                print(f'Additional uninstall cleanup failure: {cleanup_failure}', file=sys.stderr)
     print(f'Verified native Windows installer and 0.7.1 -> {expected_version} update; interactive wizard remains manual testing.')
 
 
