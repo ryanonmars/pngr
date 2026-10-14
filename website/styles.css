@@ -602,3 +602,48 @@ dialog img {
   margin: 42px auto 0;
   max-width: 560px;
 }
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.brandmark {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+.hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.hero-brandmark {
+  width: 128px;
+  height: 128px;
+  flex-shrink: 0;
+}
+.hero-brand .hero-logo {
+  width: clamp(180px, 22vw, 300px);
+  margin-bottom: 0;
+}
+@media (max-width: 750px) {
+  .brand-lockup {
+    gap: 6px;
+  }
+  .brandmark {
+    width: 38px;
+    height: 38px;
+  }
+  .hero-brand {
+    gap: 4px;
+  }
+  .hero-brandmark {
+    width: 84px;
+    height: 84px;
+  }
+  .hero-brand .hero-logo {
+    width: clamp(160px, 50vw, 195px);
+  }
+}
