@@ -120,7 +120,7 @@ public sealed class MainWindowTests
         Assert.Empty(Control<HopLatencyPlot>(window, "RoutePlot").Rows);
         Assert.True(Control<Button>(window, "StartButton").IsEnabled);
         Assert.False(Control<MenuItem>(window, "StopTraceAction").IsEnabled);
-        Assert.False(Control<Button>(window, "ExportButton").IsEnabled);
+        Assert.False(MenuTestSupport.Item(window, "Export CSV…").IsEnabled);
         var saved = await fixture.Engine.Storage.LoadSessionsAsync();
         Assert.Equal(2, saved.Count);
         Assert.All(saved, s => { Assert.NotNull(s.StoppedAt); Assert.True(s.SampleCount > 0); });
@@ -413,7 +413,7 @@ public sealed class MainWindowTests
         Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(fixture.Window, "TargetList").SelectedItem).Target);
         Assert.False(Control<Button>(fixture.Window, "StartButton").IsEnabled);
         Assert.False(Control<MenuItem>(fixture.Window, "StopTraceAction").IsEnabled);
-        Assert.True(Control<Button>(fixture.Window, "ExportButton").IsEnabled);
+        Assert.True(MenuTestSupport.Item(fixture.Window, "Export CSV…").IsEnabled);
         Assert.Equal("SAVED", Control<TextBlock>(fixture.Window, "HistoryPosition").Text);
         var table = Control<DataGrid>(fixture.Window, "HopTable");
         var hops = table.ItemsSource!.Cast<HopItem>().ToArray();

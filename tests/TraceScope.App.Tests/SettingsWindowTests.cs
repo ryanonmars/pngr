@@ -88,7 +88,7 @@ public sealed class SettingsWindowTests
     }
 
     [AvaloniaFact]
-    public async Task SettingsButtonOpensOneOwnedWindowAndCancelDoesNotApplyDraft()
+    public async Task SettingsMenuOpensOneOwnedWindowAndCancelDoesNotApplyDraft()
     {
         await using var fixture = await Fixture.CreateAsync();
         await fixture.AddTarget("127.0.0.1");
@@ -96,7 +96,7 @@ public sealed class SettingsWindowTests
         var before = await File.ReadAllTextAsync(fixture.WorkspacePath);
         var options = fixture.Engine.Sessions.Single().Options;
         var dialog = fixture.OpenSettings();
-        Click(fixture.Window.FindControl<Button>("SettingsButton")!);
+        MenuTestSupport.Click(fixture.Window, "Settings…");
         Assert.Same(dialog, fixture.Window.OwnedWindows.Single());
         dialog.SelectPage("General");
         Find<CheckBox>(dialog, "SettingsRestore").IsChecked = false;
@@ -522,7 +522,7 @@ public sealed class SettingsWindowTests
         }
         public SettingsWindow OpenSettings()
         {
-            Click(Window.FindControl<Button>("SettingsButton")!);
+            MenuTestSupport.Click(Window, "Settings…");
             return Assert.IsType<SettingsWindow>(Window.OwnedWindows.Single());
         }
         public async Task AddTarget(string target, bool useDefaults = false)

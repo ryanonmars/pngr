@@ -3,20 +3,10 @@
     <NativeMenuBar x:Name="ApplicationMenuBar" DockPanel.Dock="Top" IsVisible="False"/>
   <Grid RowDefinitions="28,28,38,*,20" Background="#191A1D">
     <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
         <TextBlock Text="pngr" FontSize="12" FontWeight="SemiBold" Foreground="#F0F1F3" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" x:Name="TargetTitle" Text="Ready to trace" FontSize="11" Foreground="#DBDDE1" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="2" x:Name="TargetSubtitle" IsVisible="False" Text="" FontSize="10" Foreground="#999DA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-          <Button x:Name="SettingsButton" Content="Settings" Click="OpenSettings" ToolTip.Tip="Settings (⌘, on macOS / Ctrl+, on Windows)"/>
-          <Button x:Name="SummaryButton" Content="Summary" Click="OpenSummary"/>
-          <Button x:Name="AlertsButton" Content="Alerts" Click="OpenAlerts"/>
-          <Button x:Name="WorkspaceButton" Content="Workspace" Click="OpenWorkspace"/>
-          <Button x:Name="NetworkButton" Content="Network" Click="OpenNetwork"/>
-          <Button x:Name="WebButton" Content="Web" Click="OpenWeb"/>
-          <Button x:Name="HistoryButton" Content="Open history" Click="OpenHistory"/>
-          <Button x:Name="ExportButton" Content="Export CSV" Click="ExportCsv"/>
-        </StackPanel>
       </Grid>
     </Border>
     <Border Grid.Row="1" Background="#1D1F23" BorderBrush="#36383E" BorderThickness="0,0,0,1">

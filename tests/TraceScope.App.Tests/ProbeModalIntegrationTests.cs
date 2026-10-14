@@ -124,7 +124,7 @@ public sealed class ProbeModalIntegrationTests
         Find<TextBox>(dialog, "ProbeTcpPort").Text = "8443";
         Assert.True(await dialog.ApplyAsync(true));
         Assert.Equal(ProbeProtocol.Tcp, target.Session!.Options.Protocol);
-        Click(f.Window.FindControl<Button>("SettingsButton")!);
+        MenuTestSupport.Click(f.Window, "Settings…");
         var settings = Assert.IsType<SettingsWindow>(f.Window.OwnedWindows.Single());
         settings.SelectPage("Monitoring");
         Find<ComboBox>(settings, "ProbeScope").SelectedIndex = 1;

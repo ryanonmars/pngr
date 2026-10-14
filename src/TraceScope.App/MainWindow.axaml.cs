@@ -42,12 +42,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         VersionLabel.Text = $"pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.0"}";
         ApplicationMenuBar.IsVisible = OperatingSystem.IsWindows();
-        if (OperatingSystem.IsMacOS())
-        {
-            SettingsButton.IsVisible = false;
-            SummaryButton.IsVisible = AlertsButton.IsVisible = WorkspaceButton.IsVisible = false;
-            NetworkButton.IsVisible = WebButton.IsVisible = HistoryButton.IsVisible = ExportButton.IsVisible = false;
-        }
         if (OperatingSystem.IsWindows())
         {
             using var icon = Avalonia.Platform.AssetLoader.Open(new Uri("avares://pngr/Assets/Icons/pngr-windows.png"));
@@ -505,7 +499,7 @@ public partial class MainWindow : Window
         ResetStatisticsAction.IsEnabled = !busy && _selected?.Session is not null;
         CloseTargetAction.IsEnabled = !busy && _selected is not null;
         NewTargetAction.IsEnabled = !_addingTarget && !_closing;
-        ExportButton.IsEnabled = _selected?.Snapshot is not null;
+        if (_exportMenuAction is not null) _exportMenuAction.IsEnabled = _selected?.Snapshot is not null;
     }
 
     private void PauseTrace(object? sender, RoutedEventArgs e)

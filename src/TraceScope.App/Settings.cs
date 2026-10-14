@@ -38,19 +38,29 @@ public partial class MainWindow
 
     internal void OpenSettingsFromMenu() => OpenSettings(null, new RoutedEventArgs());
 
+    private NativeMenuItem? _exportMenuAction;
+
+    internal void RegisterApplicationMenu(NativeMenu menu)
+    {
+        _exportMenuAction = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "File")
+            .Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Export CSV…");
+        _exportMenuAction.IsEnabled = _selected?.Snapshot is not null;
+    }
+
     internal void ExecuteAppMenuCommand(string header)
     {
         var args = new RoutedEventArgs();
         switch (header)
         {
+            case "Settings…": OpenSettingsFromMenu(); break;
             case "Open History…": OpenHistory(null, args); break;
             case "Export CSV…": ExportCsv(null, args); break;
             case "All Targets": OpenAllTargets(null, args); break;
             case "Summary": OpenSummary(null, args); break;
-            case "Network": OpenNetwork(null, args); break;
-            case "Web": OpenWeb(null, args); break;
-            case "Alerts": OpenAlerts(null, args); break;
-            case "Workspace": OpenWorkspace(null, args); break;
+            case "Network": case "Network…": OpenNetwork(null, args); break;
+            case "Web": case "Local Web / API…": OpenWeb(null, args); break;
+            case "Alerts": case "Alerts…": OpenAlerts(null, args); break;
+            case "Workspace": case "Workspace…": OpenWorkspace(null, args); break;
             case "Load Profile…": OpenLoadProfileMenu(); break;
             case "Save Current Configuration…": OpenSaveCurrentProfileMenu(); break;
             case "Manage/Delete Profiles…": OpenManageProfilesMenu(); break;
