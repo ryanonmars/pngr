@@ -3,7 +3,7 @@
 set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
-version=${1:-0.7.1}
+version=${1:-0.7.2}
 version=${version#v}
 archive_directory=${PNGR_UNIVERSAL_ARCHIVE_DIR:-artifacts}
 # CI provides validated architecture ZIPs; local builds can publish both payloads here.
@@ -13,7 +13,12 @@ if [ "${PNGR_UNIVERSAL_USE_ARCHIVES:-0}" != 1 ]; then
 fi
 mkdir -p artifacts/universal
 stage=$(mktemp -d "$project_root/artifacts/universal/build.XXXXXX")
-trap 'rm -rf "$stage"' EXIT HUP INT TERM
+mounted_volume=
+cleanup() {
+    if [ -n "$mounted_volume" ]; then hdiutil detach -quiet "$mounted_volume" || true; fi
+    rm -rf "$stage"
+}
+trap cleanup EXIT HUP INT TERM
 bundle="$stage/pngr.app"
 mkdir -p "$bundle/Contents/MacOS"
 mkdir -p "$bundle/Contents/Resources/runtimes"
@@ -40,7 +45,7 @@ fi
 # vpk accepts prebuilt bundles and preserves the legacy identifier and universal launcher.
 # '-' is ad-hoc integrity signing, not a trusted identity. Gatekeeper remains unchanged.
 "$sdk" tool restore
-"$sdk" tool run vpk -- pack --packId pngr --packVersion "$version" --packTitle pngr \
+"$sdk" tool run vpk -- pack --packId pngr --packVersion "$version" --packTitle Pngr \
     --packDir "$bundle" --mainExe pngr --runtime osx-arm64 --channel osx-universal \
     --bundleId dev.tracescope.desktop --noInst --signAppIdentity - --outputDir "$output" \
     --delta None --skip-updates
@@ -50,19 +55,44 @@ if [ -z "$portable" ]; then echo "Velopack portable bundle missing" >&2; exit 1;
 mkdir "$stage/enriched"
 ditto -x -k "$portable" "$stage/enriched"
 rm -rf "$bundle"
-mv "$stage/enriched/pngr.app" "$bundle"
+# Velopack names its portable bundle from packTitle. Preserve the installed
+# basename used by 0.7.1 while displaying Pngr via localized bundle metadata.
+mv "$stage/enriched/Pngr.app" "$bundle"
 python3 scripts/verify-macos-universal.py "$bundle" "$version" --require-updater --verify-update-permissions
 codesign --verify --deep --strict "$bundle"
 mkdir "$stage/image"
 mv "$bundle" "$stage/image/pngr.app"
 ln -s /Applications "$stage/image/Applications"
-hdiutil create -quiet -volname pngr -srcfolder "$stage/image" -format UDZO \
-    -fs HFS+ "$stage/pngr-macos-universal.dmg"
-hdiutil verify -quiet "$stage/pngr-macos-universal.dmg"
+# Finder presentation is generated on the mounted image so its background alias
+# references the image volume, not a temporary build directory.
+layout_python="$project_root/.tools/dmg-layout/bin/python3"
+if [ ! -x "$layout_python" ]; then python3 -m venv "$project_root/.tools/dmg-layout"; fi
+"$layout_python" -m pip install --disable-pip-version-check -q -r scripts/macos/dmg-requirements.txt
+mkdir -p "$stage/image/.background"
+xcrun swift scripts/macos/dmg-background.swift "$stage/image/.background/install.png"
+hdiutil create -quiet -volname Pngr -srcfolder "$stage/image" -format UDRW \
+    -fs HFS+ "$stage/install-writable.dmg"
+mkdir "$stage/mounted"
+hdiutil attach -quiet -nobrowse -mountpoint "$stage/mounted" "$stage/install-writable.dmg"
+mounted_volume="$stage/mounted"
+"$layout_python" scripts/macos/configure-dmg.py "$mounted_volume"
+hdiutil detach -quiet "$mounted_volume"
+mounted_volume=
+hdiutil convert -quiet "$stage/install-writable.dmg" -format UDZO -o "$stage/Pngr-macos-universal.dmg"
+hdiutil verify -quiet "$stage/Pngr-macos-universal.dmg"
+# Validate the final read-only image, not only staging metadata.
+hdiutil attach -quiet -nobrowse -mountpoint "$stage/mounted" "$stage/Pngr-macos-universal.dmg"
+mounted_volume="$stage/mounted"
+"$layout_python" scripts/macos/configure-dmg.py "$mounted_volume" --verify
+hdiutil detach -quiet "$mounted_volume"
+mounted_volume=
 rm -rf artifacts/universal/pngr.app
 mv "$stage/image/pngr.app" artifacts/universal/pngr.app
-mv "$stage/pngr-macos-universal.dmg" artifacts/pngr-macos-universal.dmg
-cp artifacts/pngr-macos-universal.dmg "$output/pngr-macos-universal.dmg"
+# APFS often ignores filename case: remove the old spelling before publishing
+# the replacement, never after (that would delete the new Pngr file too).
+rm -f artifacts/pngr-macos-universal.dmg
+mv "$stage/Pngr-macos-universal.dmg" artifacts/Pngr-macos-universal.dmg
+cp artifacts/Pngr-macos-universal.dmg "$output/Pngr-macos-universal.dmg"
 # Portable ZIP is an internal intermediate, not a public download.
 rm "$portable"
 # CLI upload bookkeeping lists the intentionally removed portable ZIP; SDK uses releases.*.
@@ -76,4 +106,4 @@ if ! mv "$output" "$final_output"; then
     if [ -d "$stage/previous-release" ]; then mv "$stage/previous-release" "$final_output"; fi
     exit 1
 fi
-echo "Built artifacts/pngr-macos-universal.dmg ($version)"
+echo "Built artifacts/Pngr-macos-universal.dmg ($version)"

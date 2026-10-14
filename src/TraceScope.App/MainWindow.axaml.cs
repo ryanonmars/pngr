@@ -40,7 +40,7 @@ public partial class MainWindow : Window
     public MainWindow(string[] args, TraceEngine? engine = null)
     {
         InitializeComponent();
-        VersionLabel.Text = $"pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.0"}";
+        VersionLabel.Text = $"Pngr {System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(MainWindow).Assembly)?.InformationalVersion ?? "0.7.2"}";
         ApplicationMenuBar.IsVisible = OperatingSystem.IsWindows();
         if (OperatingSystem.IsWindows())
         {
@@ -563,7 +563,7 @@ public partial class MainWindow : Window
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Export measured samples", SuggestedFileName = $"pngr-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+                Title = "Export measured samples", SuggestedFileName = $"Pngr-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
                 DefaultExtension = "csv", FileTypeChoices = [new FilePickerFileType("CSV") { Patterns = ["*.csv"] }]
             });
             if (file is null) return;

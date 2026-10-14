@@ -7,10 +7,12 @@
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>pngr</AssemblyName>
     <RootNamespace>TraceScope.App</RootNamespace>
-    <Product>pngr</Product>
-    <Title>pngr</Title>
-    <Description>pngr — Network diagnostics</Description>
-    <Version>0.7.1</Version>
+    <Product>Pngr</Product>
+    <Title>Pngr</Title>
+    <AssemblyTitle>Pngr</AssemblyTitle>
+    <Company>Pngr</Company>
+    <Description>Pngr — Network diagnostics</Description>
+    <Version>0.7.2</Version>
     <ApplicationIcon>Assets/Icons/pngr.ico</ApplicationIcon>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
   </PropertyGroup>

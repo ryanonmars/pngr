@@ -86,7 +86,7 @@ public partial class MainWindow
             while (_monitoringEvents.Count > 500) _monitoringEvents.RemoveAt(_monitoringEvents.Count - 1);
             StatusText.Text = item.Message;
             if (_configuration.DesktopNotifications)
-                _notifications?.Show(new Notification("pngr · " + item.Kind, item.Message,
+                _notifications?.Show(new Notification("Pngr · " + item.Kind, item.Message,
                     item.Kind == "Recovery" ? NotificationType.Success : NotificationType.Warning, TimeSpan.FromSeconds(8)));
             if (_selected?.Id == item.SessionId) RefreshEventMarkers();
         });
@@ -286,8 +286,8 @@ public partial class MainWindow
         {
             try
             {
-                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export pngr workspace",
-                    SuggestedFileName = "pngr.workspace.json", DefaultExtension = "json" });
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export Pngr workspace",
+                    SuggestedFileName = "Pngr.workspace.json", DefaultExtension = "json" });
                 if (file is null) return;
                 await using var stream = await file.OpenWriteAsync(); if (stream.CanSeek) stream.SetLength(0);
                 await JsonSerializer.SerializeAsync(stream, CaptureWorkspace(), WorkspaceStore.JsonOptions);
@@ -299,7 +299,7 @@ public partial class MainWindow
         {
             try
             {
-                var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import pngr workspace", AllowMultiple = false });
+                var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import Pngr workspace", AllowMultiple = false });
                 if (files.Count == 0) return;
                 await using var stream = await files[0].OpenReadAsync();
                 var workspace = await WorkspaceStore.ImportAsync(stream);
@@ -385,10 +385,10 @@ public partial class MainWindow
             if (events.SelectedItem is not MonitoringEvent selectedEvent) return;
             try
             {
-                if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in pngr")) return;
+                if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in Pngr")) return;
                 var index = _monitoringEvents.IndexOf(selectedEvent);
                 if (index >= 0) _monitoringEvents[index] = selectedEvent with
-                { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in pngr" };
+                { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in Pngr" };
             }
             catch (Exception ex) { StatusText.Text = "Acknowledgment failed: " + ex.Message; }
         };

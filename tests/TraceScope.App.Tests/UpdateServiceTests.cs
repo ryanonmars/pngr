@@ -1,6 +1,10 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Reflection;
+using Velopack;
+using Velopack.Logging;
+using Velopack.Sources;
 using TraceScope.App.Updates;
 using Xunit;
 
@@ -153,6 +157,57 @@ public sealed class UpdateServiceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new UpdateService(data.Path, new Version(0, 7, 1)).CheckAsync(true, cancellation.Token));
         Assert.Empty(Directory.GetFiles(data.Path));
     }
+    [Fact]
+    public async Task InterruptedPackageDownloadRemovesPartialFileAndLeavesInstallationUntouched()
+    {
+        using var data = new TempData();
+        using var cancellation = new CancellationTokenSource();
+        using var client = new HttpClient(new FakeHttp(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new StreamContent(new InterruptedStream(cancellation)) }));
+        var service = new UpdateService(data.Path, new Version(0, 7, 1), client);
+        var source = CreateDownloadSource(service);
+        var partial = Path.Combine(data.Path, "update.nupkg.partial");
+        var installed = Path.Combine(data.Path, "existing-application");
+        await File.WriteAllTextAsync(installed, "unchanged");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => source.DownloadReleaseEntry(new NullVelopackLogger(),
+            new VelopackAsset { FileName = "pngr-0.7.2-win-x64-full.nupkg", Size = 100 }, partial, _ => { }, cancellation.Token));
+        Assert.False(File.Exists(partial));
+        Assert.Equal("unchanged", await File.ReadAllTextAsync(installed));
+        Assert.Throws<InvalidOperationException>(() => service.PrepareInstall());
+    }
+
+    [Fact]
+    public async Task TruncatedPackageDownloadIsRejectedAndCanBeRetried()
+    {
+        using var data = new TempData();
+        using var client = new HttpClient(new FakeHttp(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new ByteArrayContent([1, 2, 3]) }));
+        var source = CreateDownloadSource(new UpdateService(data.Path, new Version(0, 7, 1), client));
+        var partial = Path.Combine(data.Path, "update.nupkg.partial");
+        await Assert.ThrowsAsync<InvalidDataException>(() => source.DownloadReleaseEntry(new NullVelopackLogger(),
+            new VelopackAsset { FileName = "pngr-0.7.2-win-x64-full.nupkg", Size = 5 }, partial, _ => { }));
+        Assert.False(File.Exists(partial));
+        await source.DownloadReleaseEntry(new NullVelopackLogger(),
+            new VelopackAsset { FileName = "pngr-0.7.2-win-x64-full.nupkg", Size = 3 }, partial, _ => { });
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(partial));
+    }
+
+    private static IUpdateSource CreateDownloadSource(UpdateService service)
+        => (IUpdateSource)typeof(UpdateService).GetNestedType("SecureReleaseSource", BindingFlags.NonPublic)!
+            .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single()
+            .Invoke([service, new Uri("https://github.com/ryanonmars/pngr/releases/download/v0.7.2/"), CancellationToken.None]);
+
+    private sealed class InterruptedStream(CancellationTokenSource cancellation) : MemoryStream([1, 2, 3, 4])
+    {
+        private bool _started;
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            if (_started) { cancellation.Cancel(); token.ThrowIfCancellationRequested(); }
+            _started = true;
+            return base.ReadAsync(buffer[..Math.Min(2, buffer.Length)], token);
+        }
+    }
+
     private sealed class FakeHttp(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         public int Calls { get; private set; }

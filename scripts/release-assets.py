@@ -41,7 +41,7 @@ def validate_feed(directory: Path, channel: str, version: str):
 
 
 def prepare(directory: Path, version: str):
-    for name in ('pngr-Setup.exe', 'pngr-macos-universal.dmg'):
+    for name in ('Pngr-Setup.exe', 'Pngr-macos-universal.dmg'):
         if not (directory / name).is_file():
             raise ValueError(f'Missing installer {name}.')
     for channel in ('win-x64', 'osx-universal'):

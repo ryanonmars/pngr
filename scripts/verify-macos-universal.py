@@ -38,6 +38,10 @@ def verify(bundle, version, check_dependencies=True, require_updater=False):
     assert plist["CFBundleExecutable"] == "pngr"
     assert plist["CFBundleShortVersionString"] == version.split("-")[0]
     assert plist["pngrReleaseVersion"] == version
+    if tuple(map(int, version.split("-")[0].split("."))) >= (0, 7, 2):
+        assert plist.get("CFBundleName") == "Pngr" and plist.get("CFBundleDisplayName") == "Pngr", "Installer display name must be Pngr"
+        assert plist.get("LSHasLocalizedDisplayName") is True, "Finder localized display name required"
+        assert 'CFBundleDisplayName = "Pngr";' in (contents / "Resources/en.lproj/InfoPlist.strings").read_text()
     assert architectures((contents / "MacOS/pngr").read_bytes()) == {ARM64, X64}, "Launcher must be Universal 2"
     assert not any((contents / "MacOS").rglob("*.dll")), "Managed assemblies must remain Resources, not MacOS code, to survive updater permission changes"
     assert (contents / "Resources/pngr.icns").is_file()

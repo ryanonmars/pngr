@@ -24,7 +24,7 @@ class InstallerAssetsTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
-        for name in ('pngr-Setup.exe', 'pngr-macos-universal.dmg'):
+        for name in ('Pngr-Setup.exe', 'Pngr-macos-universal.dmg'):
             (root / name).write_bytes(b'installer')
         for channel in ('win-x64', 'osx-universal'):
             package = root / f'pngr-0.7.1-{channel}-full.nupkg'
@@ -57,7 +57,7 @@ class InstallerAssetsTests(unittest.TestCase):
 
     def test_missing_installer_is_rejected(self):
         root = self.fixture()
-        (root / 'pngr-Setup.exe').unlink()
+        (root / 'Pngr-Setup.exe').unlink()
         with self.assertRaisesRegex(ValueError, 'Missing installer'):
             ASSETS.prepare(root, '0.7.1')
 
@@ -89,11 +89,11 @@ class InstallerAssetsTests(unittest.TestCase):
             'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
         output = root / 'installed-assets'
         output.mkdir()
-        (output / 'pngr-Setup.exe').write_bytes(b'previous-valid-installer')
+        (output / 'Pngr-Setup.exe').write_bytes(b'previous-valid-installer')
         with mock.patch.object(WINDOWS.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, ['vpk'])):
             with self.assertRaises(subprocess.CalledProcessError):
                 WINDOWS.package('0.7.1', publish, output, '/sdk/dotnet')
-        self.assertEqual(b'previous-valid-installer', (output / 'pngr-Setup.exe').read_bytes())
+        self.assertEqual(b'previous-valid-installer', (output / 'Pngr-Setup.exe').read_bytes())
         self.assertFalse(output.with_name(output.name + '.pending').exists())
 
     def test_installer_requires_matching_version_and_windows_runtime(self):

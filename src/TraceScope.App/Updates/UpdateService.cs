@@ -45,18 +45,18 @@ public sealed class UpdateService : IAppUpdateService
             try
             {
                 var manager = new VerifiedUpdateManager("https://github.com/ryanonmars/pngr/releases/latest/download", Channel);
-                if (!manager.IsInstalled) return "Install pngr using the new DMG or Windows installer before updating in the app.";
-                if (OperatingSystem.IsWindows() && manager.IsPortable) return "Install pngr using pngr-Setup.exe to enable updates.";
+                if (!manager.IsInstalled) return "Install Pngr using the DMG or Windows installer before updating in the app.";
+                if (OperatingSystem.IsWindows() && manager.IsPortable) return "Install Pngr using Pngr-Setup.exe to enable updates.";
                 if (OperatingSystem.IsMacOS())
                 {
                     var location = manager.InstallationRoot;
                     var userApps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Applications") + Path.DirectorySeparatorChar;
                     if (location is null || !(location.StartsWith("/Applications/", StringComparison.Ordinal) || location.StartsWith(userApps, StringComparison.Ordinal)))
-                        return "Move pngr.app into Applications before updating; apps on a disk image or in Downloads cannot be updated here.";
+                        return "Move Pngr into Applications before updating; apps on a disk image or in Downloads cannot be updated here.";
                     // No privilege escalation: the user must own a writable installation and its parent.
                     var parent = Directory.GetParent(location)?.FullName;
                     if (parent is null || !WritableDirectory(parent) || !WritableDirectory(location))
-                        return "This installation is not writable. Reinstall pngr in your own Applications folder to enable updates.";
+                        return "This installation is not writable. Reinstall Pngr in your own Applications folder to enable updates.";
                 }
                 return null;
             }

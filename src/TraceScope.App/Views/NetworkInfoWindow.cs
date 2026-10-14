@@ -23,7 +23,7 @@ public sealed class NetworkInfoWindow : Window
     public NetworkInfoWindow(Func<string, Task> traceTarget)
     {
         _traceTarget = traceTarget;
-        Title = "pngr · Local Network";
+        Title = "Pngr · Local Network";
         Width = 1000; Height = 590; MinWidth = 650; MinHeight = 400;
         Background = Brush.Parse("#191A1D"); Foreground = Brush.Parse("#D5D8DE");
         _refresh = new Button { Name = "NetworkRefresh", Content = "Refresh" };

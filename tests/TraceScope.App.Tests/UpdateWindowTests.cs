@@ -50,8 +50,8 @@ public sealed class UpdateWindowTests
     public void UnsupportedInstallationShowsExplanationAndNoInstallAction()
     {
         var window = new UpdateWindow((_, _, _) => throw new InvalidOperationException(), () => throw new InvalidOperationException());
-        window.Show(); window.ShowResult(new UpdateCheckResult(UpdateCheckStatus.Available, Release), "Move pngr to Applications.");
-        Assert.Contains("Move pngr", Find<TextBlock>(window, "UpdateStatus").Text);
+        window.Show(); window.ShowResult(new UpdateCheckResult(UpdateCheckStatus.Available, Release), "Move Pngr to Applications.");
+        Assert.Contains("Move Pngr", Find<TextBlock>(window, "UpdateStatus").Text);
         Assert.False(Find<Button>(window, "UpdateDownload").IsVisible);
         Assert.True(Find<Button>(window, "UpdateReleasePage").IsVisible);
         Click(window, "UpdateLater");
@@ -68,22 +68,19 @@ public sealed class UpdateWindowTests
         window.ShowChecking();
         Assert.False(Find<Button>(window, "UpdateInstall").IsVisible);
         window.ShowResult(new UpdateCheckResult(UpdateCheckStatus.Current), null);
-        Assert.Equal("pngr is up to date.", Find<TextBlock>(window, "UpdateStatus").Text);
+        Assert.Equal("Pngr is up to date.", Find<TextBlock>(window, "UpdateStatus").Text);
         Assert.False(Find<Button>(window, "UpdateDownload").IsVisible);
         window.Close();
     }
 
     [AvaloniaFact]
-    public void ManualCheckDoesNotApplyStagedSettings()
+    public void GeneralSettingsNoLongerContainsAnUpdateButton()
     {
-        var applied = 0; var tool = "";
         var window = new SettingsWindow(new WorkspaceConfiguration(), null, null,
-            [new ProbeSourceChoice("Automatic", null, null)], "test-data", _ => { applied++; return Task.CompletedTask; },
-            () => Task.FromResult(new NotificationResult(true, "test")), value => tool = value);
+            [new ProbeSourceChoice("Automatic", null, null)], "test-data", _ => Task.CompletedTask,
+            () => Task.FromResult(new NotificationResult(true, "test")), _ => { });
         window.Show();
-        Click(window, "SettingsCheckUpdates");
-        Assert.Equal("updates", tool); Assert.Equal(0, applied);
-        Assert.True(window.IsVisible);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Name == "SettingsCheckUpdates");
         window.Close();
     }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package an existing self-contained Windows publish using the pinned Velopack tool."""
+"""Package Windows updates with Velopack and a conventional per-user NSIS wizard."""
 import argparse
 import json
 import os
@@ -9,6 +9,34 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def nsis_compiler():
+    configured = os.environ.get('PNGR_MAKENSIS')
+    candidates = [configured, shutil.which('makensis')]
+    if os.name == 'nt':
+        for variable in ('ProgramFiles(x86)', 'ProgramFiles'):
+            base = os.environ.get(variable)
+            if base:
+                candidates.append(str(Path(base) / 'NSIS/makensis.exe'))
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return candidate
+    raise ValueError('NSIS is required: brew install makensis (macOS) or choco install nsis (Windows).')
+
+
+def build_wizard(version: str, payload: Path, destination: Path):
+    compiler = nsis_compiler()
+    # NSIS uses /D on Windows, -D on Unix. Paths are passed as argument values,
+    # never shell-interpolated; spaces in checkout/build directories are safe.
+    prefix = '/' if os.name == 'nt' else '-'
+    subprocess.run([compiler, f'{prefix}DVERSION={version}',
+                    f'{prefix}DNUMERIC_VERSION={version.split("-", 1)[0]}.0',
+                    f'{prefix}DPAYLOAD={payload}', f'{prefix}DOUTPUT={destination}',
+                    f'{prefix}DICON={ROOT / "src/TraceScope.App/Assets/Icons/pngr.ico"}',
+                    str(ROOT / 'scripts/windows/installer.nsi')], check=True)
+    if not destination.is_file() or destination.stat().st_size < 1024:
+        raise ValueError('NSIS did not generate the expected installation wizard.')
 
 
 def package(version: str, publish: Path, output: Path, dotnet: str):
@@ -28,7 +56,7 @@ def package(version: str, publish: Path, output: Path, dotnet: str):
     try:
         subprocess.run([dotnet, 'tool', 'restore'], cwd=ROOT, env=environment, check=True)
         subprocess.run([dotnet, 'tool', 'run', 'vpk', '--', '[win]', 'pack',
-                        '--packId', 'pngr', '--packTitle', 'pngr',
+                        '--packId', 'pngr', '--packTitle', 'Pngr',
                         '--packVersion', version, '--packDir', str(publish),
                         '--mainExe', 'pngr.exe', '--runtime', 'win-x64',
                         '--channel', 'win-x64', '--delta', 'None',
@@ -39,7 +67,11 @@ def package(version: str, publish: Path, output: Path, dotnet: str):
         setup = list(temporary.glob('*Setup.exe'))
         if len(setup) != 1 or not (temporary / 'releases.win-x64.json').is_file():
             raise ValueError('Velopack did not generate the expected installer/feed.')
-        setup[0].rename(temporary / 'pngr-Setup.exe')
+        payload = temporary / 'VelopackSetup.exe'
+        setup[0].rename(payload)
+        build_wizard(version, payload, temporary / 'Pngr-Setup.exe')
+        # The embedded one-click setup is not an additional public download.
+        payload.unlink()
         # Portable ZIP is retained by the old internal packaging flow, not a public release asset.
         for portable in temporary.glob('*Portable.zip'):
             portable.unlink()

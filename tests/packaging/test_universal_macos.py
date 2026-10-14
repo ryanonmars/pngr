@@ -68,6 +68,16 @@ class UniversalPackageTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             VERIFIER.verify(self.bundle(), "0.7.2", False)
 
+    def test_072_requires_pngr_display_name_with_legacy_identity(self):
+        bundle = self.bundle()
+        path = bundle / "Contents/Info.plist"
+        metadata = plistlib.loads(path.read_bytes())
+        metadata["CFBundleShortVersionString"] = "0.7.2"
+        metadata["pngrReleaseVersion"] = "0.7.2"
+        path.write_bytes(plistlib.dumps(metadata))
+        with self.assertRaisesRegex(AssertionError, "display name must be Pngr"):
+            VERIFIER.verify(bundle, "0.7.2", False)
+
     def test_history_is_never_packaged(self):
         bundle = self.bundle()
         (bundle / "Contents/Resources/tracescope.db").write_bytes(b"user data")

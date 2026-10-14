@@ -38,10 +38,10 @@ public sealed class RebrandingTests
         try
         {
             await (Task)typeof(MainWindow).GetMethod("InitializeProfessionalOnOpenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, null)!;
-            Assert.Equal("pngr — Network diagnostics", window.Title);
+            Assert.Equal("Pngr — Network diagnostics", window.Title);
             Assert.Equal("pngr", typeof(MainWindow).Assembly.GetName().Name);
-            Assert.Equal("pngr", typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyProductAttribute>()!.Product);
-            Assert.Equal("pngr", typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyTitleAttribute>()!.Title);
+            Assert.Equal("Pngr", typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyProductAttribute>()!.Product);
+            Assert.Equal("Pngr", typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyTitleAttribute>()!.Title);
             var engine = (TraceEngine)typeof(MainWindow).GetField("_engine", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
             Assert.Equal(database, engine.Storage.DatabasePath);
             Assert.Equal(before, await engine.Storage.LoadSamplesAsync(sessionId));

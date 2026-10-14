@@ -27,7 +27,7 @@ public sealed class UpdateWindow : Window
     public UpdateWindow(Func<UpdateRelease, IProgress<int>, CancellationToken, Task> fetch, Action restart)
     {
         _fetch = fetch; _restart = restart;
-        Title = "pngr — Updates"; Width = 580; Height = 440; MinWidth = 420; MinHeight = 300;
+        Title = "Pngr — Updates"; Width = 580; Height = 440; MinWidth = 420; MinHeight = 300;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             Spacing = 8, Children = { _releasePage, _later, _download, _install } };
@@ -62,10 +62,10 @@ public sealed class UpdateWindow : Window
         _release = result.Release;
         _status.Text = result.Message ?? (result.Status switch
         {
-            UpdateCheckStatus.Available => $"pngr {result.Release?.Version} is available",
-            UpdateCheckStatus.Current => "pngr is up to date.",
+            UpdateCheckStatus.Available => $"Pngr {result.Release?.Version} is available",
+            UpdateCheckStatus.Current => "Pngr is up to date.",
             UpdateCheckStatus.Failed => "Could not check for updates. Please try again later.",
-            _ => "Automatic updates were checked recently. Use Settings to check again."
+            _ => "Automatic updates were checked recently. Use the application menu to check again."
         });
         _notes.Text = result.Release?.Notes ?? "";
         _releasePage.IsVisible = result.Release is not null;
@@ -90,7 +90,7 @@ public sealed class UpdateWindow : Window
             var progress = new Progress<int>(value => Dispatcher.UIThread.Post(() => _progress.Value = value));
             await _fetch(_release, progress, _cancellation.Token);
             if (_cancellation.IsCancellationRequested) return;
-            _status.Text = "Update verified. Install and Restart will stop monitoring, save your workspace, and restart pngr.";
+            _status.Text = "Update verified. Install and Restart will stop monitoring, save your workspace, and restart Pngr.";
             _download.IsVisible = false; _install.IsVisible = true;
         }
         catch (OperationCanceledException) { _status.Text = "Download cancelled. Your installed application is unchanged."; }

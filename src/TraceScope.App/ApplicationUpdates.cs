@@ -6,7 +6,7 @@ namespace TraceScope.App;
 
 public partial class MainWindow
 {
-    private UpdateService? _updates;
+    private IAppUpdateService? _updates;
     private UpdateWindow? _updateWindow;
     private UpdateRelease? _availableUpdate;
     private bool _checkingUpdate;
@@ -34,7 +34,7 @@ public partial class MainWindow
             if (result.Status == UpdateCheckStatus.Available && result.Release is { } release)
             {
                 _availableUpdate = release;
-                UpdateNoticeText.Text = $"pngr {release.Version} is available";
+                UpdateNoticeText.Text = $"Pngr {release.Version} is available";
                 UpdateNotice.IsVisible = !manual;
             }
         }
@@ -65,7 +65,7 @@ public partial class MainWindow
         UpdateNotice.IsVisible = false;
         OpenUpdateWindow();
         _updateWindow!.ShowResult(new UpdateCheckResult(UpdateCheckStatus.Available, _availableUpdate,
-            $"pngr {_availableUpdate.Version} is available"), _updates.InstallationSupport);
+            $"Pngr {_availableUpdate.Version} is available"), _updates.InstallationSupport);
     }
 
     private void DismissUpdateNotice(object? sender, RoutedEventArgs e) => UpdateNotice.IsVisible = false;

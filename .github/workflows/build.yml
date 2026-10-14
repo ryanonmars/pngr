@@ -6,7 +6,7 @@ on:
       version:
         description: Semantic version embedded in the application and packages
         required: false
-        default: '0.7.1'
+        default: '0.7.2'
         type: string
 
 permissions:
@@ -59,6 +59,16 @@ jobs:
           PNGR_VERSION: ${{ inputs.version }}
           PNGR_RUNTIME: ${{ matrix.runtime }}
         run: python scripts/verify-package.py "artifacts/pngr-$PNGR_RUNTIME.zip" "$PNGR_RUNTIME" "$PNGR_VERSION"
+      - name: Prepare Windows wizard compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $compilerDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+          if (-not (Test-Path (Join-Path $compilerDir 'makensis.exe'))) {
+            choco install nsis --version=3.12.0 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          }
+          $compilerDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Package Windows installer and update feed
         if: runner.os == 'Windows'
         shell: pwsh
@@ -73,6 +83,23 @@ jobs:
           path: artifacts/installers/win-x64/*
           if-no-files-found: error
           compression-level: 0
+          retention-days: 7
+      - name: Verify Windows installation and v0.7.1 update compatibility
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+        run: |
+          $package = Get-ChildItem artifacts/installers/win-x64/*-full.nupkg | Select-Object -First 1
+          python scripts/windows/verify-install-update.py artifacts/installers/win-x64/Pngr-Setup.exe $package.FullName $env:PNGR_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer/update verification failed' }
+      - name: Upload Windows installation verification
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-installation-verification
+          path: artifacts/screenshots/windows-installation/*
+          if-no-files-found: warn
           retention-days: 7
       - name: Upload package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

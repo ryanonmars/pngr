@@ -1,7 +1,7 @@
 # Native Windows packaging for local builds and GitHub Actions.
 param(
     [ValidateSet('win-x64')][string]$Runtime = 'win-x64',
-    [string]$Version = '0.7.1'
+    [string]$Version = '0.7.2'
 )
 $ErrorActionPreference = 'Stop'
 $Version = $Version -replace '^v', ''

@@ -45,7 +45,7 @@ public sealed record WorkspaceConfiguration
 
     public void Validate()
     {
-        if (Version != 1) throw new InvalidDataException("Unsupported pngr configuration version.");
+        if (Version != 1) throw new InvalidDataException("Unsupported Pngr configuration version.");
         if (RetentionDays is < 1 or > 3650) throw new InvalidDataException("Retention must be between 1 and 3650 days.");
         if (AggregationSeconds is < 1 or > 3600) throw new InvalidDataException("Aggregation must be between 1 and 3600 seconds.");
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");

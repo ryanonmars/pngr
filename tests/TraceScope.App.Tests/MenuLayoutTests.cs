@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using TraceScope.App.Views;
+using TraceScope.App.Updates;
 using TraceScope.Core;
 using Xunit;
 
@@ -18,7 +19,7 @@ public sealed class MenuLayoutTests
         await using var fixture = new Fixture();
         var menu = MenuTestSupport.WindowsMenu(fixture.Window);
         Assert.Equal(new[] { "File", "Window", "Tools" }, menu.Items.OfType<NativeMenuItem>().Select(i => i.Header));
-        Assert.Equal(new[] { "Open History…", "Export CSV…", "Workspace…" }, Headers(menu, "File"));
+        Assert.Equal(new[] { "Open History…", "Export CSV…", "Workspace…", "Check for Updates…" }, Headers(menu, "File"));
         Assert.Equal(new[] { "All Targets", "Summary" }, Headers(menu, "Window"));
         Assert.Equal(new[] { "Settings…", "Alerts…", "Network…", "Local Web / API…", "Profiles" }, Headers(menu, "Tools"));
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Control), MenuTestSupport.Item(fixture.Window, "Settings…").Gesture);
@@ -38,6 +39,9 @@ public sealed class MenuLayoutTests
         var menu = (NativeMenu)typeof(App).GetMethod("CreateWindowMenuForPlatform", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(Application.Current, [false, null])!;
         Assert.DoesNotContain("Settings…", Headers(menu, "Tools"));
+        Assert.DoesNotContain("Check for Updates…", Headers(menu, "File"));
+        Assert.Contains(NativeMenu.GetMenu(Application.Current!)!.Items.OfType<NativeMenuItem>(), item => item.Header == "Check for Updates…");
+        Assert.Equal("Pngr", Application.Current!.Name);
         Assert.Contains(NativeMenu.GetMenu(Application.Current!)!.Items.OfType<NativeMenuItem>(), item => item.Header == "Settings…");
     }
 
@@ -48,10 +52,10 @@ public sealed class MenuLayoutTests
         MenuTestSupport.WindowsMenu(fixture.Window);
         foreach (var (header, title) in new[]
         {
-            ("Settings…", "pngr Settings"), ("Open History…", "Saved trace sessions"),
-            ("Summary", "pngr · Professional Summaries"),
+            ("Settings…", "Pngr Settings"), ("Open History…", "Saved trace sessions"),
+            ("Summary", "Pngr · Professional Summaries"),
             ("Alerts…", "Alert rules and events"), ("Workspace…", "Workspaces and data"),
-            ("Network…", "pngr · Local Network"), ("Local Web / API…", "Local read-only web interface")
+            ("Network…", "Pngr · Local Network"), ("Local Web / API…", "Local read-only web interface")
         })
         {
             MenuTestSupport.Click(fixture.Window, header);
@@ -68,6 +72,39 @@ public sealed class MenuLayoutTests
         var configuration = (WorkspaceConfiguration)typeof(MainWindow).GetField("_configuration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fixture.Window)!;
         Assert.False(configuration.WebEnabled);
         Assert.Empty(fixture.Engine.Sessions);
+    }
+
+    [AvaloniaFact]
+    public async Task UpdateMenuChecksWithoutApplyingSettingsOrStartingMonitoring()
+    {
+        await using var fixture = new Fixture();
+        var updater = new TestUpdater();
+        typeof(MainWindow).GetField("_updates", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(fixture.Window, updater);
+        MenuTestSupport.WindowsMenu(fixture.Window);
+        MenuTestSupport.Click(fixture.Window, "Settings…");
+        var settings = fixture.Window.OwnedWindows.OfType<SettingsWindow>().Single();
+        settings.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Name == "SettingsRestore").IsChecked = false;
+        MenuTestSupport.Click(fixture.Window, "Check for Updates…");
+        Assert.Equal(1, updater.ManualChecks);
+        Assert.IsType<UpdateWindow>(fixture.Window.OwnedWindows.Single(w => w is UpdateWindow));
+        var configuration = (WorkspaceConfiguration)typeof(MainWindow).GetField("_configuration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fixture.Window)!;
+        Assert.True(configuration.RestoreOnStartup);
+        Assert.Empty(fixture.Engine.Sessions);
+        foreach (var dialog in fixture.Window.OwnedWindows.ToArray()) dialog.Close();
+    }
+
+    private sealed class TestUpdater : IAppUpdateService
+    {
+        public int ManualChecks { get; private set; }
+        public string? InstallationSupport => null;
+        public Task<UpdateCheckResult> CheckAsync(bool manual, CancellationToken cancellationToken = default)
+        {
+            if (manual) ManualChecks++;
+            return Task.FromResult(new UpdateCheckResult(UpdateCheckStatus.Current));
+        }
+        public Task DownloadAsync(UpdateRelease release, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Checking must not download");
+        public void PrepareInstall() => throw new InvalidOperationException("Checking must not install");
     }
 
     private static IEnumerable<string?> Headers(NativeMenu menu, string parent)

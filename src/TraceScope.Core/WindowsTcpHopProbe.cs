@@ -17,7 +17,7 @@ internal static class WindowsTcpHopProbe
     private static readonly TimeSpan PortQuarantine = TimeSpan.FromMinutes(2);
 
     internal static string CapabilityFailure(SocketError error) => error == SocketError.AccessDenied
-        ? "Windows TCP hop discovery requires raw ICMP reception. Run pngr explicitly as administrator to enable it; TCP endpoint monitoring remains available. No driver or service is installed."
+        ? "Windows TCP hop discovery requires raw ICMP reception. Run Pngr explicitly as administrator to enable it; TCP endpoint monitoring remains available. No driver or service is installed."
         : $"Windows TCP hop discovery is unavailable ({error}); TCP endpoint monitoring remains available.";
 
     public static async Task<ProbeResult> ProbeAsync(IPAddress destination, int ttl,

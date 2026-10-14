@@ -8,7 +8,7 @@ on:
       version:
         description: Build-only validation version (does not create a release)
         required: true
-        default: 'v0.7.1'
+        default: 'v0.7.2'
         type: string
 
 permissions:
@@ -41,8 +41,8 @@ jobs:
           PNGR_TAG: ${{ github.ref_name }}
         run: |
           set -eu
-          test -f release-assets/pngr-macos-universal.dmg
-          test -f release-assets/pngr-Setup.exe
+          test -f release-assets/Pngr-macos-universal.dmg
+          test -f release-assets/Pngr-Setup.exe
           test -f release-assets/SHA256SUMS
           (cd release-assets && sha256sum --check SHA256SUMS)
           test "$PNGR_TAG" != v0.7.0 # Existing release is immutable.
@@ -53,4 +53,4 @@ jobs:
           version=${PNGR_TAG#v}
           if [[ "$version" == *-* ]]; then prerelease=--prerelease; else prerelease=; fi
           gh release create "$PNGR_TAG" release-assets/* \
-            --verify-tag --title "pngr $version" --generate-notes $prerelease
+            --verify-tag --title "Pngr $version" --generate-notes $prerelease

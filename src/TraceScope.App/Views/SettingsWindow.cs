@@ -45,7 +45,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox _resolve = Toggle("SettingsResolveHostnames", "Resolve router hostnames");
     private readonly CheckBox _useDefaults = Toggle("SettingsUseDefaults", "Use saved defaults for every new target");
     private readonly CheckBox _restore = Toggle("SettingsRestore", "Restore monitored targets and paused states at startup");
-    private readonly CheckBox _toasts = Toggle("SettingsInAppNotifications", "Show alerts inside pngr");
+    private readonly CheckBox _toasts = Toggle("SettingsInAppNotifications", "Show alerts inside Pngr");
     private readonly CheckBox _native = Toggle("SettingsNativeNotifications", "Enable native desktop notifications");
     private readonly CheckBox _recoveries = Toggle("SettingsIncludeRecovery", "Notify when a connection recovers");
     private readonly NumericUpDown _spacing = Number("SettingsNotificationSpacing", 0, 86400);
@@ -86,7 +86,7 @@ public sealed class SettingsWindow : Window
         _initialSelected = selectedOptions;
         _profileDraft = configuration.Profiles.ToList();
         _apply = apply; _permission = permission; _openTool = openTool;
-        Title = "pngr Settings"; Width = 830; Height = 650; MinWidth = 760; MinHeight = 580;
+        Title = "Pngr Settings"; Width = 830; Height = 650; MinWidth = 760; MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         _source.ItemsSource = sources.ToList();
         _scope.ItemsSource = selectedOptions is null ? new[] { "Defaults for new targets" }
@@ -109,13 +109,9 @@ public sealed class SettingsWindow : Window
         _web.IsChecked = configuration.WebEnabled; _webPort.Value = configuration.WebPort;
         LoadProbe(_defaults); ReloadProfiles();
 
-        var checkUpdates = new Button { Name = "SettingsCheckUpdates", Content = "Check for Updates…" };
-        // Checking updates must not apply unrelated staged Settings edits.
-        checkUpdates.Click += (_, _) => _openTool("updates");
 
         _pages["General"] = Page("General", "Preferences are saved locally with your workspace.", _restore,
-            checkUpdates,
-            Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing pngr stops them."),
+            Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing Pngr stops them."),
             ToolButton("Apply & manage workspaces…", "workspace"),
             Heading("Local files"), Note(dataDirectory), Note("Settings: workspace.json   ·   Measurements: tracescope.db"));
         _pages["Monitoring"] = Page("Monitoring engine", "Edit defaults or the selected target. Existing targets keep their own settings.",
@@ -155,7 +151,7 @@ public sealed class SettingsWindow : Window
             Note("Email, webhooks and executable actions stay disabled until explicitly configured in the action editor."));
         _pages["Local web / API"] = Page("Local web interface and API", "Optional access from a browser on this computer. Disabled by default.",
             _web, Row("Local port", _webPort), Note("Address: http://127.0.0.1:<port>   ·   Read-only REST endpoints: /api/targets, /api/history/<session-id>"),
-            Note("Apply starts or stops the listener immediately. No separate server is installed. The listener closes completely when pngr exits."),
+            Note("Apply starts or stops the listener immediately. No separate server is installed. The listener closes completely when Pngr exits."),
             ToolButton("Apply & open local dashboard controls…", "web"));
         var nav = new ListBox { Name = "SettingsNavigation", ItemsSource = _pages.Keys.ToArray(), SelectedIndex = 0, Background = Brushes.Transparent };
         _navigation = nav;

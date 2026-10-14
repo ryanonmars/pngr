@@ -31,7 +31,9 @@ public partial class App : Application
     internal NativeMenu CreateWindowMenuForPlatform(bool windows, Action<string>? execute = null)
     {
         var menu = new NativeMenu();
-        AddSubmenu("File", "Open History…", "Export CSV…", "Workspace…");
+        AddSubmenu("File", windows
+            ? ["Open History…", "Export CSV…", "Workspace…", "Check for Updates…"]
+            : ["Open History…", "Export CSV…", "Workspace…"]);
         AddSubmenu("Window", "All Targets", "Summary");
         AddSubmenu("Tools", windows
             ? ["Settings…", "Alerts…", "Network…", "Local Web / API…"]

@@ -106,7 +106,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         => _notifier.RequestPermissionAsync(cancellationToken);
     public Task<NotificationResult> SendTestNotificationAsync(CancellationToken cancellationToken = default)
         => Volatile.Read(ref _configuration).NativeNotificationsEnabled
-            ? _notifier.SendAsync("pngr — notification test", "Native desktop notifications are enabled.", cancellationToken)
+            ? _notifier.SendAsync("Pngr — notification test", "Native desktop notifications are enabled.", cancellationToken)
             : Task.FromResult(new NotificationResult(false, "Enable native notifications before sending a test."));
     public bool Enqueue(MonitoringEvent monitoringEvent) => TryEnqueue(monitoringEvent);
     public bool TryEnqueue(MonitoringEvent monitoringEvent)
@@ -133,7 +133,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
                 {
                     _lastNotification = now;
                     await ExecuteAsync(e, "Native notification", config.ActionTimeoutSeconds,
-                        async ct => { var result = await _notifier.SendAsync(e.Kind == "Recovery" ? "pngr — recovered" : "pngr — network alert", e.Message, ct);
+                        async ct => { var result = await _notifier.SendAsync(e.Kind == "Recovery" ? "Pngr — recovered" : "Pngr — network alert", e.Message, ct);
                             if (!result.Success) throw new IOException(result.Message); });
                 }
                 if (!ReferenceEquals(config, Volatile.Read(ref _configuration))) continue;
@@ -175,7 +175,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
     {
         using var client = new SmtpClient(config.Host, config.Port) { EnableSsl = config.UseTls, UseDefaultCredentials = false };
         if (!string.IsNullOrEmpty(config.Username)) client.Credentials = new NetworkCredential(config.Username, Secret(config.PasswordEnvironmentVariable));
-        using var message = new MailMessage(config.From, config.To) { Subject = $"pngr — {e.Kind}", Body = $"{e.Timestamp:O}\n{e.Message}\nSession: {e.SessionId}" };
+        using var message = new MailMessage(config.From, config.To) { Subject = $"Pngr — {e.Kind}", Body = $"{e.Timestamp:O}\n{e.Message}\nSession: {e.SessionId}" };
         await client.SendMailAsync(message, ct);
     }
     private static async Task RunScriptAsync(MonitoringEvent e, ScriptAlertConfiguration config, CancellationToken ct)
