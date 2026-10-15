@@ -12,7 +12,7 @@
     <AssemblyTitle>Pngr</AssemblyTitle>
     <Company>Pngr</Company>
     <Description>Pngr — Network diagnostics</Description>
-    <Version>0.7.5</Version>
+    <Version>0.7.6</Version>
     <ApplicationIcon>Assets/Icons/pngr.ico</ApplicationIcon>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
   </PropertyGroup>

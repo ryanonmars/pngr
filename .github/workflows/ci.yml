@@ -14,7 +14,7 @@ on:
       package_version:
         description: Internal validation package version (no tag or release)
         required: false
-        default: '0.7.5-compliance.1'
+        default: '0.7.6-compliance.1'
         type: string
 
 permissions:
@@ -29,4 +29,4 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       package: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_packages }}
-      version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '0.7.5' }}
+      version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '0.7.6' }}

@@ -6,7 +6,7 @@ on:
       version:
         description: Semantic version embedded in the application and packages
         required: false
-        default: '0.7.5'
+        default: '0.7.6'
         type: string
       package:
         description: Build release packages (version-tag release workflow only)
