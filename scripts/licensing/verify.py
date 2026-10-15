@@ -30,6 +30,8 @@ def validate_bytes(notices: bytes, inventory: bytes, deps: dict | None = None):
 
 def validate_directory(path: Path, rid: str | None = None):
     path = Path(path)
+    if (path / 'LICENSE').read_bytes() != (Path(__file__).resolve().parents[2] / 'LICENSE').read_bytes():
+        raise ValueError('Missing or changed Pngr MIT license')
     deps_path = path / 'pngr.deps.json'
     result = validate_bytes((path / 'THIRD-PARTY-NOTICES.txt').read_bytes(),
                             (path / 'third-party-inventory.json').read_bytes(),

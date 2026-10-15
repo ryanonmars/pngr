@@ -1,5 +1,6 @@
 import copy
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,15 @@ class DistributionNoticesTests(unittest.TestCase):
     def deps(self, rid='osx-arm64'):
         desktop, _ = generate.load_inventory()
         return {'libraries': {key: {'type': 'package'} for key in desktop['reviewedDistributionProfiles'][rid]}}
+
+    def test_all_authoritative_notice_inputs_are_tracked(self):
+        tracked = set(subprocess.check_output(
+            ['git', 'ls-files', '-z'], cwd=generate.ROOT).decode().split('\0'))
+        desktop, rust = generate.load_inventory()
+        packages = desktop['packages'] + desktop.get('additionalComponents', []) + rust['packages']
+        for package in packages:
+            for notice in package['notices']:
+                self.assertIn(notice['path'], tracked, "License input would be missing from a clean checkout")
 
     def test_every_reviewed_rid_round_trips_offline(self):
         for rid in generate.RIDS:

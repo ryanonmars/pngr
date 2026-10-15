@@ -48,7 +48,7 @@ else
     mkdir -p "$bundle/Contents/Resources"
     rsync -a --delete "$publish_dir/" "$bundle/Contents/MacOS/"
     # Notices belong to bundle resources, alongside a per-runtime inventory.
-    for material in THIRD-PARTY-NOTICES.txt third-party-inventory.json; do
+    for material in LICENSE THIRD-PARTY-NOTICES.txt third-party-inventory.json; do
         mv "$bundle/Contents/MacOS/$material" "$bundle/Contents/Resources/$material"
     done
     cp src/TraceScope.App/Platforms/macOS/Info.plist "$bundle/Contents/Info.plist"

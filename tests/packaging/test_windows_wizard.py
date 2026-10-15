@@ -71,6 +71,7 @@ class WindowsWizardTests(unittest.TestCase):
                 'libraries': {'pngr/0.7.2': {}},
                 'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
             notices, inventory, libraries = materials('win-x64')
+            (publish / 'LICENSE').write_bytes((ROOT / 'LICENSE').read_bytes())
             (publish / 'THIRD-PARTY-NOTICES.txt').write_bytes(notices)
             (publish / 'third-party-inventory.json').write_bytes(inventory)
             (publish / 'pngr.deps.json').write_text(json.dumps({

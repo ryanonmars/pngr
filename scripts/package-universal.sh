@@ -27,6 +27,7 @@ for rid in osx-arm64 osx-x64; do
     ditto -x -k "$archive_directory/pngr-$rid.zip" "$stage/$rid"
     mv "$stage/$rid/pngr.app/Contents/MacOS" "$bundle/Contents/Resources/runtimes/$rid"
     # Preserve each architecture's exact dependency inventory through relocation.
+    cp "$stage/$rid/pngr.app/Contents/Resources/LICENSE" "$bundle/Contents/Resources/runtimes/$rid/"
     cp "$stage/$rid/pngr.app/Contents/Resources/third-party-inventory.json" "$bundle/Contents/Resources/runtimes/$rid/"
     cp "$stage/$rid/pngr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt" "$bundle/Contents/Resources/runtimes/$rid/"
     # The apphost carried its original bundle's Info.plist signature slot.
@@ -73,6 +74,7 @@ codesign --verify --deep --strict "$bundle"
 mkdir "$stage/image"
 mv "$bundle" "$stage/image/pngr.app"
 cp compliance/THIRD-PARTY-NOTICES.txt "$stage/image/THIRD-PARTY-NOTICES.txt"
+cp LICENSE "$stage/image/LICENSE"
 ln -s /Applications "$stage/image/Applications"
 # Finder presentation is generated on the mounted image so its background alias
 # references the image volume, not a temporary build directory.
@@ -97,6 +99,7 @@ hdiutil attach -quiet -nobrowse -mountpoint "$stage/mounted" "$stage/Pngr-macos-
 mounted_volume="$stage/mounted"
 "$layout_python" scripts/macos/configure-dmg.py "$mounted_volume" --verify
 cmp compliance/THIRD-PARTY-NOTICES.txt "$mounted_volume/THIRD-PARTY-NOTICES.txt"
+cmp LICENSE "$mounted_volume/LICENSE"
 python3 scripts/verify-macos-universal.py "$mounted_volume/pngr.app" "$version" --require-updater
 hdiutil detach -quiet "$mounted_volume"
 mounted_volume=

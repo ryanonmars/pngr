@@ -122,9 +122,11 @@ if (process.argv.includes('--refresh')) {
     for (const path of observed) if (!covered.has(path)) throw new Error(`Unreviewed emitted browser dependency: ${path}`);
   }
   await mkdir('public', { recursive: true });
+  await copyFile('compliance/PROJECT-LICENSE.txt', 'public/LICENSE');
   await copyFile(noticesPath, 'public/THIRD-PARTY-NOTICES.txt');
   await copyFile('compliance/dependency-inventory.json', 'public/dependency-inventory.json');
   if (process.argv.includes('--browser')) {
+    await copyFile('compliance/PROJECT-LICENSE.txt', 'out/LICENSE');
     await copyFile(noticesPath, 'out/THIRD-PARTY-NOTICES.txt');
     await copyFile('compliance/dependency-inventory.json', 'out/dependency-inventory.json');
   }

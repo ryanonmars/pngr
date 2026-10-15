@@ -39,6 +39,12 @@ class DistributionNoticeTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'Missing third-party'):
                         PORTABLE.ReleaseArchiveTests.verify(self, path, rid)
 
+    def test_portable_distribution_requires_project_mit_license(self):
+        path = PORTABLE.ReleaseArchiveTests.create_archive(self, 'win-x64')
+        rewrite_without(path, 'LICENSE')
+        with self.assertRaises(ValueError):
+            PORTABLE.ReleaseArchiveTests.verify(self, path, 'win-x64')
+
     def test_update_packages_reject_stripped_notice_after_feed_integrity_is_updated(self):
         for channel in ('win-x64', 'osx-universal'):
             with self.subTest(channel=channel):

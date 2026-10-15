@@ -88,6 +88,7 @@ def generate(publish_dir, rid):
     packages = select_packages(deps, rid)
     notices = render(packages)
     inventory = {'schemaVersion': 1, 'rid': rid, 'noticesSha256': hashlib.sha256(notices).hexdigest(), 'packages': packages}
+    (publish_dir / 'LICENSE').write_bytes((ROOT / 'LICENSE').read_bytes())
     (publish_dir / 'THIRD-PARTY-NOTICES.txt').write_bytes(notices)
     (publish_dir / 'third-party-inventory.json').write_text(json.dumps(inventory, indent=2) + '\n')
     return inventory

@@ -38,6 +38,7 @@ class UniversalPackageTests(unittest.TestCase):
         (contents / "MacOS/pngr").write_bytes(fat())
         (contents / "Resources/pngr.icns").write_bytes(b"icon")
         (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "dev.tracescope.desktop", "CFBundleExecutable": "pngr", "CFBundleShortVersionString": "0.7.1", "pngrReleaseVersion": "0.7.1"}))
+        (contents / "Resources/LICENSE").write_bytes((SCRIPT.parents[1] / "LICENSE").read_bytes())
         (contents / "Resources/THIRD-PARTY-NOTICES.txt").write_bytes((SCRIPT.parents[1] / "compliance/THIRD-PARTY-NOTICES.txt").read_bytes())
         for rid, cpu in (("osx-arm64", VERIFIER.ARM64), ("osx-x64", VERIFIER.X64)):
             payload = contents / "Resources" / "runtimes" / rid
@@ -45,6 +46,7 @@ class UniversalPackageTests(unittest.TestCase):
             for name in ("pngr", "libhostfxr.dylib", "libcoreclr.dylib", "libAvaloniaNative.dylib", "libSkiaSharp.dylib", "libe_sqlite3.dylib", "tracescope-tcp-hop", "libTraceScopeNotifications.dylib"):
                 (payload / name).write_bytes(thin(cpu))
             notices, inventory, libraries = materials(rid)
+            (payload / "LICENSE").write_bytes((SCRIPT.parents[1] / "LICENSE").read_bytes())
             (payload / "THIRD-PARTY-NOTICES.txt").write_bytes(notices)
             (payload / "third-party-inventory.json").write_bytes(inventory)
             (payload / "pngr.dll").write_bytes(b"MZ managed image")

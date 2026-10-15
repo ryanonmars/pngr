@@ -39,6 +39,7 @@ class ReleaseArchiveTests(unittest.TestCase):
                 "__MACOSX/pngr.app/._Contents": b"resource metadata",
             })
         material_prefix = "pngr.app/Contents/Resources/" if mac else ""
+        files[material_prefix + "LICENSE"] = (SCRIPT.parents[1] / "LICENSE").read_bytes()
         files[material_prefix + "THIRD-PARTY-NOTICES.txt"] = notices
         files[material_prefix + "third-party-inventory.json"] = inventory
         files.update(extra or {})

@@ -32,11 +32,13 @@ class InstallerAssetsTests(unittest.TestCase):
             with zipfile.ZipFile(package, 'w') as archive:
                 archive.writestr('lib/app/pngr.dll', b'application')
                 if channel == 'osx-universal':
+                    archive.writestr('lib/app/Contents/Resources/LICENSE', (ROOT / 'LICENSE').read_bytes())
                     archive.writestr('lib/app/Contents/Resources/THIRD-PARTY-NOTICES.txt',
                                      (ROOT / 'compliance/THIRD-PARTY-NOTICES.txt').read_bytes())
                 for rid in (('osx-arm64', 'osx-x64') if channel == 'osx-universal' else ('win-x64',)):
                     notices, inventory, libraries = materials(rid)
                     prefix = 'lib/app/' if channel == 'win-x64' else 'lib/app/Contents/Resources/runtimes/' + rid + '/'
+                    archive.writestr(prefix + 'LICENSE', (ROOT / 'LICENSE').read_bytes())
                     archive.writestr(prefix + 'THIRD-PARTY-NOTICES.txt', notices)
                     archive.writestr(prefix + 'third-party-inventory.json', inventory)
                     archive.writestr(prefix + 'pngr.deps.json', json.dumps({
@@ -100,6 +102,7 @@ class InstallerAssetsTests(unittest.TestCase):
             'libraries': {'pngr/0.7.1': {}},
             'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
         notices, inventory, libraries = materials('win-x64')
+        (publish / 'LICENSE').write_bytes((ROOT / 'LICENSE').read_bytes())
         (publish / 'THIRD-PARTY-NOTICES.txt').write_bytes(notices)
         (publish / 'third-party-inventory.json').write_bytes(inventory)
         (publish / 'pngr.deps.json').write_text(json.dumps({

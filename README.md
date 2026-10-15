@@ -86,8 +86,9 @@ The DMG also includes a notice file at its root. Website notices are linked
 from the footer and documentation navigation.
 
 See [desktop licenses and inventory](compliance/README.md) and
-[website licenses and inventory](website/compliance/README.md). These notices
-cover third-party components and do not grant a license to Pngr's own code.
+[website licenses and inventory](website/compliance/README.md). Pngr-owned code and documentation use the [MIT license](LICENSE). Third-party
+components retain their own licenses. Branding and artwork are excluded from
+the code license pending confirmation of their source rights.
 Dependency or runtime changes require an inventory review before packaging.
 
 Maintainers can run the existing CI workflow manually with

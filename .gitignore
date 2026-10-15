@@ -95,3 +95,7 @@ secrets*.json
 # Python packaging checks
 __pycache__/
 *.py[cod]
+
+# Retain reviewed licenses even when upstream names resemble SQLite journals.
+!compliance/licenses/
+!compliance/licenses/**

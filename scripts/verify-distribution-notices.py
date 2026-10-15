@@ -21,6 +21,8 @@ def reject_private_material(name):
 
 def verify_archive_runtime(archive, material_prefix, deps_prefix, rid):
     try:
+        if archive.read(material_prefix + "LICENSE") != (ROOT / "LICENSE").read_bytes():
+            raise ValueError("Missing or changed Pngr MIT license")
         manifest = LICENSES.validate_bytes(
             archive.read(material_prefix + 'THIRD-PARTY-NOTICES.txt'),
             archive.read(material_prefix + 'third-party-inventory.json'),
@@ -39,6 +41,8 @@ def verify_update_archive(archive, channel):
         verify_archive_runtime(archive, 'lib/app/', 'lib/app/', channel)
     elif channel == 'osx-universal':
         prefix = 'lib/app/Contents/Resources/'
+        if archive.read(prefix + 'LICENSE') != (ROOT / 'LICENSE').read_bytes():
+            raise ValueError('Missing or changed Pngr MIT license')
         if archive.read(prefix + 'THIRD-PARTY-NOTICES.txt') != (ROOT / 'compliance/THIRD-PARTY-NOTICES.txt').read_bytes():
             raise ValueError('Universal application lacks the complete reviewed notice collection')
         for rid in ('osx-arm64', 'osx-x64'):
@@ -50,6 +54,8 @@ def verify_update_archive(archive, channel):
 
 def verify_universal_directory(bundle):
     resources = Path(bundle) / 'Contents/Resources'
+    if (resources / 'LICENSE').read_bytes() != (ROOT / 'LICENSE').read_bytes():
+        raise ValueError('Missing or changed Pngr MIT license')
     if (resources / 'THIRD-PARTY-NOTICES.txt').read_bytes() != (ROOT / 'compliance/THIRD-PARTY-NOTICES.txt').read_bytes():
         raise ValueError('Universal application lacks the complete reviewed notice collection')
     for rid in ('osx-arm64', 'osx-x64'):

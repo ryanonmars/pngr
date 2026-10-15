@@ -6,7 +6,12 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+test('website project license matches the owner-approved repository license', async () => {
+  assert.equal(await readFile('compliance/PROJECT-LICENSE.txt', 'utf8'), await readFile('../LICENSE', 'utf8'));
+});
+
 test('actual static distribution contains reviewed notices and inventory', async () => {
+  assert.equal(await readFile('out/LICENSE', 'utf8'), await readFile('compliance/PROJECT-LICENSE.txt', 'utf8'));
   const manifest = JSON.parse(await readFile('compliance/browser-dependencies.json', 'utf8'));
   const notice = await readFile('out/THIRD-PARTY-NOTICES.txt', 'utf8');
   assert.equal(notice, await readFile('compliance/THIRD-PARTY-NOTICES.txt', 'utf8'));
