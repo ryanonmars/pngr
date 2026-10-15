@@ -29,6 +29,9 @@ public sealed record WorkspaceConfiguration
     public bool WebEnabled { get; init; }
     public bool WebLanEnabled { get; init; }
     public string? WebLanAddress { get; init; }
+    // Missing mode in older settings means manual when an address was already selected.
+    public bool? WebLanAutomatic { get; init; }
+    [JsonIgnore] public bool WebUsesAutomaticInterface => WebLanAutomatic ?? string.IsNullOrEmpty(WebLanAddress);
     public bool WebHttpAcknowledged { get; init; }
     public string? WebAccessKeyVerifier { get; init; }
     public bool DesktopNotifications { get; init; }
@@ -55,8 +58,9 @@ public sealed record WorkspaceConfiguration
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");
         if (WebAccessKeyVerifier is not null && !WebAccessKey.IsValidVerifier(WebAccessKeyVerifier))
             throw new InvalidDataException("Invalid web access key verifier.");
+        var validWebAddress = System.Net.IPAddress.TryParse(WebLanAddress, out var webAddress) && WebServerNetwork.IsPrivateAddress(webAddress);
         if (WebLanEnabled && (!WebHttpAcknowledged || !WebAccessKey.IsValidVerifier(WebAccessKeyVerifier)
-            || !System.Net.IPAddress.TryParse(WebLanAddress, out var webAddress) || !WebServerNetwork.IsPrivateAddress(webAddress)))
+            || !validWebAddress && !(WebUsesAutomaticInterface && WebLanAddress is null)))
             throw new InvalidDataException("LAN access requires a private interface address, a generated key and acknowledgement of unencrypted HTTP.");
         if (DefaultProbeOptions is null || Display is null) throw new InvalidDataException("Monitoring and display settings are required.");
         DefaultProbeOptions.Validate();
@@ -219,7 +223,7 @@ public sealed class WorkspaceStore
     {
         configuration.Validate();
         // Sharing a workspace must not share authentication state or enable remote access on import.
-        var exported = configuration with { WebLanEnabled = false, WebLanAddress = null,
+        var exported = configuration with { WebLanEnabled = false, WebLanAddress = null, WebLanAutomatic = null,
             WebHttpAcknowledged = false, WebAccessKeyVerifier = null, Actions = configuration.Actions with
         { Webhook = configuration.Actions.Webhook with { Enabled = false, Url = "", UrlSecretId = "" } } };
         return JsonSerializer.SerializeAsync(stream, exported, JsonOptions, cancellationToken);

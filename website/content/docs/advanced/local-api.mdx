@@ -79,7 +79,7 @@ UDP target health distinguishes `NoResponse`, `ProbeRejected`, `Reachable`, and 
 
 ## Access and lifetime
 
-Localhost mode binds to IPv4 loopback only. LAN mode adds one explicitly selected assigned private IPv4 or unique-local IPv6 address and applies authentication to both listeners. Host validation accepts only supported listener hosts, preventing arbitrary hostname access; use the displayed numeric address. There is no permissive CORS configuration. Responses use `Cache-Control: no-store`, and request body/form limits and authentication rate limits bound untrusted input. The dashboard and API require the desktop process to remain open.
+Localhost mode binds to IPv4 loopback only. LAN mode adds one selected assigned private address: Automatic chooses a suitable private IPv4 default-route interface, while advanced manual selection also supports unique-local IPv6 and applies authentication to both listeners. Host validation accepts only supported listener hosts, preventing arbitrary hostname access; use the displayed numeric address. There is no permissive CORS configuration. Responses use `Cache-Control: no-store`, and request body/form limits and authentication rate limits bound untrusted input. The dashboard and API require the desktop process to remain open.
 
 The server exposes defined routes and embedded dashboard HTML, not a filesystem directory. All monitoring-data routes are behind the same authentication boundary in LAN mode. Successful authentication grants read access to all available monitoring data; there are no per-client permissions. The desktop GUI and probing engines do not participate in web authentication.
 

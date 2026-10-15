@@ -6,7 +6,7 @@ on:
       version:
         description: Semantic version embedded in the application and packages
         required: false
-        default: '0.7.6'
+        default: '0.8.0'
         type: string
       package:
         description: Build release packages (version-tag release workflow only)
@@ -35,6 +35,11 @@ jobs:
         working-directory: website
       - run: npm run typecheck && npm run build && npm test
         working-directory: website
+      - name: Install dashboard test browser
+        run: npx playwright install --with-deps --only-shell chromium
+        working-directory: website
+      - name: Test embedded web dashboard
+        run: node --test tests/web-dashboard/dashboard.test.mjs
   build:
     name: ${{ matrix.runtime }}
     strategy:

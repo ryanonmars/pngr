@@ -37,3 +37,26 @@ The default time range is 10 minutes. The time-range selector offers 1, 5, 10, a
 5. Use Clear Selection or Escape to clear it. Use the Live button or Home to resume the live view.
 
 Clearing selection preserves zoom and the held timestamp. Returning to Live also clears the selection. Earlier route addresses and probing configurations can appear in selected statistics; do not assume the latest hop table describes the entire session.
+
+## Web dashboard navigation
+
+The read-only [web dashboard](/docs/settings/local-web-api) uses separate latency and jitter panels for the selected target and hop. Both panels share one timeline. Latency displays the existing average measurement in pale green, with faint min–max whiskers preserving bucket extrema. Jitter uses orange and its own zero-based scale. Neither series affects the other panel's scale.
+
+| Control | Result |
+| --- | --- |
+| Scroll over either graph | Zoom around the pointer; recent samples stay visible when much of the window is empty |
+| Drag horizontally across either graph | Zoom both panels to the selected interval |
+| Zoom − / + | Zoom out / in; available on touch devices too |
+| Earlier / Later | Move by the current visible duration without changing zoom |
+| Live | Follow the latest data at the current zoom duration; the highlighted button indicates Live mode |
+| History | Establish a new base duration and reset interactive zoom |
+| Reset Zoom or double-click | Restore the selected History duration at the current window end |
+| Fit | Fit recorded sample timestamps within the selected History range ending at the current window end, with modest padding |
+
+Web zoom spans are limited to **10 seconds through 24 hours**. Fit is explicit and does not change the History dropdown. It searches only that bounded range, handles single samples without a zero-width window, and leaves gaps empty. Earlier/Later can explicitly navigate to empty periods. Zoom keeps the whole newest aggregate bucket visible when avoiding empty time.
+
+Hover over either panel for a shared vertical crosshair and timestamp, latency, and jitter values. Tooltips identify bucket averages and attempt counts when multiple measurements are aggregated; unavailable measurements are marked rather than interpolated. On touch devices, tap to inspect and use the buttons to zoom. Page scrolling remains available; touch pinch zoom is not implemented.
+
+**Show Jitter** is enabled by default. Hiding it removes the lower panel and expands latency while preserving the time window. The choice is stored as a boolean in this browser's localStorage; no credentials are stored there. This affects display only, never measurement collection or storage.
+
+Both panels reuse one read-only history response, with at most 1,000 aggregate points per request. Rapid zoom requests are debounced, obsolete requests are cancelled, and stale responses cannot replace a newer selection. Zooming requests a finer view of retained data without modifying samples, calculations, or retention. Saved sessions without sampling-cadence metadata may show isolated points where joining them would imply continuity the data cannot establish.

@@ -20,7 +20,31 @@ public sealed class SettingsConfigurationTests
         Assert.False(configuration.WebHttpAcknowledged);
         Assert.Null(configuration.WebAccessKeyVerifier);
         Assert.Equal(8787, configuration.WebPort);
+        Assert.True(configuration.WebUsesAutomaticInterface);
         Assert.False(configuration.Actions.NativeNotificationsEnabled);
+    }
+
+    [Fact]
+    public async Task LegacyLanAddressRemainsManualAndAutomaticModeSurvivesSettingsRoundTrip()
+    {
+        var originalKey = WebAccessKey.Generate();
+        var legacy = new WorkspaceConfiguration { WebEnabled = true, WebLanEnabled = true,
+            WebLanAddress = "192.168.30.2", WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(originalKey) };
+        Assert.False(legacy.WebUsesAutomaticInterface);
+        using var stored = new MemoryStream();
+        await System.Text.Json.JsonSerializer.SerializeAsync(stored, legacy, WorkspaceStore.JsonOptions);
+        stored.Position = 0;
+        var manual = await WorkspaceStore.ImportAsync(stored);
+        Assert.False(manual.WebUsesAutomaticInterface);
+        Assert.Equal(legacy.WebLanAddress, manual.WebLanAddress);
+        Assert.True(WebAccessKey.Verify(originalKey, manual.WebAccessKeyVerifier));
+        var automatic = manual with { WebLanAutomatic = true, WebLanAddress = null };
+        automatic.Validate(); // Resolution happens on explicit Apply/startup, not while reading settings.
+        using var saved = new MemoryStream();
+        await System.Text.Json.JsonSerializer.SerializeAsync(saved, automatic, WorkspaceStore.JsonOptions);
+        saved.Position = 0;
+        Assert.True((await WorkspaceStore.ImportAsync(saved)).WebUsesAutomaticInterface);
+        Assert.Throws<InvalidDataException>(() => (manual with { WebLanAutomatic = false, WebLanAddress = null }).Validate());
     }
 
     [Fact]

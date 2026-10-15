@@ -424,8 +424,13 @@ public partial class MainWindow
         _applicationCancellation.Token.ThrowIfCancellationRequested();
         if (_webServer?.Url is not null) return;
         if (_webServer is not null) { await _webServer.DisposeAsync(); _webServer = null; }
+        var configuration = await ResolveWebInterfaceAsync(_configuration);
         var server = new LocalWebServer(_engine);
-        try { await server.StartAsync(WebOptions(_configuration), _applicationCancellation.Token); _webServer = server; }
+        try
+        {
+            await server.StartAsync(WebOptions(configuration), _applicationCancellation.Token);
+            _webServer = server; _configuration = configuration;
+        }
         catch { await server.DisposeAsync(); throw; }
     }
 

@@ -474,6 +474,34 @@ public sealed class SettingsWindowTests
     }
 
     [AvaloniaFact]
+    public async Task AutomaticLanApplyUsesCurrentRouteAndUnrelatedSettingsKeepRunningAddress()
+    {
+        var selected = await WebServerNetwork.GetAutomaticLanAddressAsync();
+        if (selected is null) return; // Isolated/VPN-only hosts deliberately cannot select automatically.
+        await using var fixture = await Fixture.CreateAsync();
+        var key = WebAccessKey.Generate();
+        var configuration = fixture.Configuration with { WebEnabled = true, WebPort = AvailablePort(),
+            WebLanEnabled = true, WebLanAutomatic = true, WebLanAddress = "10.254.254.254",
+            WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(key) };
+        await InvokeTask(fixture.Window, "CommitSettingsAsync", configuration, null, null, null, null);
+        var server = Field<LocalWebServer>(fixture.Window, "_webServer");
+        Assert.Equal(selected.Address, fixture.Configuration.WebLanAddress);
+        Assert.True((await fixture.LoadWorkspace()).WebLanAutomatic);
+        Assert.Equal(2, server.ListeningUrls.Count);
+        Assert.All(server.ListeningUrls, url => Assert.Contains(new Uri(url).Host, new[] { "127.0.0.1", selected.Address }));
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(server.Url + "/api/targets")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", key);
+        Assert.Equal("[]", await client.GetStringAsync(server.Url + "/api/targets"));
+        // A new draft candidate must not move a live listener when applying unrelated preferences.
+        var unrelated = new SettingsChange(fixture.Configuration with { RetentionDays = 60, WebLanAddress = "10.254.254.253" }, null);
+        await InvokeTask(fixture.Window, "ApplySettingsAsync", unrelated, null);
+        Assert.Same(server, Field<LocalWebServer>(fixture.Window, "_webServer"));
+        Assert.Equal(selected.Address, fixture.Configuration.WebLanAddress);
+        Assert.Equal("[]", await client.GetStringAsync(server.Url + "/api/targets"));
+    }
+
+    [AvaloniaFact]
     public async Task LanModeRebindsSamePortRotatesKeyAndReturnsToUnauthenticatedLocalhost()
     {
         var address = WebServerNetwork.GetLanAddresses().FirstOrDefault();

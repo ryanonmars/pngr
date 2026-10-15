@@ -1,7 +1,10 @@
 using Avalonia.Controls;
+using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
+using Avalonia.Threading;
 using TraceScope.App.Views;
 using TraceScope.Core;
 using Xunit;
@@ -15,6 +18,9 @@ public sealed class WebServerSettingsTests
     {
         using var fixture = new Fixture();
         Assert.False(fixture.Configuration.WebLanEnabled);
+        Assert.True(fixture.Configuration.WebUsesAutomaticInterface);
+        Assert.Equal(0, fixture.Get<ComboBox>("SettingsWebNetworkMode").SelectedIndex);
+        Assert.False(fixture.Get<Expander>("SettingsWebAdvanced").IsExpanded);
         Assert.True(fixture.Get<RadioButton>("SettingsWebLocalhost").IsChecked);
         Assert.False(fixture.Get<RadioButton>("SettingsWebLan").IsChecked);
         Assert.False(fixture.Get<StackPanel>("SettingsWebLanOptions").IsVisible);
@@ -72,6 +78,8 @@ public sealed class WebServerSettingsTests
     {
         var originalKey = WebAccessKey.Generate();
         using var fixture = new Fixture(LanConfiguration(originalKey));
+        Assert.Equal(1, fixture.Get<ComboBox>("SettingsWebNetworkMode").SelectedIndex);
+        Assert.True(fixture.Get<Expander>("SettingsWebAdvanced").IsExpanded);
         Assert.Empty(fixture.Get<TextBox>("SettingsWebAccessKey").Text ?? "");
         Assert.False(fixture.Get<Button>("SettingsWebCopyKey").IsEnabled);
         Assert.False(fixture.Get<CheckBox>("SettingsWebRevealKey").IsEnabled);
@@ -123,6 +131,7 @@ public sealed class WebServerSettingsTests
     {
         using var fixture = new Fixture();
         fixture.Get<RadioButton>("SettingsWebLan").IsChecked = true;
+        fixture.Get<ComboBox>("SettingsWebNetworkMode").SelectedIndex = 1;
         var interfaces = fixture.Get<ComboBox>("SettingsWebInterface");
         interfaces.ItemsSource = new[] { new WebServerAddress("Ethernet", "192.168.30.50"), new WebServerAddress("Wi-Fi", "10.1.2.3") };
         interfaces.SelectedItem = null;
@@ -135,6 +144,72 @@ public sealed class WebServerSettingsTests
         await fixture.ApplyAsync();
         Assert.Equal("10.1.2.3", fixture.Configuration.WebLanAddress);
         Assert.Equal(8799, fixture.Configuration.WebPort);
+        Assert.False(fixture.Configuration.WebLanAutomatic);
+    }
+
+    [AvaloniaFact]
+    public async Task AutomaticSelectionNeedsNoTechnicalInterfaceChoiceAndPersistsMode()
+    {
+        using var fixture = new Fixture();
+        fixture.Get<CheckBox>("SettingsWebEnabled").IsChecked = true;
+        fixture.Get<RadioButton>("SettingsWebLan").IsChecked = true;
+        fixture.Get<CheckBox>("SettingsWebHttpAcknowledged").IsChecked = true;
+        await Until(() => fixture.Get<TextBlock>("SettingsWebSelectedAddress").Text == "192.168.30.20");
+        Assert.False(fixture.Get<Expander>("SettingsWebAdvanced").IsExpanded);
+        await fixture.ApplyAsync();
+        Assert.True(fixture.Configuration.WebLanAutomatic);
+        Assert.Equal("192.168.30.20", fixture.Configuration.WebLanAddress);
+        Assert.True(fixture.LastChange!.ReevaluateWebInterface);
+    }
+
+    [AvaloniaFact]
+    public async Task UnavailableAutomaticNetworkOffersManualSelection()
+    {
+        using var fixture = new Fixture(automaticAddress: _ => Task.FromResult<WebServerAddress?>(null));
+        fixture.Get<RadioButton>("SettingsWebLan").IsChecked = true;
+        Assert.Contains("Choose manually", fixture.Get<TextBlock>("SettingsWebSelectionHelp").Text);
+        Assert.Equal("No suitable network found", fixture.Get<TextBlock>("SettingsWebSelectedAddress").Text);
+        fixture.SelectLan();
+        fixture.Get<CheckBox>("SettingsWebHttpAcknowledged").IsChecked = true;
+        await fixture.ApplyAsync();
+        Assert.False(fixture.Configuration.WebLanAutomatic);
+        Assert.Equal("192.168.30.50", fixture.Configuration.WebLanAddress);
+    }
+
+    [AvaloniaFact]
+    public async Task UnrelatedSettingsApplyDoesNotRequestRunningAutomaticNetworkChange()
+    {
+        var key = WebAccessKey.Generate();
+        using var fixture = new Fixture(LanConfiguration(key) with { WebLanAutomatic = true },
+            serverAddress: () => "http://192.168.30.50:8787/");
+        fixture.Window.SelectPage("General");
+        await fixture.ApplyAsync();
+        Assert.False(fixture.LastChange!.ReevaluateWebInterface);
+        fixture.Window.SelectPage("Web Server");
+        Assert.Equal("192.168.30.50", fixture.Get<TextBlock>("SettingsWebSelectedAddress").Text);
+    }
+
+    [AvaloniaFact]
+    public void KeyFieldAndActionsRemainSeparateAtSupportedWindowWidths()
+    {
+        using var fixture = new Fixture();
+        fixture.SelectLan();
+        foreach (var width in new[] { 760d, 830d })
+        {
+            fixture.Window.Width = width;
+            Dispatcher.UIThread.RunJobs(); fixture.Window.UpdateLayout();
+            Rect Bounds(Control control) => new(control.TranslatePoint(default, fixture.Window)!.Value, control.Bounds.Size);
+            var key = Bounds(fixture.Get<TextBox>("SettingsWebAccessKey"));
+            var copy = Bounds(fixture.Get<Button>("SettingsWebCopyKey"));
+            var regenerate = Bounds(fixture.Get<Button>("SettingsWebRegenerateKey"));
+            var reveal = Bounds(fixture.Get<CheckBox>("SettingsWebRevealKey"));
+            Assert.InRange(key.Width, 200, 300);
+            Assert.InRange(Math.Abs(key.Left - copy.Left), 0, 1);
+            Assert.True(key.Bottom <= copy.Top, "Key text and actions must occupy separate rows.");
+            Assert.True(copy.Right <= regenerate.Left && regenerate.Right <= reveal.Left,
+                "Copy, regenerate and reveal controls must not overlap.");
+            Assert.True(reveal.Right < width - 16, "Key actions must remain inside the settings content.");
+        }
     }
 
     [AvaloniaFact]
@@ -161,7 +236,8 @@ public sealed class WebServerSettingsTests
     };
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static T Find<T>(Window window, string name) where T : Control
-        => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+        => window.GetVisualDescendants().OfType<T>().Concat(window.GetLogicalDescendants().OfType<T>())
+            .Distinct().Single(control => control.Name == name);
     private static async Task Until(Func<bool> condition)
     {
         var end = DateTime.UtcNow.AddSeconds(5);
@@ -174,17 +250,20 @@ public sealed class WebServerSettingsTests
         public WorkspaceConfiguration Configuration { get; private set; }
         public SettingsWindow Window { get; }
         public int Applies { get; private set; }
+        public SettingsChange? LastChange { get; private set; }
         public bool RejectChanges { get; init; }
-        public Fixture(WorkspaceConfiguration? configuration = null, Func<string?>? serverAddress = null, Func<string?>? serverError = null)
+        public Fixture(WorkspaceConfiguration? configuration = null, Func<string?>? serverAddress = null, Func<string?>? serverError = null,
+            Func<CancellationToken, Task<WebServerAddress?>>? automaticAddress = null)
         {
             Configuration = configuration ?? new WorkspaceConfiguration();
             Window = new SettingsWindow(Configuration, null, null, [new ProbeSourceChoice("Automatic", null, null)], "/tmp/pngr-web-settings",
                 change =>
                 {
                     if (RejectChanges) throw new IOException("Port is unavailable.");
-                    Configuration = change.Configuration; Applies++;
+                    Configuration = change.Configuration; LastChange = change; Applies++;
                     return Task.CompletedTask;
-                }, () => Task.FromResult(new NotificationResult(true, "Unused")), _ => { }, serverAddress: serverAddress, serverError: serverError);
+                }, () => Task.FromResult(new NotificationResult(true, "Unused")), _ => { }, serverAddress: serverAddress, serverError: serverError,
+                automaticAddress: automaticAddress ?? (_ => Task.FromResult<WebServerAddress?>(new("Wi-Fi", "192.168.30.20"))));
             Window.Show(); Window.SelectPage("Web Server");
         }
         public T Get<T>(string name) where T : Control => Find<T>(Window, name);
@@ -192,6 +271,7 @@ public sealed class WebServerSettingsTests
         {
             Get<CheckBox>("SettingsWebEnabled").IsChecked = true;
             Get<RadioButton>("SettingsWebLan").IsChecked = true;
+            Get<ComboBox>("SettingsWebNetworkMode").SelectedIndex = 1;
             var interfaces = Get<ComboBox>("SettingsWebInterface");
             interfaces.ItemsSource = new[] { new WebServerAddress("Test LAN", "192.168.30.50") };
             interfaces.SelectedIndex = 0;

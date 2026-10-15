@@ -87,6 +87,7 @@ public partial class MainWindow
             Profiles = draft.Profiles, DesktopNotifications = draft.DesktopNotifications,
             WebEnabled = draft.WebEnabled, WebPort = draft.WebPort,
             WebLanEnabled = draft.WebLanEnabled, WebLanAddress = draft.WebLanAddress,
+            WebLanAutomatic = draft.WebLanAutomatic,
             WebHttpAcknowledged = draft.WebHttpAcknowledged, WebAccessKeyVerifier = draft.WebAccessKeyVerifier,
             Actions = _configuration.Actions with
             {
@@ -98,12 +99,17 @@ public partial class MainWindow
         var selectedOptions = selectedSessionId.HasValue && change.SelectedTargetOptions is { } options
             && _engine.Sessions.Any(s => s.Id == selectedSessionId && s.State is SessionState.Running or SessionState.Paused)
             && _engine.Sessions.First(s => s.Id == selectedSessionId).Options != options ? options : null;
-        await CommitSettingsAsync(configuration, selectedSessionId, selectedOptions, change.SelectedTcpPort, change.SelectedUdpPort);
+        await CommitSettingsCoreAsync(configuration, selectedSessionId, selectedOptions, change.SelectedTcpPort, change.SelectedUdpPort,
+            change.ReevaluateWebInterface);
         StatusText.Text = "Settings saved · monitoring continues";
     }
 
-    private async Task CommitSettingsAsync(WorkspaceConfiguration configuration, Guid? sessionId = null, ProbeOptions? options = null,
+    private Task CommitSettingsAsync(WorkspaceConfiguration configuration, Guid? sessionId = null, ProbeOptions? options = null,
         int? tcpPort = null, int? udpPort = null)
+        => CommitSettingsCoreAsync(configuration, sessionId, options, tcpPort, udpPort, true);
+
+    private async Task CommitSettingsCoreAsync(WorkspaceConfiguration configuration, Guid? sessionId, ProbeOptions? options,
+        int? tcpPort, int? udpPort, bool reevaluateWebInterface)
     {
         configuration.Validate();
         await _webLifecycle.WaitAsync(_applicationCancellation.Token);
@@ -114,6 +120,11 @@ public partial class MainWindow
         try
         {
             _applicationCancellation.Token.ThrowIfCancellationRequested();
+            if (reevaluateWebInterface || _webServer?.Url is null || !previousConfiguration.WebLanEnabled
+                || !previousConfiguration.WebUsesAutomaticInterface)
+                configuration = await ResolveWebInterfaceAsync(configuration);
+            else if (configuration.WebLanEnabled && configuration.WebUsesAutomaticInterface)
+                configuration = configuration with { WebLanAddress = previousConfiguration.WebLanAddress };
             var replace = configuration.WebEnabled && (_webServer?.Url is null
                 || previousConfiguration.WebPort != configuration.WebPort
                 || previousConfiguration.WebLanEnabled != configuration.WebLanEnabled
@@ -180,7 +191,12 @@ public partial class MainWindow
             if (replacement is not null) { await replacement.DisposeAsync(); replacement = null; }
             if (stoppedPrevious && !committed && !_applicationCancellation.IsCancellationRequested)
             {
-                try { await StartWebServerAsync(); }
+                try
+                {
+                    var restored = new LocalWebServer(_engine);
+                    try { await restored.StartAsync(WebOptions(previousConfiguration), _applicationCancellation.Token); _webServer = restored; }
+                    catch { await restored.DisposeAsync(); throw; }
+                }
                 catch { StatusText.Text = "Previous web listener could not be restored. Reopen Web Server settings and apply to retry."; }
             }
             throw;
@@ -197,6 +213,14 @@ public partial class MainWindow
         Port = configuration.WebPort, LanEnabled = configuration.WebLanEnabled, LanAddress = configuration.WebLanAddress,
         HttpAcknowledged = configuration.WebHttpAcknowledged, AccessKeyVerifier = configuration.WebAccessKeyVerifier
     };
+
+    private async Task<WorkspaceConfiguration> ResolveWebInterfaceAsync(WorkspaceConfiguration configuration)
+    {
+        if (!configuration.WebEnabled || !configuration.WebLanEnabled || !configuration.WebUsesAutomaticInterface) return configuration;
+        var address = await WebServerNetwork.GetAutomaticLanAddressAsync(_applicationCancellation.Token)
+            ?? throw new InvalidOperationException("Automatic selection could not find a suitable LAN address on the default route. Choose an interface in Advanced network options.");
+        return configuration with { WebLanAddress = address.Address, WebLanAutomatic = true };
+    }
 
     private void ApplyPreferenceControls(bool resetTimeRange = true)
     {

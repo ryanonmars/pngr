@@ -47,17 +47,17 @@ Build installers locally:
 
 ```sh
 # macOS universal app, DMG and macOS update feed (run on a Mac)
-scripts/package-universal.sh 0.7.6
+scripts/package-universal.sh 0.8.0
 
 # Windows cross-publish/installer (also works from macOS)
-scripts/package.sh win-x64 0.7.6
-python3 scripts/package-windows-installer.py 0.7.6
+scripts/package.sh win-x64 0.8.0
+python3 scripts/package-windows-installer.py 0.8.0
 ```
 
 ```powershell
 # Native Windows publish and per-user installer
-./scripts/package.ps1 -Version 0.7.6
-python scripts/package-windows-installer.py 0.7.6
+./scripts/package.ps1 -Version 0.8.0
+python scripts/package-windows-installer.py 0.8.0
 ```
 
 The updater SDK and CLI are pinned to Velopack 1.2.161; the packaging scripts restore the repository's local tool manifest. Final assets are in `artifacts/installers/osx-universal` and `artifacts/installers/win-x64`. Architecture-specific ZIPs remain internal build intermediates/portable local packages, not future public release downloads. Run from source with `dotnet run --project src/TraceScope.App`. The existing solution and internal namespaces retain the TraceScope name.
@@ -72,13 +72,15 @@ Data is stored locally. Existing TraceScope settings, profiles, workspaces, and 
 
 Open **Settings → Web Server** to enable the existing read-only server. **Localhost Only** is the default: `http://127.0.0.1:8787` works without authentication on the computer running Pngr. The desktop application never requires web authentication.
 
-To connect another device, explicitly select **Local Network (LAN)**, choose a current private interface address and port, acknowledge the HTTP warning, and apply. Copy the displayed server address and the newly generated `pngr_` access key. Use that address in a browser and enter the key, or send `Authorization: Bearer <access-key>` with API requests. In LAN mode, authentication applies to both the LAN and localhost listeners. The API remains read-only; existing response formats are unchanged.
+To connect another device, explicitly select **Local Network (LAN)**, keep **Automatic (Recommended)** or choose a private address under **Advanced network options**, set the port, acknowledge the HTTP warning, and apply. Copy the displayed server address and the newly generated `pngr_` access key. Use that address in a browser and enter the key, or send `Authorization: Bearer <access-key>` with API requests. In LAN mode, authentication applies to both the LAN and localhost listeners. The API remains read-only; existing response formats are unchanged.
 
 The original key is available only when generated in the desktop settings window; save it in a password manager before closing the window. Pngr persists a SHA-256 verifier, not the original secret. **Regenerate Key** requires confirmation and immediately invalidates the previous key and all browser sessions. A lost key must be regenerated. Existing macOS Keychain and Windows Credential Manager webhook storage is unchanged.
 
 LAN HTTP is **unencrypted**: someone who can observe or alter network traffic can capture the key, browser session, and monitoring data. Use a trusted isolated network or an encrypted VPN/tunnel; a user-managed HTTPS reverse proxy needs the restrictions described in the [Web Server guide](website/content/docs/settings/local-web-api.mdx). Pngr does not provision TLS certificates, router forwarding, UPnP, or firewall exceptions. LAN access does not itself enable internet access; the network owner remains responsible for routing, firewall and proxy exposure.
 
-Choose **Localhost Only** and apply to remove LAN access, or disable **Enable Web Server** to stop both listeners. Pngr must remain open. Address changes require refreshing/reselecting the interface; unavailable addresses and port conflicts are reported without changing monitoring. See the [Web Server guide](website/content/docs/settings/local-web-api.mdx) and [API reference](website/content/docs/advanced/local-api.mdx) for login, API examples and troubleshooting.
+Choose **Localhost Only** and apply to remove LAN access, or disable **Enable Web Server** to stop both listeners. Pngr must remain open. Automatic selection uses the active default-route interface and a suitable private IPv4 address, excluding known VPN and virtual adapters. Existing manual addresses are preserved. A running LAN listener never switches networks silently; unavailable addresses and port conflicts are reported without changing monitoring. Reapply Web Server settings or restart Pngr to resolve Automatic again. See the [Web Server guide](website/content/docs/settings/local-web-api.mdx) and [API reference](website/content/docs/advanced/local-api.mdx) for login, API examples and troubleshooting.
+
+The web dashboard has separate, synchronized latency and jitter graphs with independent scales. Wheel or drag to zoom, use Earlier/Later to navigate, and choose Live to follow new samples. Fit uses available samples within the selected history range; Reset Zoom restores that range. Show Jitter is a browser-only preference. See [web graph controls](website/content/docs/graphs-history/navigation.mdx#web-dashboard-navigation).
 
 ## Automated releases
 

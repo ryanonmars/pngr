@@ -13,7 +13,7 @@ public sealed record ProbeSourceChoice(string Label, string? Interface, string? 
 }
 
 public sealed record SettingsChange(WorkspaceConfiguration Configuration, ProbeOptions? SelectedTargetOptions,
-    int? SelectedTcpPort = null, int? SelectedUdpPort = null);
+    int? SelectedTcpPort = null, int? SelectedUdpPort = null, bool ReevaluateWebInterface = false);
 
 /// <summary>Edits a private draft. Only Apply/OK can change running monitoring or saved preferences.</summary>
 public sealed partial class SettingsWindow : Window
@@ -76,7 +76,8 @@ public sealed partial class SettingsWindow : Window
     public SettingsWindow(WorkspaceConfiguration configuration, ProbeOptions? selectedOptions, string? selectedTarget,
         IReadOnlyList<ProbeSourceChoice> sources, string dataDirectory, Func<SettingsChange, Task> apply,
         Func<Task<NotificationResult>> permission, Action<string> openTool,
-        int selectedTcpPort = 443, int selectedUdpPort = 33434, Func<string?>? serverAddress = null, Func<string?>? serverError = null)
+        int selectedTcpPort = 443, int selectedUdpPort = 33434, Func<string?>? serverAddress = null, Func<string?>? serverError = null,
+        Func<CancellationToken, Task<WebServerAddress?>>? automaticAddress = null)
     {
         _original = configuration;
         _defaults = configuration.DefaultProbeOptions;
@@ -107,7 +108,7 @@ public sealed partial class SettingsWindow : Window
         _events.IsChecked = configuration.Display.ShowEventMarkers;
         _retention.Value = configuration.RetentionDays; _aggregation.Value = configuration.AggregationSeconds;
         _web.IsChecked = configuration.WebEnabled; _webPort.Value = configuration.WebPort;
-        InitializeWebSettings(configuration, serverAddress, serverError);
+        InitializeWebSettings(configuration, serverAddress, serverError, automaticAddress);
         LoadProbe(_defaults); ReloadProfiles();
 
 
@@ -272,7 +273,8 @@ public sealed partial class SettingsWindow : Window
                 UseDefaultProbeOptionsForNewTargets = _useDefaults.IsChecked == true,
                 RetentionDays = (int)Value(_retention), AggregationSeconds = (int)Value(_aggregation),
                 DesktopNotifications = _toasts.IsChecked == true, WebEnabled = _web.IsChecked == true, WebPort = (int)Value(_webPort),
-                WebLanEnabled = _webLan.IsChecked == true, WebLanAddress = (_webInterface.SelectedItem as WebServerAddress)?.Address,
+                WebLanEnabled = _webLan.IsChecked == true, WebLanAddress = SelectedWebAddress,
+                WebLanAutomatic = IsAutomaticWebInterface,
                 WebHttpAcknowledged = _webAcknowledged.IsChecked == true, WebAccessKeyVerifier = _webVerifier,
                 Actions = _original.Actions with { NativeNotificationsEnabled = _native.IsChecked == true, IncludeRecovery = _recoveries.IsChecked == true,
                     MinimumNotificationSpacingSeconds = (int)Value(_spacing) },
@@ -284,7 +286,11 @@ public sealed partial class SettingsWindow : Window
             _busy = true; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = false;
             await _apply(new SettingsChange(configuration, _selected != _initialSelected ? _selected : null,
                 _selected != _initialSelected ? _ports[1].Tcp : null,
-                _selected != _initialSelected ? _ports[1].Udp : null));
+                _selected != _initialSelected ? _ports[1].Udp : null,
+                _webNetworkChanged || _navigation.SelectedItem as string == "Web Server"));
+            _webNetworkChanged = false;
+            if (IsAutomaticWebInterface && _webLan.IsChecked == true && _serverAddress?.Invoke() is { } running)
+                _webAutomaticAddress = new WebServerAddress("Running network", new Uri(running).Host.Trim('[', ']'));
             _status.Text = "Settings saved. Changes apply immediately; monitoring continues.";
             _webSaved = true;
             UpdateWebControls();
