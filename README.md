@@ -75,3 +75,21 @@ Builds and tests cover ARM64 macOS, Intel macOS and Windows x64 on GitHub-hosted
 Normal pushes and pull requests run builds and automated tests on all three platforms without installer packaging. Version tags run tests, package each platform once, assemble the universal macOS DMG from those artifacts, validate the same installer/update assets, and publish only after every required check passes. NuGet and DMG tooling dependencies are cached. Already published tags are skipped; existing releases are never overwritten. Release packaging is reserved for version tags.
 
 To validate updating, use an installed v0.7.1 or later release and check manually, review the release notes, download, approve installation, and verify the new version after restart. Compare history, profiles and workspace before/after. Repeat with an interrupted download/offline check and verify the existing app remains usable. Apple Silicon testing does not establish Intel or Windows runtime behavior.
+
+
+## Third-party licenses
+
+Application distributions include `THIRD-PARTY-NOTICES.txt` and an exact
+dependency inventory. macOS bundles keep notices in `Contents/Resources`;
+Windows installations keep them in the application’s `current` directory.
+The DMG also includes a notice file at its root. Website notices are linked
+from the footer and documentation navigation.
+
+See [desktop licenses and inventory](compliance/README.md) and
+[website licenses and inventory](website/compliance/README.md). These notices
+cover third-party components and do not grant a license to Pngr's own code.
+Dependency or runtime changes require an inventory review before packaging.
+
+Maintainers can run the existing CI workflow manually with
+`verify_packages=true` and an internal prerelease `package_version` to validate
+all installers and update packages without creating a tag or publishing a release.

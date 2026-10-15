@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Validate installer/update assets and create the public SHA-256 manifest."""
 import argparse
+import importlib.util
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import zipfile
+
+_NOTICE_SPEC = importlib.util.spec_from_file_location(
+    'pngr_distribution_notices', Path(__file__).resolve().parent / 'verify-distribution-notices.py')
+NOTICE_CHECKS = importlib.util.module_from_spec(_NOTICE_SPEC)
+_NOTICE_SPEC.loader.exec_module(NOTICE_CHECKS)
 
 
 def validate_feed(directory: Path, channel: str, version: str):
@@ -37,6 +43,7 @@ def validate_feed(directory: Path, channel: str, version: str):
             if ('..' in components or filename in ('workspace.json', 'profiles.json', '.env')
                     or filename.endswith(('.db', '.db-wal', '.db-shm', '.sqlite', '.pdb'))):
                 raise ValueError(f'Private or development file in update: {item}')
+        NOTICE_CHECKS.verify_update_archive(archive, channel)
     return package
 
 

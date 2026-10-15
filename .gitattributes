@@ -1,0 +1,4 @@
+# Preserve authoritative license bytes and reviewed hashes on every platform.
+compliance/** -text
+website/compliance/** -text
+website/package-lock.json -text

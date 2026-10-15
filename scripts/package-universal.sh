@@ -26,6 +26,9 @@ for rid in osx-arm64 osx-x64; do
     mkdir "$stage/$rid"
     ditto -x -k "$archive_directory/pngr-$rid.zip" "$stage/$rid"
     mv "$stage/$rid/pngr.app/Contents/MacOS" "$bundle/Contents/Resources/runtimes/$rid"
+    # Preserve each architecture's exact dependency inventory through relocation.
+    cp "$stage/$rid/pngr.app/Contents/Resources/third-party-inventory.json" "$bundle/Contents/Resources/runtimes/$rid/"
+    cp "$stage/$rid/pngr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt" "$bundle/Contents/Resources/runtimes/$rid/"
     # The apphost carried its original bundle's Info.plist signature slot.
     # Re-sign it as a standalone tool after relocation; outer --deep signing
     # treats Resources as data and does not repair the running host's identity.
@@ -33,6 +36,9 @@ for rid in osx-arm64 osx-x64; do
 done
 cp "$stage/osx-arm64/pngr.app/Contents/Info.plist" "$bundle/Contents/Info.plist"
 cp -R "$stage/osx-arm64/pngr.app/Contents/Resources/." "$bundle/Contents/Resources/"
+# The visible collection covers both architectures; exact inventories stay with each payload.
+cp compliance/THIRD-PARTY-NOTICES.txt "$bundle/Contents/Resources/THIRD-PARTY-NOTICES.txt"
+rm "$bundle/Contents/Resources/third-party-inventory.json"
 xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=12.0 \
     scripts/macos/universal-launcher.c -o "$bundle/Contents/MacOS/pngr"
 # Ad-hoc signatures satisfy runtime integrity; this is NOT Developer ID signing or notarization.
@@ -66,6 +72,7 @@ python3 scripts/verify-macos-universal.py "$bundle" "$version" --require-updater
 codesign --verify --deep --strict "$bundle"
 mkdir "$stage/image"
 mv "$bundle" "$stage/image/pngr.app"
+cp compliance/THIRD-PARTY-NOTICES.txt "$stage/image/THIRD-PARTY-NOTICES.txt"
 ln -s /Applications "$stage/image/Applications"
 # Finder presentation is generated on the mounted image so its background alias
 # references the image volume, not a temporary build directory.
@@ -89,6 +96,8 @@ hdiutil verify -quiet "$stage/Pngr-macos-universal.dmg"
 hdiutil attach -quiet -nobrowse -mountpoint "$stage/mounted" "$stage/Pngr-macos-universal.dmg"
 mounted_volume="$stage/mounted"
 "$layout_python" scripts/macos/configure-dmg.py "$mounted_volume" --verify
+cmp compliance/THIRD-PARTY-NOTICES.txt "$mounted_volume/THIRD-PARTY-NOTICES.txt"
+python3 scripts/verify-macos-universal.py "$mounted_volume/pngr.app" "$version" --require-updater
 hdiutil detach -quiet "$mounted_volume"
 mounted_volume=
 rm -rf artifacts/universal/pngr.app

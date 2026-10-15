@@ -1,0 +1,1211 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "Avalonia",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Angle.Windows.Natives",
+      "version": "2.1.25547.20250602",
+      "kind": "runtime-or-platform-runtime",
+      "license": "LICENSE",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Angle.Windows.Natives/2.1.25547.20250602",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/angle/",
+        "commit": "cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/LICENSE",
+          "source": "https://www.nuget.org/packages/Avalonia.Angle.Windows.Natives/2.1.25547.20250602#package-file:LICENSE",
+          "sha256": "54aff7276217df9f6b5181613999d208c9e40d2b1d51bf55217837e6871a4a63"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/common/third_party/xxhash/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/common/third_party/xxhash/LICENSE",
+          "sha256": "86ec6953794503942b70fcd4f35b565d44f63f703b7037ce44dad965c4aaae91"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/libANGLE/overlay/LICENSE.txt",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/libANGLE/overlay/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/libANGLE/renderer/vulkan/shaders/src/third_party/etc_decoder/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/libANGLE/renderer/vulkan/shaders/src/third_party/etc_decoder/LICENSE",
+          "sha256": "118be5792e5126839694ca2209c62c71d2d7cd49e7bbb43bbdee9b016fb06094"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/libANGLE/renderer/vulkan/shaders/src/third_party/ffx_spd/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/libANGLE/renderer/vulkan/shaders/src/third_party/ffx_spd/LICENSE",
+          "sha256": "09a7c3fbc0b4ae6a9ccc4ffdcbfa511c14b8647a24f24783838862cf6c226d4e"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/third_party/ceval/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/third_party/ceval/LICENSE",
+          "sha256": "0dd71b8a6d6db0db4dc38a983749e1b2f4bb57aba30141a168042042c4a7b6f8"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/third_party/libXNVCtrl/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/third_party/libXNVCtrl/LICENSE",
+          "sha256": "31346421254a3e6e12687cf17f19f6357ee73a617fa7b3d3ccefdcbabe49bdd3"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/src/third_party/volk/LICENSE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/src/third_party/volk/LICENSE.md",
+          "sha256": "336f505f8d5aa73ea40b4d798dde86953e9c1f6525757f1d7f18120fea09bb1d"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/third_party/flatbuffers/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/third_party/flatbuffers/LICENSE",
+          "sha256": "7ec9661a8afafab1eee3523d6f1a193eff76314a5ab10b4ce96aefd87621b0c3"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/third_party/glslang/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/third_party/glslang/LICENSE",
+          "sha256": "23353f4505b1c8ce4f8f72fc3b11dc74b4a8a7bf95921d93ff77f227c171a710"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/third_party/spirv-headers/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/third_party/spirv-headers/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/third_party/spirv-tools/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/third_party/spirv-tools/LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/third_party/vulkan-headers/LICENSE.txt",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/third_party/vulkan-headers/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "compliance/licenses/avalonia.angle.windows.natives-2.1.25547.20250602/upstream/util/windows/third_party/StackWalker/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/angle/cb8b4e1307a9d8f5ff56b8c5973bea4158ffead8/util/windows/third_party/StackWalker/LICENSE",
+          "sha256": "bfec18debedcb337f8af53f143ccf0b1575d0b7c30deaee137f10397eca0d353"
+        }
+      ],
+      "distributedRids": [
+        "win-x64"
+      ],
+      "nativeNoticeScope": "Pinned ANGLE package root license plus conservative runtime/vendor source notice superset, including optional Vulkan/X11 components. Build/test-only tooling notices excluded. Exact compiler feature/linkage attestation remains upstream.",
+      "copyrightMetadata": "Copyright 2013-2025 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.BuildServices",
+      "version": "11.3.2",
+      "kind": "build-only",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.BuildServices/11.3.2",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia.BuildServices",
+        "commit": "777f975b0a0cecf0311273711d56697212c558c0"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.buildservices-11.3.2/LICENSE",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia.BuildServices/777f975b0a0cecf0311273711d56697212c558c0/LICENSE",
+          "sha256": "94162c40c663bd96ec1b870e6aba6ef0a43f44c9eb500807e7965e7078f6dc47"
+        }
+      ],
+      "distributedRids": [],
+      "copyrightMetadata": "Copyright 2023-2025 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Controls.DataGrid",
+      "version": "11.3.7",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Controls.DataGrid/11.3.7",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia.Controls.DataGrid",
+        "commit": "f79608e7c6fe3e9a3bcb5d46d2a68d5a93e07a4e"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.controls.datagrid-11.3.7/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia.Controls.DataGrid/f79608e7c6fe3e9a3bcb5d46d2a68d5a93e07a4e/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2025 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Desktop",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Desktop/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.desktop-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.FreeDesktop",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.FreeDesktop/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.freedesktop-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Native",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Native/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.native-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Remote.Protocol",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Remote.Protocol/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.remote.protocol-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Skia",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Skia/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.skia-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Themes.Fluent",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Themes.Fluent/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.themes.fluent-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.Win32",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.Win32/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.win32-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "Avalonia.X11",
+      "version": "11.3.20",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT and component-specific terms in NOTICE.md",
+      "packageSource": "https://www.nuget.org/packages/Avalonia.X11/11.3.20",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/AvaloniaUI/Avalonia/",
+        "commit": "984c3b833f29806eb159fb7f12a6132e936b75df"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/avalonia.x11-11.3.20/licence.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/licence.md",
+          "sha256": "213814d306090074d234d760239ff0f67eb9b8d20eefb4d5631bb39dbe0b769b"
+        },
+        {
+          "path": "compliance/licenses/avalonia-11.3.20/NOTICE.md",
+          "source": "https://raw.githubusercontent.com/AvaloniaUI/Avalonia/984c3b833f29806eb159fb7f12a6132e936b75df/NOTICE.md",
+          "sha256": "0e1ecea8b94eaacec8ade631994149d678940d05163b21d6f4be3d5dccb0a08d"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2013-2026 \u00a9 The AvaloniaUI Project",
+      "authorsMetadata": "Avalonia Team"
+    },
+    {
+      "name": "HarfBuzzSharp",
+      "version": "8.3.1.1",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/HarfBuzzSharp/8.3.1.1",
+      "repository": {
+        "type": "git",
+        "url": "https://go.microsoft.com/fwlink/?linkid=868515",
+        "branch": "release/3.119.0",
+        "commit": "64f24b1cddb68d30ec0ac6b661964178fc21d5ec"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/harfbuzzsharp-8.3.1.1/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp/8.3.1.1#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "HarfBuzzSharp.NativeAssets.Linux",
+      "version": "8.3.1.1",
+      "kind": "restored-not-redistributed",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Linux/8.3.1.1",
+      "repository": {
+        "type": "git",
+        "url": "https://go.microsoft.com/fwlink/?linkid=868515",
+        "branch": "release/3.119.0",
+        "commit": "64f24b1cddb68d30ec0ac6b661964178fc21d5ec"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.linux-8.3.1.1/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Linux/8.3.1.1#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.linux-8.3.1.1/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Linux/8.3.1.1#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "HarfBuzzSharp.NativeAssets.macOS",
+      "version": "8.3.1.1",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.macOS/8.3.1.1",
+      "repository": {
+        "type": "git",
+        "url": "https://go.microsoft.com/fwlink/?linkid=868515",
+        "branch": "release/3.119.0",
+        "commit": "64f24b1cddb68d30ec0ac6b661964178fc21d5ec"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.macos-8.3.1.1/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.macOS/8.3.1.1#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.macos-8.3.1.1/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.macOS/8.3.1.1#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "HarfBuzzSharp.NativeAssets.WebAssembly",
+      "version": "8.3.1.1",
+      "kind": "restored-not-redistributed",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.WebAssembly/8.3.1.1",
+      "repository": {
+        "type": "git",
+        "url": "https://go.microsoft.com/fwlink/?linkid=868515",
+        "branch": "release/3.119.0",
+        "commit": "64f24b1cddb68d30ec0ac6b661964178fc21d5ec"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.webassembly-8.3.1.1/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.WebAssembly/8.3.1.1#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.webassembly-8.3.1.1/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.WebAssembly/8.3.1.1#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "HarfBuzzSharp.NativeAssets.Win32",
+      "version": "8.3.1.1",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Win32/8.3.1.1",
+      "repository": {
+        "type": "git",
+        "url": "https://go.microsoft.com/fwlink/?linkid=868515",
+        "branch": "release/3.119.0",
+        "commit": "64f24b1cddb68d30ec0ac6b661964178fc21d5ec"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.win32-8.3.1.1/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Win32/8.3.1.1#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/harfbuzzsharp.nativeassets.win32-8.3.1.1/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Win32/8.3.1.1#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "MicroCom.Runtime",
+      "version": "0.11.0",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/MicroCom.Runtime/0.11.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/kekekeks/MicroCom"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/microcom.runtime-0.11.0/LICENSE",
+          "source": "https://raw.githubusercontent.com/kekekeks/MicroCom/76785efcafd91b5902fd19dd11145f6dd655b7b4/LICENSE",
+          "sha256": "6ee769c9ac4dac9abb16b98b1341e9528ff9f4ab685481410d3376d14148f3a9"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "provenanceNote": "NuGet 0.11.0 declares MIT and Copyright 2021 Nikita Tsukanov. Upstream has no published tags or package commit; immutable upstream notice is consistent with package metadata, but exact source revision remains unestablished.",
+      "copyrightMetadata": "Copyright 2021 \u00a9 Nikita Tsukanov",
+      "authorsMetadata": "MicroCom.Runtime"
+    },
+    {
+      "name": "Microsoft.Data.Sqlite",
+      "version": "10.0.12",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "95017c711e6afc1085133d440e42b4bd78155701"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.data.sqlite-10.0.12/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/LICENSE.TXT",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.12",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Microsoft.Data.Sqlite.Core/10.0.12",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "95017c711e6afc1085133d440e42b4bd78155701"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.data.sqlite.core-10.0.12/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/LICENSE.TXT",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SkiaSharp",
+      "version": "2.88.9",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/SkiaSharp/2.88.9",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/mono/SkiaSharp",
+        "branch": "release/2.88.9",
+        "commit": "9699cdf046a989423a5e5eca68e7fd813486d81c"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/skiasharp-2.88.9/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp/2.88.9#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/skiasharp-2.88.9/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp/2.88.9#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SkiaSharp.NativeAssets.Linux",
+      "version": "2.88.9",
+      "kind": "restored-not-redistributed",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux/2.88.9",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/mono/SkiaSharp",
+        "branch": "release/2.88.9",
+        "commit": "9699cdf046a989423a5e5eca68e7fd813486d81c"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.linux-2.88.9/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux/2.88.9#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.linux-2.88.9/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux/2.88.9#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SkiaSharp.NativeAssets.macOS",
+      "version": "2.88.9",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.macOS/2.88.9",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/mono/SkiaSharp",
+        "branch": "release/2.88.9",
+        "commit": "9699cdf046a989423a5e5eca68e7fd813486d81c"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.macos-2.88.9/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.macOS/2.88.9#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.macos-2.88.9/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.macOS/2.88.9#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SkiaSharp.NativeAssets.WebAssembly",
+      "version": "2.88.9",
+      "kind": "restored-not-redistributed",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.WebAssembly/2.88.9",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/mono/SkiaSharp",
+        "branch": "release/2.88.9",
+        "commit": "9699cdf046a989423a5e5eca68e7fd813486d81c"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.webassembly-2.88.9/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.WebAssembly/2.88.9#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.webassembly-2.88.9/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.WebAssembly/2.88.9#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SkiaSharp.NativeAssets.Win32",
+      "version": "2.88.9",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/2.88.9",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/mono/SkiaSharp",
+        "branch": "release/2.88.9",
+        "commit": "9699cdf046a989423a5e5eca68e7fd813486d81c"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.win32-2.88.9/THIRD-PARTY-NOTICES.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/2.88.9#package-file:THIRD-PARTY-NOTICES.txt",
+          "sha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5"
+        },
+        {
+          "path": "compliance/licenses/skiasharp.nativeassets.win32-2.88.9/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/2.88.9#package-file:LICENSE.txt",
+          "sha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938"
+        }
+      ],
+      "distributedRids": [
+        "win-x64"
+      ],
+      "copyrightMetadata": "\u00a9 Microsoft Corporation. All rights reserved.",
+      "authorsMetadata": "Microsoft"
+    },
+    {
+      "name": "SQLite",
+      "version": "3.53.4",
+      "kind": "runtime-or-platform-runtime",
+      "license": "LICENSE.txt",
+      "packageSource": "https://www.nuget.org/packages/SQLite/3.53.4",
+      "repository": {},
+      "notices": [
+        {
+          "path": "compliance/licenses/sqlite-3.53.4/LICENSE.txt",
+          "source": "https://www.nuget.org/packages/SQLite/3.53.4#package-file:LICENSE.txt",
+          "sha256": "99464c3a88df7b708ce59e462cdcb85f72dfc9b1335b4fcc68be56131b634b95"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2014-2026 SourceGear, LLC",
+      "authorsMetadata": "Eric Sink"
+    },
+    {
+      "name": "SQLitePCLRaw.bundle_e_sqlite3",
+      "version": "3.0.5",
+      "kind": "runtime-or-platform-runtime",
+      "license": "Apache-2.0",
+      "packageSource": "https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3/3.0.5",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/ericsink/SQLitePCL.raw"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/sqlitepclraw.bundle_e_sqlite3-3.0.5/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/v3.0.5/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2014-2026 SourceGear, LLC",
+      "authorsMetadata": "Eric Sink"
+    },
+    {
+      "name": "SQLitePCLRaw.config.e_sqlite3",
+      "version": "3.0.5",
+      "kind": "runtime-or-platform-runtime",
+      "license": "Apache-2.0",
+      "packageSource": "https://www.nuget.org/packages/SQLitePCLRaw.config.e_sqlite3/3.0.5",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/ericsink/SQLitePCL.raw",
+        "commit": "96043b8cff323f21919df86a431c136655d81b4a"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/sqlitepclraw.config.e_sqlite3-3.0.5/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/96043b8cff323f21919df86a431c136655d81b4a/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2014-2026 SourceGear, LLC",
+      "authorsMetadata": "Eric Sink"
+    },
+    {
+      "name": "SQLitePCLRaw.core",
+      "version": "3.0.5",
+      "kind": "runtime-or-platform-runtime",
+      "license": "Apache-2.0",
+      "packageSource": "https://www.nuget.org/packages/SQLitePCLRaw.core/3.0.5",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/ericsink/SQLitePCL.raw",
+        "commit": "ed046114d5a30534e13294d94d78eb73de896ad4"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/sqlitepclraw.core-3.0.5/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2014-2025 SourceGear, LLC",
+      "authorsMetadata": "Eric Sink"
+    },
+    {
+      "name": "SQLitePCLRaw.provider.e_sqlite3",
+      "version": "3.0.5",
+      "kind": "runtime-or-platform-runtime",
+      "license": "Apache-2.0",
+      "packageSource": "https://www.nuget.org/packages/SQLitePCLRaw.provider.e_sqlite3/3.0.5",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/ericsink/SQLitePCL.raw",
+        "commit": "ed046114d5a30534e13294d94d78eb73de896ad4"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/sqlitepclraw.provider.e_sqlite3-3.0.5/LICENSE.TXT",
+          "source": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright 2014-2025 SourceGear, LLC",
+      "authorsMetadata": "Eric Sink"
+    },
+    {
+      "name": "Tmds.DBus.Protocol",
+      "version": "0.21.3",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Tmds.DBus.Protocol/0.21.3",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/tmds/Tmds.DBus.git",
+        "branch": "refs/heads/release/0.21",
+        "commit": "8cb04f66c330b64244e996ff68f685f27f7381a0"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/tmds.dbus.protocol-0.21.3/COPYING",
+          "source": "https://raw.githubusercontent.com/tmds/Tmds.DBus/8cb04f66c330b64244e996ff68f685f27f7381a0/COPYING",
+          "sha256": "aca3b49277abcc7886ccb2f115603a9f5b15fc3f96019a10c00f2974098b210c"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Tom Deseyn",
+      "authorsMetadata": "Tom Deseyn"
+    },
+    {
+      "name": "Velopack",
+      "version": "1.2.161",
+      "kind": "runtime-or-platform-runtime",
+      "license": "MIT",
+      "packageSource": "https://www.nuget.org/packages/Velopack/1.2.161",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/velopack/velopack",
+        "branch": "refs/heads/master",
+        "commit": "92d6a1c91716729d449034df5c50307dcce39493"
+      },
+      "notices": [
+        {
+          "path": "compliance/licenses/velopack-1.2.161/LICENSE",
+          "source": "https://raw.githubusercontent.com/velopack/velopack/92d6a1c91716729d449034df5c50307dcce39493/LICENSE",
+          "sha256": "91845db83551c877ebbb1118e0fb92e4e527290d23b995c55dcd438b3293943f"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64",
+        "osx-x64",
+        "win-x64"
+      ],
+      "copyrightMetadata": "Copyright \u00a9 Velopack Ltd. All rights reserved.",
+      "authorsMetadata": "Velopack Ltd,Caelan Sayler,Kevin Bost"
+    },
+    {
+      "name": "microsoft.netcore.app.runtime.osx-arm64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "osx-arm64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.osx-arm64-10.0.13/LICENSE.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.osx-arm64/10.0.13/microsoft.netcore.app.runtime.osx-arm64.10.0.13.nupkg#LICENSE.TXT",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+        },
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.osx-arm64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.osx-arm64/10.0.13/microsoft.netcore.app.runtime.osx-arm64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "66f1d4e44973185519bb4aa8a9718eb22fc7af2cc532e3ae9cfc4c127ee7fc54"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64"
+      ]
+    },
+    {
+      "name": "microsoft.netcore.app.runtime.osx-x64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "osx-x64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.osx-x64-10.0.13/LICENSE.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.osx-x64/10.0.13/microsoft.netcore.app.runtime.osx-x64.10.0.13.nupkg#LICENSE.TXT",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+        },
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.osx-x64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.osx-x64/10.0.13/microsoft.netcore.app.runtime.osx-x64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "66f1d4e44973185519bb4aa8a9718eb22fc7af2cc532e3ae9cfc4c127ee7fc54"
+        }
+      ],
+      "distributedRids": [
+        "osx-x64"
+      ]
+    },
+    {
+      "name": "microsoft.netcore.app.runtime.win-x64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "win-x64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.win-x64-10.0.13/LICENSE.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-x64/10.0.13/microsoft.netcore.app.runtime.win-x64.10.0.13.nupkg#LICENSE.TXT",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "path": "compliance/licenses/microsoft.netcore.app.runtime.win-x64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.runtime.win-x64/10.0.13/microsoft.netcore.app.runtime.win-x64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ],
+      "distributedRids": [
+        "win-x64"
+      ]
+    },
+    {
+      "name": "microsoft.aspnetcore.app.runtime.osx-arm64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "osx-arm64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.osx-arm64-10.0.13/LICENSE.txt",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.osx-arm64/10.0.13/microsoft.aspnetcore.app.runtime.osx-arm64.10.0.13.nupkg#LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+        },
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.osx-arm64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.osx-arm64/10.0.13/microsoft.aspnetcore.app.runtime.osx-arm64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "52af3d603b6d069e635f8afd08ec44ec01559255b5f3afd161ae9e6fe7e7aa54"
+        }
+      ],
+      "distributedRids": [
+        "osx-arm64"
+      ]
+    },
+    {
+      "name": "microsoft.aspnetcore.app.runtime.osx-x64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "osx-x64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.osx-x64-10.0.13/LICENSE.txt",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.osx-x64/10.0.13/microsoft.aspnetcore.app.runtime.osx-x64.10.0.13.nupkg#LICENSE.txt",
+          "sha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310"
+        },
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.osx-x64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.osx-x64/10.0.13/microsoft.aspnetcore.app.runtime.osx-x64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "52af3d603b6d069e635f8afd08ec44ec01559255b5f3afd161ae9e6fe7e7aa54"
+        }
+      ],
+      "distributedRids": [
+        "osx-x64"
+      ]
+    },
+    {
+      "name": "microsoft.aspnetcore.app.runtime.win-x64",
+      "version": "10.0.13",
+      "kind": "runtime-framework",
+      "license": "MIT and component-specific licenses",
+      "rid": "win-x64",
+      "notices": [
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.win-x64-10.0.13/LICENSE.txt",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.win-x64/10.0.13/microsoft.aspnetcore.app.runtime.win-x64.10.0.13.nupkg#LICENSE.txt",
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "path": "compliance/licenses/microsoft.aspnetcore.app.runtime.win-x64-10.0.13/THIRD-PARTY-NOTICES.TXT",
+          "source": "https://api.nuget.org/v3-flatcontainer/microsoft.aspnetcore.app.runtime.win-x64/10.0.13/microsoft.aspnetcore.app.runtime.win-x64.10.0.13.nupkg#THIRD-PARTY-NOTICES.TXT",
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9"
+        }
+      ],
+      "distributedRids": [
+        "win-x64"
+      ]
+    }
+  ],
+  "additionalComponents": [
+    {
+      "name": "NSIS installer runtime, Modern UI, compression and plugins",
+      "version": "3.12.0",
+      "kind": "native-installer",
+      "license": "zlib/libpng and component-specific terms in COPYING",
+      "rids": [
+        "win-x64"
+      ],
+      "notices": [
+        {
+          "path": "compliance/licenses/nsis-3.12/COPYING",
+          "source": "https://raw.githubusercontent.com/kichik/nsis/v312/COPYING",
+          "sha256": "6cc665347be5c84b76bf0fd6f85fbb0c33261e89b3408aa3e3e55dbe95e12d89"
+        }
+      ],
+      "sourceAvailability": "Unmodified NSIS 3.12 source (including LZMA module): https://github.com/kichik/nsis/tree/v312 ; source archive: https://github.com/kichik/nsis/archive/refs/tags/v312.tar.gz . NSIS compiler is build-only; installer stub, MUI/plugin and LZMA code are redistributed."
+    }
+  ],
+  "reviewedDistributionProfiles": {
+    "osx-arm64": [
+      "Avalonia.Controls.DataGrid/11.3.7",
+      "Avalonia.Desktop/11.3.20",
+      "Avalonia.FreeDesktop/11.3.20",
+      "Avalonia.Native/11.3.20",
+      "Avalonia.Remote.Protocol/11.3.20",
+      "Avalonia.Skia/11.3.20",
+      "Avalonia.Themes.Fluent/11.3.20",
+      "Avalonia.Win32/11.3.20",
+      "Avalonia.X11/11.3.20",
+      "Avalonia/11.3.20",
+      "HarfBuzzSharp.NativeAssets.macOS/8.3.1.1",
+      "HarfBuzzSharp/8.3.1.1",
+      "MicroCom.Runtime/0.11.0",
+      "Microsoft.Data.Sqlite.Core/10.0.12",
+      "Microsoft.Data.Sqlite/10.0.12",
+      "SQLite/3.53.4",
+      "SQLitePCLRaw.bundle_e_sqlite3/3.0.5",
+      "SQLitePCLRaw.config.e_sqlite3/3.0.5",
+      "SQLitePCLRaw.core/3.0.5",
+      "SQLitePCLRaw.provider.e_sqlite3/3.0.5",
+      "SkiaSharp.NativeAssets.macOS/2.88.9",
+      "SkiaSharp/2.88.9",
+      "Tmds.DBus.Protocol/0.21.3",
+      "Velopack/1.2.161",
+      "runtimepack.Microsoft.AspNetCore.App.Runtime.osx-arm64/10.0.13",
+      "runtimepack.Microsoft.NETCore.App.Runtime.osx-arm64/10.0.13"
+    ],
+    "osx-x64": [
+      "Avalonia.Controls.DataGrid/11.3.7",
+      "Avalonia.Desktop/11.3.20",
+      "Avalonia.FreeDesktop/11.3.20",
+      "Avalonia.Native/11.3.20",
+      "Avalonia.Remote.Protocol/11.3.20",
+      "Avalonia.Skia/11.3.20",
+      "Avalonia.Themes.Fluent/11.3.20",
+      "Avalonia.Win32/11.3.20",
+      "Avalonia.X11/11.3.20",
+      "Avalonia/11.3.20",
+      "HarfBuzzSharp.NativeAssets.macOS/8.3.1.1",
+      "HarfBuzzSharp/8.3.1.1",
+      "MicroCom.Runtime/0.11.0",
+      "Microsoft.Data.Sqlite.Core/10.0.12",
+      "Microsoft.Data.Sqlite/10.0.12",
+      "SQLite/3.53.4",
+      "SQLitePCLRaw.bundle_e_sqlite3/3.0.5",
+      "SQLitePCLRaw.config.e_sqlite3/3.0.5",
+      "SQLitePCLRaw.core/3.0.5",
+      "SQLitePCLRaw.provider.e_sqlite3/3.0.5",
+      "SkiaSharp.NativeAssets.macOS/2.88.9",
+      "SkiaSharp/2.88.9",
+      "Tmds.DBus.Protocol/0.21.3",
+      "Velopack/1.2.161",
+      "runtimepack.Microsoft.AspNetCore.App.Runtime.osx-x64/10.0.13",
+      "runtimepack.Microsoft.NETCore.App.Runtime.osx-x64/10.0.13"
+    ],
+    "win-x64": [
+      "Avalonia.Angle.Windows.Natives/2.1.25547.20250602",
+      "Avalonia.Controls.DataGrid/11.3.7",
+      "Avalonia.Desktop/11.3.20",
+      "Avalonia.FreeDesktop/11.3.20",
+      "Avalonia.Native/11.3.20",
+      "Avalonia.Remote.Protocol/11.3.20",
+      "Avalonia.Skia/11.3.20",
+      "Avalonia.Themes.Fluent/11.3.20",
+      "Avalonia.Win32/11.3.20",
+      "Avalonia.X11/11.3.20",
+      "Avalonia/11.3.20",
+      "HarfBuzzSharp.NativeAssets.Win32/8.3.1.1",
+      "HarfBuzzSharp/8.3.1.1",
+      "MicroCom.Runtime/0.11.0",
+      "Microsoft.Data.Sqlite.Core/10.0.12",
+      "Microsoft.Data.Sqlite/10.0.12",
+      "SQLite/3.53.4",
+      "SQLitePCLRaw.bundle_e_sqlite3/3.0.5",
+      "SQLitePCLRaw.config.e_sqlite3/3.0.5",
+      "SQLitePCLRaw.core/3.0.5",
+      "SQLitePCLRaw.provider.e_sqlite3/3.0.5",
+      "SkiaSharp.NativeAssets.Win32/2.88.9",
+      "SkiaSharp/2.88.9",
+      "Tmds.DBus.Protocol/0.21.3",
+      "Velopack/1.2.161",
+      "runtimepack.Microsoft.AspNetCore.App.Runtime.win-x64/10.0.13",
+      "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/10.0.13"
+    ]
+  },
+  "reviewedRelease": "v0.7.5"
+}

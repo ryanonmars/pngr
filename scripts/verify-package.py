@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Check release ZIP contents without launching a cross-platform executable."""
 import argparse
+import importlib.util
 import json
 import pathlib
 import plistlib
 import zipfile
+
+# Reuse the same content/hash checks for staging, portable archives and updates.
+_NOTICE_SPEC = importlib.util.spec_from_file_location(
+    'pngr_distribution_notices', pathlib.Path(__file__).resolve().parent / 'verify-distribution-notices.py')
+NOTICE_CHECKS = importlib.util.module_from_spec(_NOTICE_SPEC)
+_NOTICE_SPEC.loader.exec_module(NOTICE_CHECKS)
 
 
 def verify(path, runtime, version):
@@ -20,7 +27,10 @@ def verify(path, runtime, version):
         dependencies = json.loads(archive.read(prefix + "pngr.deps.json"))
         assert f"pngr/{version}" in dependencies["libraries"], "Application version does not match release"
         assert dependencies["runtimeTarget"]["name"].endswith("/" + runtime), "Archive runtime does not match release target"
+        material_prefix = "pngr.app/Contents/Resources/" if runtime.startswith("osx-") else ""
+        NOTICE_CHECKS.verify_archive_runtime(archive, material_prefix, prefix, runtime)
         for name in names:
+            NOTICE_CHECKS.reject_private_material(name)
             # ditto includes harmless AppleDouble resource metadata in macOS ZIPs.
             parts = pathlib.PurePosixPath(name).parts
             if parts and parts[0] == "__MACOSX":

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify native architecture slices and self-contained dependencies of a Universal 2 bundle."""
 import argparse
+import importlib.util
 import json
 import pathlib
 import plistlib
@@ -11,6 +12,12 @@ import tempfile
 
 ARM64 = 0x0100000C
 X64 = 0x01000007
+
+# Reuse the same content/hash checks for staging, portable archives and updates.
+_NOTICE_SPEC = importlib.util.spec_from_file_location(
+    'pngr_distribution_notices', pathlib.Path(__file__).resolve().parent / 'verify-distribution-notices.py')
+NOTICE_CHECKS = importlib.util.module_from_spec(_NOTICE_SPEC)
+_NOTICE_SPEC.loader.exec_module(NOTICE_CHECKS)
 
 
 def architectures(data):
@@ -87,8 +94,10 @@ def verify(bundle, version, check_dependencies=True, require_updater=False):
                         # should require Homebrew or a separately installed .NET runtime.
                         assert any(payload.rglob(pathlib.PurePosixPath(dependency).name)), f"Missing rpath dependency: {dependency}"
     for file in bundle.rglob("*"):
+        NOTICE_CHECKS.reject_private_material(file.relative_to(bundle).as_posix())
         assert file.suffix.lower() not in (".db", ".sqlite", ".sqlite3", ".pdb", ".cs", ".csproj", ".trx"), f"User/development file: {file}"
         assert file.name not in ("workspace.json", "settings.json", "profiles.json", ".env")
+    NOTICE_CHECKS.verify_universal_directory(bundle)
     verify_runtime_signatures(bundle, version)
     print(f"Verified Universal 2 pngr {version}: native ARM64/x64 launcher and both self-contained payloads")
 

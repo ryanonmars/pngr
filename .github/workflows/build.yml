@@ -21,6 +21,20 @@ permissions:
   contents: read
 
 jobs:
+  website:
+    name: Website license coverage and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+        working-directory: website
+      - run: npm run typecheck && npm run build && npm test
+        working-directory: website
   build:
     name: ${{ matrix.runtime }}
     strategy:
@@ -55,6 +69,8 @@ jobs:
         run: dotnet test TraceScope.slnx -c Release --no-build --logger trx --results-directory artifacts/test-results
       - name: Test packaging verification
         run: python -m unittest discover -s tests/packaging -v
+      - name: Test license inventory and original notice texts
+        run: python -m unittest discover -s scripts/licensing -p "test_*.py" -v
       - name: Package macOS
         if: inputs.package && runner.os == 'macOS'
         shell: bash
@@ -80,10 +96,13 @@ jobs:
         shell: pwsh
         run: |
           $compilerDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
-          if (-not (Test-Path (Join-Path $compilerDir 'makensis.exe'))) {
-            choco install nsis --version=3.12.0 --yes --no-progress
+          $compiler = Join-Path $compilerDir 'makensis.exe'
+          $compilerVersion = if (Test-Path $compiler) { & $compiler /VERSION } else { '' }
+          if ($compilerVersion -ne 'v3.12') {
+            choco upgrade nsis --version=3.12.0 --allow-downgrade --yes --no-progress
             if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
           }
+          if ((& $compiler /VERSION) -ne 'v3.12') { throw 'NSIS version differs from reviewed license inventory' }
           $compilerDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Package Windows installer and update feed
         if: inputs.package && runner.os == 'Windows'
@@ -180,7 +199,7 @@ jobs:
   validate-installers:
     name: Validate public installer assets
     if: inputs.package
-    needs: [build, universal]
+    needs: [build, universal, website]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

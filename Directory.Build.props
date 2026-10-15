@@ -2,4 +2,10 @@
   <PropertyGroup>
     <RestorePackagesPath>$(MSBuildThisFileDirectory).tools/nuget</RestorePackagesPath>
   </PropertyGroup>
+  <!-- Keep the shipped runtime aligned with the reviewed license inventory.
+       Framework-dependent developer tests use their installed .NET runtime. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <RuntimeFrameworkVersion>10.0.13</RuntimeFrameworkVersion>
+    <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
+  </PropertyGroup>
 </Project>

@@ -18,6 +18,8 @@ try {
     if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
     & $sdk publish src/TraceScope.App/TraceScope.App.csproj -c Release -r $Runtime --self-contained true "-p:Version=$Version" -p:IncludeSourceRevisionInInformationalVersion=false -p:DebugType=None -p:DebugSymbols=false -o $publishDir
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)." }
+    python scripts/licensing/generate.py --publish-dir $publishDir --rid $Runtime
+    if ($LASTEXITCODE -ne 0) { throw "Third-party notice generation failed." }
     $executable = Join-Path $publishDir 'pngr.exe'
     $reportedVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($executable).ProductVersion
     if ($reportedVersion -ne $Version) { throw "Application reports '$reportedVersion', expected '$Version'." }

@@ -1,0 +1,1526 @@
+{
+  "schemaVersion": 1,
+  "packageLockSha256": "75a0d84485ffd65469a596598f695bcfe173e370dd67c30309ca8171d4a30c24",
+  "noticesSha256": "4ee079190ba5cd669cddbdb030cd640221452b6d4db71950df537dac09e596dc",
+  "packages": [
+    {
+      "path": "node_modules/@floating-ui/core",
+      "name": "@floating-ui/core",
+      "version": "1.8.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @floating-ui/core@1.8.0",
+      "files": [
+        {
+          "path": "node_modules/@floating-ui/core/LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@floating-ui/dom",
+      "name": "@floating-ui/dom",
+      "version": "1.8.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @floating-ui/dom@1.8.0",
+      "files": [
+        {
+          "path": "node_modules/@floating-ui/dom/LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@floating-ui/react-dom",
+      "name": "@floating-ui/react-dom",
+      "version": "2.1.9",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @floating-ui/react-dom@2.1.9",
+      "files": [
+        {
+          "path": "node_modules/@floating-ui/react-dom/LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@floating-ui/utils",
+      "name": "@floating-ui/utils",
+      "version": "0.2.12",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @floating-ui/utils@0.2.12",
+      "files": [
+        {
+          "path": "node_modules/@floating-ui/utils/LICENSE",
+          "sha256": "0e4c9a9b6c71019cbbea3bdc20b01223110a9035700f9c960c8fcbf78c2325ce"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@fuma-translate/react",
+      "name": "@fuma-translate/react",
+      "version": "1.0.2",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @fuma-translate/react@1.0.2",
+      "files": [
+        {
+          "path": "node_modules/@fuma-translate/react/LICENSE",
+          "sha256": "0360e39059f75e3657c7c0beb76f9ccd1e8c9809d8f538ee1b426812cf1ce1fb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/number",
+      "name": "@radix-ui/number",
+      "version": "1.1.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/number@1.1.3",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/number/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/primitive",
+      "name": "@radix-ui/primitive",
+      "version": "1.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/primitive@1.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/primitive/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-accordion",
+      "name": "@radix-ui/react-accordion",
+      "version": "1.3.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-accordion@1.3.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-accordion/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-collapsible",
+      "name": "@radix-ui/react-collapsible",
+      "version": "1.2.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-collapsible@1.2.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-collapsible/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-collection",
+      "name": "@radix-ui/react-collection",
+      "version": "1.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-collection@1.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-collection/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-compose-refs",
+      "name": "@radix-ui/react-compose-refs",
+      "version": "1.1.5",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-compose-refs@1.1.5",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-compose-refs/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-context",
+      "name": "@radix-ui/react-context",
+      "version": "1.3.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-context@1.3.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-context/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-dialog",
+      "name": "@radix-ui/react-dialog",
+      "version": "1.3.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-dialog@1.3.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-dialog/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-direction",
+      "name": "@radix-ui/react-direction",
+      "version": "1.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-direction@1.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-direction/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-dismissable-layer",
+      "name": "@radix-ui/react-dismissable-layer",
+      "version": "1.2.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-dismissable-layer@1.2.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-dismissable-layer/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-focus-guards",
+      "name": "@radix-ui/react-focus-guards",
+      "version": "1.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-focus-guards@1.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-focus-guards/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-focus-scope",
+      "name": "@radix-ui/react-focus-scope",
+      "version": "1.3.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-focus-scope@1.3.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-focus-scope/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-id",
+      "name": "@radix-ui/react-id",
+      "version": "1.1.4",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-id@1.1.4",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-id/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-popover",
+      "name": "@radix-ui/react-popover",
+      "version": "1.3.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-popover@1.3.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-popover/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-popper",
+      "name": "@radix-ui/react-popper",
+      "version": "1.4.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-popper@1.4.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-popper/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-portal",
+      "name": "@radix-ui/react-portal",
+      "version": "1.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-portal@1.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-portal/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-presence",
+      "name": "@radix-ui/react-presence",
+      "version": "1.1.11",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-presence@1.1.11",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-presence/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-primitive",
+      "name": "@radix-ui/react-primitive",
+      "version": "2.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-primitive@2.2.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-primitive/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-roving-focus",
+      "name": "@radix-ui/react-roving-focus",
+      "version": "1.2.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-roving-focus@1.2.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-roving-focus/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-scroll-area",
+      "name": "@radix-ui/react-scroll-area",
+      "version": "1.4.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-scroll-area@1.4.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-scroll-area/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-slot",
+      "name": "@radix-ui/react-slot",
+      "version": "1.5.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-slot@1.5.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-slot/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-tabs",
+      "name": "@radix-ui/react-tabs",
+      "version": "1.2.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-tabs@1.2.1",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-tabs/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-callback-ref",
+      "name": "@radix-ui/react-use-callback-ref",
+      "version": "1.1.5",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-callback-ref@1.1.5",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-callback-ref/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-controllable-state",
+      "name": "@radix-ui/react-use-controllable-state",
+      "version": "1.3.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-controllable-state@1.3.0",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-controllable-state/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-effect-event",
+      "name": "@radix-ui/react-use-effect-event",
+      "version": "0.0.5",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-effect-event@0.0.5",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-effect-event/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-is-hydrated",
+      "name": "@radix-ui/react-use-is-hydrated",
+      "version": "0.1.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-is-hydrated@0.1.3",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-is-hydrated/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-layout-effect",
+      "name": "@radix-ui/react-use-layout-effect",
+      "version": "1.1.4",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-layout-effect@1.1.4",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-layout-effect/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@radix-ui/react-use-size",
+      "name": "@radix-ui/react-use-size",
+      "version": "1.1.5",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm @radix-ui/react-use-size@1.1.5",
+      "files": [
+        {
+          "path": "node_modules/@radix-ui/react-use-size/LICENSE",
+          "sha256": "0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/@swc/helpers",
+      "name": "@swc/helpers",
+      "version": "0.5.23",
+      "license": "Apache-2.0",
+      "obligations": "Include Apache-2.0 text and applicable upstream NOTICE/attributions; identify modified upstream files if any. No upstream modifications made by this compliance pass.",
+      "scope": "emitted browser code",
+      "source": "npm @swc/helpers@0.5.23",
+      "files": [
+        {
+          "path": "node_modules/@swc/helpers/LICENSE",
+          "sha256": "d96eba1f1881334d50ffc144276dfa98e147a415e7c591ecdfcb81680361dc91"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/aria-hidden",
+      "name": "aria-hidden",
+      "version": "1.2.6",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm aria-hidden@1.2.6",
+      "files": [
+        {
+          "path": "node_modules/aria-hidden/LICENSE",
+          "sha256": "30f0cfddf483d1128e3610205020f2041a6c5e837aa999e0aa82e5576187d4a9"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/class-variance-authority",
+      "name": "class-variance-authority",
+      "version": "0.7.1",
+      "license": "Apache-2.0",
+      "obligations": "Include Apache-2.0 text and applicable upstream NOTICE/attributions; identify modified upstream files if any. No upstream modifications made by this compliance pass.",
+      "scope": "emitted browser code",
+      "source": "npm class-variance-authority@0.7.1",
+      "files": [
+        {
+          "path": "node_modules/class-variance-authority/LICENSE",
+          "sha256": "0ccbf956cffc8dcf515809433cb5242ee67c94513d46e48c261d68d0880de406"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/clsx",
+      "name": "clsx",
+      "version": "2.1.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm clsx@2.1.1",
+      "files": [
+        {
+          "path": "node_modules/clsx/license",
+          "sha256": "9a9edad7baae52622bddf3c15b2ef8a33d2c89f2d25408ad13e8a7481c6b0c97"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/cn",
+      "name": "cn",
+      "version": "0.4.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm cn@0.4.0",
+      "files": [
+        {
+          "path": "node_modules/cn/LICENSE",
+          "sha256": "00ff8408e93e2ecc4d90c0edeabdf434100c3aff50acc5d330e17eccd4a3faa5"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/comma-separated-tokens",
+      "name": "comma-separated-tokens",
+      "version": "2.0.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm comma-separated-tokens@2.0.3",
+      "files": [
+        {
+          "path": "node_modules/comma-separated-tokens/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/compute-scroll-into-view",
+      "name": "compute-scroll-into-view",
+      "version": "3.1.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm compute-scroll-into-view@3.1.1",
+      "files": [
+        {
+          "path": "node_modules/compute-scroll-into-view/LICENSE",
+          "sha256": "dfe2b2d612c7c1de1f32dcab5969bd68ecac0022a7582ca8cd4594729b9c8664"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/decode-named-character-reference",
+      "name": "decode-named-character-reference",
+      "version": "1.3.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm decode-named-character-reference@1.3.0",
+      "files": [
+        {
+          "path": "node_modules/decode-named-character-reference/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/devlop",
+      "name": "devlop",
+      "version": "1.1.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm devlop@1.1.0",
+      "files": [
+        {
+          "path": "node_modules/devlop/license",
+          "sha256": "6f296a5eccc1dc96714bb94ebaa9cac25b0a1467d74cc5263ac4d0646ab01f62"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/estree-util-is-identifier-name",
+      "name": "estree-util-is-identifier-name",
+      "version": "3.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm estree-util-is-identifier-name@3.0.0",
+      "files": [
+        {
+          "path": "node_modules/estree-util-is-identifier-name/license",
+          "sha256": "536804b3adbff17dbbb9ed0d2bf9655b78f07640278581e37e3d7475282d5e61"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/fumadocs-core",
+      "name": "fumadocs-core",
+      "version": "16.17.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm fumadocs-core@16.17.3",
+      "files": [
+        {
+          "path": "node_modules/fumadocs-core/LICENSE",
+          "sha256": "6d36549f2f0312586bb6d75c41b8007ea7557482aecfce6378f7713ced76766e"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/fumadocs-ui",
+      "name": "fumadocs-ui",
+      "version": "16.17.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm fumadocs-ui@16.17.3",
+      "files": [
+        {
+          "path": "node_modules/fumadocs-ui/LICENSE",
+          "sha256": "6d36549f2f0312586bb6d75c41b8007ea7557482aecfce6378f7713ced76766e"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/get-nonce",
+      "name": "get-nonce",
+      "version": "1.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm get-nonce@1.0.1",
+      "files": [
+        {
+          "path": "node_modules/get-nonce/LICENSE",
+          "sha256": "acf3b087b348d2f2e731b9d4131af185aad694c1204ce14a46909483fd42da05"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/hast-util-from-dom",
+      "name": "hast-util-from-dom",
+      "version": "5.0.1",
+      "license": "ISC",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm hast-util-from-dom@5.0.1",
+      "files": [
+        {
+          "path": "node_modules/hast-util-from-dom/license",
+          "sha256": "c01b44788e1829e81cb20d621c93c07a08ea010063118b956739f2ab050d17ca"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/hast-util-parse-selector",
+      "name": "hast-util-parse-selector",
+      "version": "4.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm hast-util-parse-selector@4.0.0",
+      "files": [
+        {
+          "path": "node_modules/hast-util-parse-selector/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/hast-util-to-jsx-runtime",
+      "name": "hast-util-to-jsx-runtime",
+      "version": "2.3.6",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm hast-util-to-jsx-runtime@2.3.6",
+      "files": [
+        {
+          "path": "node_modules/hast-util-to-jsx-runtime/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/hast-util-whitespace",
+      "name": "hast-util-whitespace",
+      "version": "3.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm hast-util-whitespace@3.0.0",
+      "files": [
+        {
+          "path": "node_modules/hast-util-whitespace/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/hastscript",
+      "name": "hastscript",
+      "version": "9.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm hastscript@9.0.1",
+      "files": [
+        {
+          "path": "node_modules/hastscript/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/inline-style-parser",
+      "name": "inline-style-parser",
+      "version": "0.2.7",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm inline-style-parser@0.2.7",
+      "files": [
+        {
+          "path": "node_modules/inline-style-parser/LICENSE",
+          "sha256": "395c95f20598da653ff1eb1cb9d74947c7fac689697147f1d192fd0242a0e635"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/lucide-react",
+      "name": "lucide-react",
+      "version": "1.57.0",
+      "license": "ISC AND MIT (bundled Feather icons; see upstream LICENSE)",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm lucide-react@1.57.0",
+      "files": [
+        {
+          "path": "node_modules/lucide-react/LICENSE",
+          "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark",
+      "name": "micromark",
+      "version": "4.0.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark@4.0.3",
+      "files": [
+        {
+          "path": "node_modules/micromark/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-core-commonmark",
+      "name": "micromark-core-commonmark",
+      "version": "2.0.4",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-core-commonmark@2.0.4",
+      "files": [
+        {
+          "path": "node_modules/micromark-core-commonmark/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-extension-gfm-table",
+      "name": "micromark-extension-gfm-table",
+      "version": "2.1.2",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-extension-gfm-table@2.1.2",
+      "files": [
+        {
+          "path": "node_modules/micromark-extension-gfm-table/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-factory-destination",
+      "name": "micromark-factory-destination",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-factory-destination@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-factory-destination/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-factory-label",
+      "name": "micromark-factory-label",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-factory-label@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-factory-label/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-factory-space",
+      "name": "micromark-factory-space",
+      "version": "2.1.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-factory-space@2.1.0",
+      "files": [
+        {
+          "path": "node_modules/micromark-factory-space/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-factory-title",
+      "name": "micromark-factory-title",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-factory-title@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-factory-title/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-factory-whitespace",
+      "name": "micromark-factory-whitespace",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-factory-whitespace@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-factory-whitespace/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-character",
+      "name": "micromark-util-character",
+      "version": "2.1.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-character@2.1.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-character/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-chunked",
+      "name": "micromark-util-chunked",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-chunked@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-chunked/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-classify-character",
+      "name": "micromark-util-classify-character",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-classify-character@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-classify-character/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-combine-extensions",
+      "name": "micromark-util-combine-extensions",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-combine-extensions@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-combine-extensions/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-decode-numeric-character-reference",
+      "name": "micromark-util-decode-numeric-character-reference",
+      "version": "2.0.2",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-decode-numeric-character-reference@2.0.2",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-decode-numeric-character-reference/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-edit-map",
+      "name": "micromark-util-edit-map",
+      "version": "1.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-edit-map@1.0.0",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-edit-map/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-encode",
+      "name": "micromark-util-encode",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-encode@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-encode/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-html-tag-name",
+      "name": "micromark-util-html-tag-name",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-html-tag-name@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-html-tag-name/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-normalize-identifier",
+      "name": "micromark-util-normalize-identifier",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-normalize-identifier@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-normalize-identifier/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-resolve-all",
+      "name": "micromark-util-resolve-all",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-resolve-all@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-resolve-all/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-sanitize-uri",
+      "name": "micromark-util-sanitize-uri",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-sanitize-uri@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-sanitize-uri/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/micromark-util-subtokenize",
+      "name": "micromark-util-subtokenize",
+      "version": "2.1.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm micromark-util-subtokenize@2.1.0",
+      "files": [
+        {
+          "path": "node_modules/micromark-util-subtokenize/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next",
+      "name": "next",
+      "version": "16.4.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1",
+      "files": [
+        {
+          "path": "node_modules/next/license.md",
+          "sha256": "ee765244e2d59f5234d474f62e0766fa0c8b99af967fdd4c0cb8dcb0c76ea224"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next-themes",
+      "name": "next-themes",
+      "version": "0.4.6",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next-themes@0.4.6",
+      "files": [
+        {
+          "path": "node_modules/next-themes/license.md",
+          "sha256": "b5acfd21b3b61508365224c40ec1b03ec71091248baaf989d4be916551e7d532"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/path-to-regexp",
+      "name": "path-to-regexp",
+      "version": "vendored in next@16.4.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/path-to-regexp",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/path-to-regexp/LICENSE",
+          "sha256": "4eeb3271453a891df609e5a9f4ee79a68307f730c13417a3bfeffa604ac8cf25"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/process",
+      "name": "process",
+      "version": "vendored in next@16.4.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/process",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/process/LICENSE",
+          "sha256": "59a400d04c5078579acc27ddd6452c1bdf763f9506e01364700935fbb1a7c91b"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/react",
+      "name": "react-builtin",
+      "version": "19.3.0-canary-278794d7-20261002",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/react",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/react/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/react-dom",
+      "name": "react-dom-builtin",
+      "version": "19.3.0-canary-278794d7-20261002",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/react-dom",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/react-dom/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/react-server-dom-webpack",
+      "name": "react-server-dom-webpack-builtin",
+      "version": "19.3.0-canary-278794d7-20261002",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/react-server-dom-webpack",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/react-server-dom-webpack/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/next/dist/compiled/scheduler",
+      "name": "scheduler-builtin",
+      "version": "vendored in next@16.4.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm next@16.4.1, dist/compiled/scheduler",
+      "files": [
+        {
+          "path": "node_modules/next/dist/compiled/scheduler/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/property-information",
+      "name": "property-information",
+      "version": "7.2.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm property-information@7.2.0",
+      "files": [
+        {
+          "path": "node_modules/property-information/license",
+          "sha256": "5d0698266086f217bb11ea0499d33453e401fe479fb9126ad04e625e63d3557b"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/react",
+      "name": "react",
+      "version": "19.2.4",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm react@19.2.4",
+      "files": [
+        {
+          "path": "node_modules/react/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/react-dom",
+      "name": "react-dom",
+      "version": "19.2.4",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm react-dom@19.2.4",
+      "files": [
+        {
+          "path": "node_modules/react-dom/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/react-remove-scroll",
+      "name": "react-remove-scroll",
+      "version": "2.7.2",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm react-remove-scroll@2.7.2",
+      "files": [
+        {
+          "path": "node_modules/react-remove-scroll/LICENSE",
+          "sha256": "30f0cfddf483d1128e3610205020f2041a6c5e837aa999e0aa82e5576187d4a9"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/react-remove-scroll-bar",
+      "name": "react-remove-scroll-bar",
+      "version": "2.3.8",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "https://github.com/theKashey/react-remove-scroll-bar/blob/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE (upstream canonical MIT text; npm 2.3.8 omits LICENSE and its recorded gitHead is unavailable; historical text remains unverified)",
+      "files": [
+        {
+          "path": "compliance/upstream/react-remove-scroll-bar-2.3.8/LICENSE",
+          "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/react-style-singleton",
+      "name": "react-style-singleton",
+      "version": "2.2.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm react-style-singleton@2.2.3",
+      "files": [
+        {
+          "path": "node_modules/react-style-singleton/LICENSE",
+          "sha256": "30f0cfddf483d1128e3610205020f2041a6c5e837aa999e0aa82e5576187d4a9"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/scheduler",
+      "name": "scheduler",
+      "version": "0.27.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm scheduler@0.27.0",
+      "files": [
+        {
+          "path": "node_modules/scheduler/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/scroll-into-view-if-needed",
+      "name": "scroll-into-view-if-needed",
+      "version": "3.1.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm scroll-into-view-if-needed@3.1.0",
+      "files": [
+        {
+          "path": "node_modules/scroll-into-view-if-needed/LICENSE",
+          "sha256": "62b9f69bb4ccf131e7e4cc8ce6ec5b4acf3d9848f0ac73c3c2f285d716ff1b5c"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/space-separated-tokens",
+      "name": "space-separated-tokens",
+      "version": "2.0.2",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm space-separated-tokens@2.0.2",
+      "files": [
+        {
+          "path": "node_modules/space-separated-tokens/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/style-to-js",
+      "name": "style-to-js",
+      "version": "1.1.21",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm style-to-js@1.1.21",
+      "files": [
+        {
+          "path": "node_modules/style-to-js/LICENSE",
+          "sha256": "bbb380e5c1a717079378d6ea4d33c8a5a81655d4612b749f882e34e46712aab5"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/style-to-object",
+      "name": "style-to-object",
+      "version": "1.0.14",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm style-to-object@1.0.14",
+      "files": [
+        {
+          "path": "node_modules/style-to-object/LICENSE",
+          "sha256": "896c9fd6b5fc48ac31800b9d29a6e3ffcb0c2d534ed077ebfa5c2fa388cc38b7"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/tailwindcss",
+      "name": "tailwindcss",
+      "version": "4.3.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "generated stylesheet",
+      "source": "npm tailwindcss@4.3.3",
+      "files": [
+        {
+          "path": "node_modules/tailwindcss/LICENSE",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/tslib",
+      "name": "tslib",
+      "version": "2.8.1",
+      "license": "0BSD",
+      "obligations": "No attribution condition; upstream license text retained voluntarily.",
+      "scope": "emitted browser code",
+      "source": "npm tslib@2.8.1",
+      "files": [
+        {
+          "path": "node_modules/tslib/LICENSE.txt",
+          "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/unist-util-position",
+      "name": "unist-util-position",
+      "version": "5.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm unist-util-position@5.0.0",
+      "files": [
+        {
+          "path": "node_modules/unist-util-position/license",
+          "sha256": "63cb98b3f6abfb3c3592c16f88253c1bdc834087bf52671e8ce5609e4eb693cf"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/unist-util-stringify-position",
+      "name": "unist-util-stringify-position",
+      "version": "4.0.0",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm unist-util-stringify-position@4.0.0",
+      "files": [
+        {
+          "path": "node_modules/unist-util-stringify-position/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/use-callback-ref",
+      "name": "use-callback-ref",
+      "version": "1.3.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm use-callback-ref@1.3.3",
+      "files": [
+        {
+          "path": "node_modules/use-callback-ref/LICENSE",
+          "sha256": "30f0cfddf483d1128e3610205020f2041a6c5e837aa999e0aa82e5576187d4a9"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/use-sidecar",
+      "name": "use-sidecar",
+      "version": "1.1.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm use-sidecar@1.1.3",
+      "files": [
+        {
+          "path": "node_modules/use-sidecar/LICENSE",
+          "sha256": "30f0cfddf483d1128e3610205020f2041a6c5e837aa999e0aa82e5576187d4a9"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/vfile-message",
+      "name": "vfile-message",
+      "version": "4.0.3",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm vfile-message@4.0.3",
+      "files": [
+        {
+          "path": "node_modules/vfile-message/license",
+          "sha256": "dd1081884a92952802f4803110a6bb543acea9a814c786d58605b4c1219b5ebb"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/web-namespaces",
+      "name": "web-namespaces",
+      "version": "2.0.1",
+      "license": "MIT",
+      "obligations": "Retain upstream copyright and permission notice with copies/substantial portions; complete upstream text is included.",
+      "scope": "emitted browser code",
+      "source": "npm web-namespaces@2.0.1",
+      "files": [
+        {
+          "path": "node_modules/web-namespaces/license",
+          "sha256": "ca4662cb5d1b738fbe5350c0d5485ba11773b4b7208974082ae6e129a52d631d"
+        }
+      ]
+    },
+    {
+      "path": "node_modules/zbsearch",
+      "name": "zbsearch",
+      "version": "4.0.1",
+      "license": "Apache-2.0",
+      "obligations": "Include Apache-2.0 text and applicable upstream NOTICE/attributions; identify modified upstream files if any. No upstream modifications made by this compliance pass.",
+      "scope": "emitted browser code",
+      "source": "npm zbsearch@4.0.1",
+      "files": [
+        {
+          "path": "node_modules/zbsearch/LICENSE.md",
+          "sha256": "2bb6874a2a66438ea1421ab19fa67c569608cafefa1e4ae2161ba82fd1764a4d"
+        },
+        {
+          "path": "compliance/upstream/Apache-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ]
+    }
+  ]
+}

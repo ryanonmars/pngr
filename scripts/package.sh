@@ -23,6 +23,7 @@ publish_dir="artifacts/publish/$runtime"
 # Publish into a clean generated directory so removed assemblies cannot survive.
 rm -rf "$publish_dir"
 "$sdk" publish src/TraceScope.App/TraceScope.App.csproj -c Release -r "$runtime" --self-contained true -p:Version="$version" -p:IncludeSourceRevisionInInformationalVersion=false -p:DebugType=None -p:DebugSymbols=false -o "$publish_dir"
+python3 scripts/licensing/generate.py --publish-dir "$publish_dir" --rid "$runtime"
 if [ "$runtime" = win-x64 ]; then
     mkdir -p "$destination"
     rsync -a --delete "$publish_dir/" "$destination/"
@@ -46,6 +47,10 @@ else
     rm -rf "$bundle/Contents/Resources"
     mkdir -p "$bundle/Contents/Resources"
     rsync -a --delete "$publish_dir/" "$bundle/Contents/MacOS/"
+    # Notices belong to bundle resources, alongside a per-runtime inventory.
+    for material in THIRD-PARTY-NOTICES.txt third-party-inventory.json; do
+        mv "$bundle/Contents/MacOS/$material" "$bundle/Contents/Resources/$material"
+    done
     cp src/TraceScope.App/Platforms/macOS/Info.plist "$bundle/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $bundle_version" "$bundle/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $bundle_version" "$bundle/Contents/Info.plist"

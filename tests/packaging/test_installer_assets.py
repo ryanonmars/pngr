@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 import subprocess
 import zipfile
+from notice_fixtures import materials
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('release_assets', ROOT / 'scripts/release-assets.py')
@@ -30,6 +31,17 @@ class InstallerAssetsTests(unittest.TestCase):
             package = root / f'pngr-0.7.1-{channel}-full.nupkg'
             with zipfile.ZipFile(package, 'w') as archive:
                 archive.writestr('lib/app/pngr.dll', b'application')
+                if channel == 'osx-universal':
+                    archive.writestr('lib/app/Contents/Resources/THIRD-PARTY-NOTICES.txt',
+                                     (ROOT / 'compliance/THIRD-PARTY-NOTICES.txt').read_bytes())
+                for rid in (('osx-arm64', 'osx-x64') if channel == 'osx-universal' else ('win-x64',)):
+                    notices, inventory, libraries = materials(rid)
+                    prefix = 'lib/app/' if channel == 'win-x64' else 'lib/app/Contents/Resources/runtimes/' + rid + '/'
+                    archive.writestr(prefix + 'THIRD-PARTY-NOTICES.txt', notices)
+                    archive.writestr(prefix + 'third-party-inventory.json', inventory)
+                    archive.writestr(prefix + 'pngr.deps.json', json.dumps({
+                        'runtimeTarget': {'name': 'net10/' + rid},
+                        'libraries': dict(libraries, **{'pngr/0.7.1': {'type': 'project'}})}))
             payload = package.read_bytes()
             (root / f'releases.{channel}.json').write_text(json.dumps({'Assets': [{
                 'Version': '0.7.1', 'Type': 'Full', 'FileName': package.name,
@@ -86,6 +98,12 @@ class InstallerAssetsTests(unittest.TestCase):
         publish.mkdir()
         (publish / 'pngr.deps.json').write_text(json.dumps({
             'libraries': {'pngr/0.7.1': {}},
+            'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
+        notices, inventory, libraries = materials('win-x64')
+        (publish / 'THIRD-PARTY-NOTICES.txt').write_bytes(notices)
+        (publish / 'third-party-inventory.json').write_bytes(inventory)
+        (publish / 'pngr.deps.json').write_text(json.dumps({
+            'libraries': dict(libraries, **{'pngr/0.7.1': {'type': 'project'}}),
             'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
         output = root / 'installed-assets'
         output.mkdir()

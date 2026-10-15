@@ -9,6 +9,10 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+import importlib.util
+_NOTICE_SPEC = importlib.util.spec_from_file_location('pngr_distribution_notices', ROOT / 'scripts/verify-distribution-notices.py')
+NOTICE_CHECKS = importlib.util.module_from_spec(_NOTICE_SPEC)
+_NOTICE_SPEC.loader.exec_module(NOTICE_CHECKS)
 
 
 def nsis_compiler():
@@ -30,6 +34,9 @@ def build_wizard(version: str, payload: Path, destination: Path):
     # NSIS uses /D on Windows, -D on Unix. Paths are passed as argument values,
     # never shell-interpolated; spaces in checkout/build directories are safe.
     prefix = '/' if os.name == 'nt' else '-'
+    compiler_version = subprocess.check_output([compiler, prefix + 'VERSION'], text=True).strip()
+    if compiler_version not in ('v3.12', 'v3.12.0'):
+        raise ValueError('NSIS version differs from reviewed license inventory: ' + compiler_version)
     subprocess.run([compiler, f'{prefix}DVERSION={version}',
                     f'{prefix}DNUMERIC_VERSION={version.split("-", 1)[0]}.0',
                     f'{prefix}DPAYLOAD={payload}', f'{prefix}DOUTPUT={destination}',
@@ -48,6 +55,7 @@ def package(version: str, publish: Path, output: Path, dotnet: str):
         raise ValueError('Published application version does not match installer version.')
     if not deps['runtimeTarget']['name'].endswith('/win-x64'):
         raise ValueError('Installer requires a win-x64 publish.')
+    NOTICE_CHECKS.LICENSES.validate_directory(publish, "win-x64")
     output.mkdir(parents=True, exist_ok=True)
     # Build in isolation; leave an existing installer intact if packaging fails.
     temporary = output.with_name(output.name + '.pending')

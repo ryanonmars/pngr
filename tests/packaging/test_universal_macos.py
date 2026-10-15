@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from notice_fixtures import materials
 
 SCRIPT = pathlib.Path(__file__).resolve().parents[2] / "scripts/verify-macos-universal.py"
 SPEC = importlib.util.spec_from_file_location("universal_verifier", SCRIPT)
@@ -37,14 +38,18 @@ class UniversalPackageTests(unittest.TestCase):
         (contents / "MacOS/pngr").write_bytes(fat())
         (contents / "Resources/pngr.icns").write_bytes(b"icon")
         (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "dev.tracescope.desktop", "CFBundleExecutable": "pngr", "CFBundleShortVersionString": "0.7.1", "pngrReleaseVersion": "0.7.1"}))
+        (contents / "Resources/THIRD-PARTY-NOTICES.txt").write_bytes((SCRIPT.parents[1] / "compliance/THIRD-PARTY-NOTICES.txt").read_bytes())
         for rid, cpu in (("osx-arm64", VERIFIER.ARM64), ("osx-x64", VERIFIER.X64)):
             payload = contents / "Resources" / "runtimes" / rid
             payload.mkdir(parents=True)
             for name in ("pngr", "libhostfxr.dylib", "libcoreclr.dylib", "libAvaloniaNative.dylib", "libSkiaSharp.dylib", "libe_sqlite3.dylib", "tracescope-tcp-hop", "libTraceScopeNotifications.dylib"):
                 (payload / name).write_bytes(thin(cpu))
+            notices, inventory, libraries = materials(rid)
+            (payload / "THIRD-PARTY-NOTICES.txt").write_bytes(notices)
+            (payload / "third-party-inventory.json").write_bytes(inventory)
             (payload / "pngr.dll").write_bytes(b"MZ managed image")
             (payload / "pngr.runtimeconfig.json").write_text(json.dumps({"runtimeOptions": {"includedFrameworks": []}}))
-            (payload / "pngr.deps.json").write_text(json.dumps({"runtimeTarget": {"name": "net10/" + rid}, "libraries": {"pngr/0.7.1": {}}}))
+            (payload / "pngr.deps.json").write_text(json.dumps({"runtimeTarget": {"name": "net10/" + rid}, "libraries": dict(libraries, **{"pngr/0.7.1": {"type": "project"}})}))
         return bundle
 
     def test_native_and_managed_images_are_distinguished(self):

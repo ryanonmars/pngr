@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/assets.mjs && next dev",
-    "build": "node scripts/assets.mjs && next build --webpack && node scripts/export.mjs",
+    "dev": "node scripts/licenses.mjs && node scripts/assets.mjs && next dev",
+    "build": "node scripts/licenses.mjs && node scripts/assets.mjs && next build --webpack && node scripts/export.mjs && node scripts/licenses.mjs --browser",
+    "licenses:check": "node scripts/licenses.mjs --browser",
+    "licenses:refresh": "node scripts/licenses.mjs --refresh",
     "postinstall": "fumadocs-mdx",
     "typecheck": "fumadocs-mdx && tsc --noEmit",
     "test": "node --test tests/*.test.mjs",

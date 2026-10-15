@@ -19,6 +19,12 @@ import tempfile
 import time
 import urllib.request
 
+import importlib.util
+_NOTICE_SPEC = importlib.util.spec_from_file_location(
+    'pngr_distribution_notices', Path(__file__).resolve().parents[1] / 'verify-distribution-notices.py')
+NOTICE_CHECKS = importlib.util.module_from_spec(_NOTICE_SPEC)
+_NOTICE_SPEC.loader.exec_module(NOTICE_CHECKS)
+
 LEGACY_RELEASE = 'https://github.com/ryanonmars/pngr/releases/download/v0.7.1/'
 
 
@@ -74,6 +80,8 @@ def assert_installation(installation: Path, expected_version: str):
             raise ValueError(f'Missing installed file: {name}')
     if version(installation) != expected_version:
         raise ValueError(f'Installed application does not report {expected_version}.')
+    if expected_version != '0.7.1':
+        NOTICE_CHECKS.LICENSES.validate_directory(installation / 'current', 'win-x64')
     # Velopack owns Add/Remove Programs and a stable Start menu shortcut.
     import winreg
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall\pngr') as key:

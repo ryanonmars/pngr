@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsProvider>
       <DocsLayout tree={source.pageTree} themeSwitch={{ enabled: false }}
         nav={{ title: <img src="/assets/branding/wordmark.png" alt="Pngr" width={94} height={32} />, url: '/' }}
-        links={[{ text: 'Capabilities', url: '/#capabilities' }, { text: 'Download', url: '/#download' }]}
+        links={[{ text: 'Capabilities', url: '/#capabilities' }, { text: 'Download', url: '/#download' }, { text: 'Licenses', url: '/THIRD-PARTY-NOTICES.txt' }]}
         sidebar={{ collapsible: false }}>
         {children}
       </DocsLayout>

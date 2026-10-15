@@ -8,6 +8,7 @@ import plistlib
 import tempfile
 import unittest
 import zipfile
+from notice_fixtures import materials
 
 SCRIPT = pathlib.Path(__file__).resolve().parents[2] / "scripts" / "verify-package.py"
 SPEC = importlib.util.spec_from_file_location("verify_package", SCRIPT)
@@ -22,11 +23,12 @@ class ReleaseArchiveTests(unittest.TestCase):
         path = pathlib.Path(temporary.name) / "release.zip"
         mac = runtime.startswith("osx-")
         prefix = "pngr.app/Contents/MacOS/" if mac else ""
+        notices, inventory, libraries = materials(runtime)
         files = {
             prefix + ("pngr" if mac else "pngr.exe"): b"synthetic executable",
             prefix + "pngr.dll": b"synthetic assembly",
             prefix + "pngr.runtimeconfig.json": json.dumps({"runtimeOptions": {"includedFrameworks": []} if framework else {}}),
-            prefix + "pngr.deps.json": json.dumps({"runtimeTarget": {"name": ".NETCoreApp,Version=v10.0/" + runtime}, "libraries": {"pngr/" + version: {}}}),
+            prefix + "pngr.deps.json": json.dumps({"runtimeTarget": {"name": ".NETCoreApp,Version=v10.0/" + runtime}, "libraries": dict(libraries, **{"pngr/" + version: {"type": "project"}})}),
         }
         if mac:
             files.update({
@@ -36,6 +38,9 @@ class ReleaseArchiveTests(unittest.TestCase):
                 prefix + "libTraceScopeNotifications.dylib": b"synthetic bridge",
                 "__MACOSX/pngr.app/._Contents": b"resource metadata",
             })
+        material_prefix = "pngr.app/Contents/Resources/" if mac else ""
+        files[material_prefix + "THIRD-PARTY-NOTICES.txt"] = notices
+        files[material_prefix + "third-party-inventory.json"] = inventory
         files.update(extra or {})
         with zipfile.ZipFile(path, "w") as archive:
             for name, data in files.items():

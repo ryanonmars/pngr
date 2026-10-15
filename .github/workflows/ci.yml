@@ -5,6 +5,17 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      verify_packages:
+        description: Build and validate installers without publishing a release
+        required: false
+        default: false
+        type: boolean
+      package_version:
+        description: Internal validation package version (no tag or release)
+        required: false
+        default: '0.7.5-compliance.1'
+        type: string
 
 permissions:
   contents: read
@@ -17,4 +28,5 @@ jobs:
   platforms:
     uses: ./.github/workflows/build.yml
     with:
-      package: false
+      package: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_packages }}
+      version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '0.7.5' }}

@@ -7,6 +7,7 @@ import struct
 import tempfile
 import unittest
 from unittest import mock
+from notice_fixtures import materials
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('windows_wizard', ROOT / 'scripts/package-windows-installer.py')
@@ -58,7 +59,7 @@ class WindowsWizardTests(unittest.TestCase):
                 self.assertNotIn('shell', kwargs)
                 output.write_bytes(b'MZ' + b'0' * 2048)
             with mock.patch.object(WINDOWS, 'nsis_compiler', return_value='/tools/makensis'):
-                with mock.patch.object(WINDOWS.subprocess, 'run', side_effect=compile):
+                with mock.patch.object(WINDOWS.subprocess, 'run', side_effect=compile), mock.patch.object(WINDOWS.subprocess, 'check_output', return_value='v3.12'):
                     WINDOWS.build_wizard('0.7.2', payload, output)
 
     def test_wrapper_failure_preserves_previous_installer_and_feed(self):
@@ -68,6 +69,12 @@ class WindowsWizardTests(unittest.TestCase):
             publish.mkdir()
             (publish / 'pngr.deps.json').write_text(json.dumps({
                 'libraries': {'pngr/0.7.2': {}},
+                'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
+            notices, inventory, libraries = materials('win-x64')
+            (publish / 'THIRD-PARTY-NOTICES.txt').write_bytes(notices)
+            (publish / 'third-party-inventory.json').write_bytes(inventory)
+            (publish / 'pngr.deps.json').write_text(json.dumps({
+                'libraries': dict(libraries, **{'pngr/0.7.2': {'type': 'project'}}),
                 'runtimeTarget': {'name': '.NETCoreApp,Version=v10.0/win-x64'}}))
             output = root / 'output'
             output.mkdir()
