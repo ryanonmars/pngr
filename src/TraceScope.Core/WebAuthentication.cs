@@ -19,6 +19,8 @@ internal sealed class WebAuthentication(string verifier, TimeProvider clock)
     private sealed record Session(DateTimeOffset Created, DateTimeOffset LastUsed, string Csrf);
     private sealed record Attempts(DateTimeOffset Since, int Count);
     private static string Token() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+    private static bool IsToken(string? token) => token is { Length: 64 }
+        && token.AsSpan().IndexOfAnyExcept("0123456789abcdef") < 0;
     private static string Digest(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     private static bool Equal(string? left, string? right) => left is { Length: 64 } && right is { Length: 64 }
         && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(left), Encoding.UTF8.GetBytes(right));
@@ -92,7 +94,11 @@ internal sealed class WebAuthentication(string verifier, TimeProvider clock)
         {
             if (HttpMethods.IsGet(request.Method))
             {
-                var token = Token();
+                // A favicon redirect or another login tab must not invalidate a form
+                // already displayed by this browser. Keep its well-formed double-submit
+                // token until the cookie expires or successful login deletes it.
+                var existing = request.Cookies[LoginCookie];
+                var token = IsToken(existing) ? existing! : Token();
                 var options = Cookie(context); options.MaxAge = TimeSpan.FromMinutes(5);
                 context.Response.Cookies.Append(LoginCookie, token, options);
                 await Html(context, LoginPage(token));

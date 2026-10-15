@@ -114,6 +114,87 @@ public sealed class WebLanTests
     }
 
     [Fact]
+    public async Task LanBrowserLoginSurvivesAutomaticFaviconRequest()
+    {
+        await using var fixture = new Fixture(); await fixture.StartLan();
+        using var client = fixture.Client();
+        var origin = client.BaseAddress!.GetLeftPart(UriPartial.Authority);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/")).StatusCode);
+        var login = await fixture.LoginForm(client);
+        // Chrome may fetch the site icon after displaying the form. Follow its redirects
+        // with the same cookie jar, without replacing the form already shown to the user.
+        using var icon = await client.GetAsync("/favicon.ico");
+        if (icon.StatusCode == HttpStatusCode.Redirect)
+        {
+            using var redirectedIcon = await client.GetAsync(icon.Headers.Location);
+            Assert.Equal(HttpStatusCode.OK, redirectedIcon.StatusCode);
+        }
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/login")
+        { Content = Form(("csrf", login.Token), ("key", fixture.Key)) };
+        request.Headers.Add("Origin", origin);
+        request.Headers.Referrer = new Uri(client.BaseAddress!, "/login");
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location!.OriginalString);
+        Assert.Equal("[]", await client.GetStringAsync("/api/targets"));
+    }
+
+    [Fact]
+    public async Task RepeatedLanLoginPagesPreserveCsrfAndRejectInvalidCredentials()
+    {
+        await using var fixture = new Fixture(); await fixture.StartLan();
+        using var client = fixture.Client();
+        var origin = client.BaseAddress!.GetLeftPart(UriPartial.Authority);
+        var first = await fixture.LoginForm(client);
+        var second = await fixture.LoginForm(client);
+        // Do not print CSRF values even if this assertion fails.
+        Assert.True(first.Token == second.Token, "A second login page must preserve the browser's CSRF token.");
+        async Task<HttpResponseMessage> Submit(params (string Key, string Value)[] values)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/login") { Content = Form(values) };
+            request.Headers.Add("Origin", origin);
+            request.Headers.Referrer = new Uri(client.BaseAddress!, "/login");
+            return await client.SendAsync(request);
+        }
+        using var missing = await Submit(("key", fixture.Key));
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        using var invalid = await Submit(("csrf", new string('0', 64)), ("key", fixture.Key));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using var wrongKey = await Submit(("csrf", first.Token), ("key", WebAccessKey.Generate()));
+        Assert.Equal(HttpStatusCode.Unauthorized, wrongKey.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/targets")).StatusCode);
+        using var crossOrigin = new HttpRequestMessage(HttpMethod.Post, "/login")
+        { Content = Form(("csrf", first.Token), ("key", fixture.Key)) };
+        crossOrigin.Headers.Add("Origin", "http://untrusted.invalid");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(crossOrigin)).StatusCode);
+        using var nonForm = new HttpRequestMessage(HttpMethod.Post, "/login")
+        { Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json") };
+        nonForm.Headers.Add("Origin", origin);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(nonForm)).StatusCode);
+        using var excessiveFields = await Submit(("csrf", first.Token), ("key", fixture.Key),
+            ("extra1", "1"), ("extra2", "2"), ("extra3", "3"));
+        Assert.Equal(HttpStatusCode.BadRequest, excessiveFields.StatusCode);
+        using var valid = await Submit(("csrf", first.Token), ("key", fixture.Key));
+        Assert.Equal(HttpStatusCode.Redirect, valid.StatusCode);
+        Assert.Equal("[]", await client.GetStringAsync("/api/targets"));
+        using var otherBrowser = fixture.Client();
+        using var absentCookie = await otherBrowser.PostAsync("/login", Form(("csrf", first.Token), ("key", fixture.Key)));
+        Assert.Equal(HttpStatusCode.BadRequest, absentCookie.StatusCode);
+    }
+
+    [Fact]
+    public async Task MalformedLoginCookieIsReplacedWithRandomCsrfToken()
+    {
+        await using var fixture = new Fixture(); await fixture.StartLan();
+        using var client = fixture.Client();
+        // A malformed existing cookie must never be copied into a generated form.
+        client.DefaultRequestHeaders.Add("Cookie", "pngr_login=" + new string('z', 64));
+        var login = await fixture.LoginForm(client);
+        Assert.True(login.Token.Length == 64 && login.Token.All(c => char.IsAsciiHexDigitLower(c)),
+            "Malformed cookies must be replaced with a generated hexadecimal CSRF token.");
+    }
+
+    [Fact]
     public async Task BrowserLoginSessionLogoutAndCsrfAreProtected()
     {
         await using var fixture = new Fixture(); await fixture.StartLan();
