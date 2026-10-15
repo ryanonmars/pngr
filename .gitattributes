@@ -1,4 +1,5 @@
 # Preserve authoritative license bytes and reviewed hashes on every platform.
-compliance/** -text
-website/compliance/** -text
+# Upstream CRLF and whitespace are intentional; do not reformat license texts.
+compliance/** -text -whitespace
+website/compliance/** -text -whitespace
 website/package-lock.json -text
