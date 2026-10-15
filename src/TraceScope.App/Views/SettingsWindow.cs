@@ -16,7 +16,7 @@ public sealed record SettingsChange(WorkspaceConfiguration Configuration, ProbeO
     int? SelectedTcpPort = null, int? SelectedUdpPort = null);
 
 /// <summary>Edits a private draft. Only Apply/OK can change running monitoring or saved preferences.</summary>
-public sealed class SettingsWindow : Window
+public sealed partial class SettingsWindow : Window
 {
     private readonly WorkspaceConfiguration _original;
     private readonly Func<SettingsChange, Task> _apply;
@@ -59,7 +59,7 @@ public sealed class SettingsWindow : Window
         ItemsSource = new[] { "1 minute", "5 minutes", "10 minutes", "15 minutes", "1 hour", "6 hours", "1 day", "1 week" } };
     private readonly NumericUpDown _retention = Number("SettingsRetention", 1, 3650);
     private readonly NumericUpDown _aggregation = Number("SettingsAggregation", 1, 3600);
-    private readonly CheckBox _web = Toggle("SettingsWebEnabled", "Enable local read-only dashboard and REST API");
+    private readonly CheckBox _web = Toggle("SettingsWebEnabled", "Enable Web Server");
     private readonly NumericUpDown _webPort = Number("SettingsWebPort", 1024, 65535);
     private readonly ComboBox _profiles = new() { Name = "SettingsProfiles", Width = 250 };
     private readonly TextBox _profileName = new() { Name = "SettingsProfileName", Watermark = "Profile name", Width = 220, MaxLength = 80 };
@@ -76,7 +76,7 @@ public sealed class SettingsWindow : Window
     public SettingsWindow(WorkspaceConfiguration configuration, ProbeOptions? selectedOptions, string? selectedTarget,
         IReadOnlyList<ProbeSourceChoice> sources, string dataDirectory, Func<SettingsChange, Task> apply,
         Func<Task<NotificationResult>> permission, Action<string> openTool,
-        int selectedTcpPort = 443, int selectedUdpPort = 33434)
+        int selectedTcpPort = 443, int selectedUdpPort = 33434, Func<string?>? serverAddress = null, Func<string?>? serverError = null)
     {
         _original = configuration;
         _defaults = configuration.DefaultProbeOptions;
@@ -107,6 +107,7 @@ public sealed class SettingsWindow : Window
         _events.IsChecked = configuration.Display.ShowEventMarkers;
         _retention.Value = configuration.RetentionDays; _aggregation.Value = configuration.AggregationSeconds;
         _web.IsChecked = configuration.WebEnabled; _webPort.Value = configuration.WebPort;
+        InitializeWebSettings(configuration, serverAddress, serverError);
         LoadProbe(_defaults); ReloadProfiles();
 
 
@@ -149,10 +150,7 @@ public sealed class SettingsWindow : Window
             ToolButton("Apply & edit alert rules / history…", "alerts"),
             ToolButton("Apply & configure email, webhooks and scripts…", "actions"),
             Note("Email, webhooks and executable actions stay disabled until explicitly configured in the action editor."));
-        _pages["Local web / API"] = Page("Local web interface and API", "Optional access from a browser on this computer. Disabled by default.",
-            _web, Row("Local port", _webPort), Note("Address: http://127.0.0.1:<port>   ·   Read-only REST endpoints: /api/targets, /api/history/<session-id>"),
-            Note("Apply starts or stops the listener immediately. No separate server is installed. The listener closes completely when Pngr exits."),
-            ToolButton("Apply & open local dashboard controls…", "web"));
+        _pages["Web Server"] = BuildWebPage();
         var nav = new ListBox { Name = "SettingsNavigation", ItemsSource = _pages.Keys.ToArray(), SelectedIndex = 0, Background = Brushes.Transparent };
         _navigation = nav;
         nav.SelectionChanged += (_, _) => { if (nav.SelectedItem is string name) _page.Content = _pages[name]; };
@@ -197,7 +195,7 @@ public sealed class SettingsWindow : Window
     }
 
     public static int[] TimeRanges { get; } = [1, 5, 10, 15, 60, 360, 1440, 10080];
-    public void SelectPage(string name) => _navigation.SelectedItem = name;
+    public void SelectPage(string name) => _navigation.SelectedItem = name == "Local web / API" ? "Web Server" : name;
 
     private void CaptureProbe()
     {
@@ -267,12 +265,15 @@ public sealed class SettingsWindow : Window
         try
         {
             CaptureProbe();
+            ValidateWebDraft();
             var configuration = _original with
             {
                 DefaultProbeOptions = _defaults, Profiles = _profileDraft.ToArray(), RestoreOnStartup = _restore.IsChecked == true,
                 UseDefaultProbeOptionsForNewTargets = _useDefaults.IsChecked == true,
                 RetentionDays = (int)Value(_retention), AggregationSeconds = (int)Value(_aggregation),
                 DesktopNotifications = _toasts.IsChecked == true, WebEnabled = _web.IsChecked == true, WebPort = (int)Value(_webPort),
+                WebLanEnabled = _webLan.IsChecked == true, WebLanAddress = (_webInterface.SelectedItem as WebServerAddress)?.Address,
+                WebHttpAcknowledged = _webAcknowledged.IsChecked == true, WebAccessKeyVerifier = _webVerifier,
                 Actions = _original.Actions with { NativeNotificationsEnabled = _native.IsChecked == true, IncludeRecovery = _recoveries.IsChecked == true,
                     MinimumNotificationSpacingSeconds = (int)Value(_spacing) },
                 Display = new DisplayConfiguration { WarningLatencyMs = (double)Value(_warning), CriticalLatencyMs = (double)Value(_critical),
@@ -285,12 +286,18 @@ public sealed class SettingsWindow : Window
                 _selected != _initialSelected ? _ports[1].Tcp : null,
                 _selected != _initialSelected ? _ports[1].Udp : null));
             _status.Text = "Settings saved. Changes apply immediately; monitoring continues.";
+            _webSaved = true;
+            UpdateWebControls();
             _busy = false;
             if (close) Close();
             return true;
         }
         catch (Exception ex) { _status.Text = "Settings were not applied: " + ex.Message; return false; }
-        finally { _busy = false; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = true; }
+        finally
+        {
+            _busy = false; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = true;
+            UpdateWebControls();
+        }
     }
     private void SaveProfile()
     {

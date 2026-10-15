@@ -472,6 +472,70 @@ public sealed class SettingsWindowTests
         if (expectSuccess) Assert.StartsWith("Settings saved.", status.Text);
         else Assert.StartsWith("Settings were not applied:", status.Text);
     }
+
+    [AvaloniaFact]
+    public async Task LanModeRebindsSamePortRotatesKeyAndReturnsToUnauthenticatedLocalhost()
+    {
+        var address = WebServerNetwork.GetLanAddresses().FirstOrDefault();
+        if (address is null) return; // Some isolated CI hosts have no private network interface.
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var session = fixture.Engine.Sessions.Single();
+        var options = session.Options;
+        var port = AvailablePort();
+        async Task Save(WorkspaceConfiguration configuration) => await InvokeTask(fixture.Window,
+            "CommitSettingsAsync", configuration, null, null, null, null);
+        await Save(fixture.Configuration with { WebEnabled = true, WebPort = port });
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        var url = $"http://127.0.0.1:{port}";
+        Assert.Contains(session.Id.ToString(), await client.GetStringAsync(url + "/api/targets"));
+        var key = WebAccessKey.Generate();
+        await Save(fixture.Configuration with { WebLanEnabled = true, WebLanAddress = address.Address,
+            WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(key) });
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(url + "/api/targets")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", key);
+        Assert.Contains(session.Id.ToString(), await client.GetStringAsync(url + "/api/targets"));
+        var newKey = WebAccessKey.Generate();
+        var beforeRotation = Field<LocalWebServer>(fixture.Window, "_webServer");
+        await Save(fixture.Configuration with { WebAccessKeyVerifier = WebAccessKey.CreateVerifier(newKey) });
+        Assert.Same(beforeRotation, Field<LocalWebServer>(fixture.Window, "_webServer"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(url + "/api/targets")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", newKey);
+        Assert.Contains(session.Id.ToString(), await client.GetStringAsync(url + "/api/targets"));
+        Assert.True(WebAccessKey.Verify(newKey, (await fixture.LoadWorkspace()).WebAccessKeyVerifier));
+        Assert.DoesNotContain(newKey, await File.ReadAllTextAsync(fixture.WorkspacePath));
+        await Save(fixture.Configuration with { WebLanEnabled = false });
+        client.DefaultRequestHeaders.Authorization = null;
+        Assert.Contains(session.Id.ToString(), await client.GetStringAsync(url + "/api/targets"));
+        Assert.Equal(SessionState.Running, session.State);
+        Assert.Equal(options, session.Options);
+    }
+
+    [AvaloniaFact]
+    public async Task FailedSamePortLanRebindRestoresLocalhostAndSavedSettings()
+    {
+        var address = WebServerNetwork.GetLanAddresses().FirstOrDefault();
+        if (address is null) return;
+        await using var fixture = await Fixture.CreateAsync();
+        var port = AvailablePort();
+        await InvokeTask(fixture.Window, "CommitSettingsAsync",
+            fixture.Configuration with { WebEnabled = true, WebPort = port }, null, null, null, null);
+        var before = await File.ReadAllTextAsync(fixture.WorkspacePath);
+        var occupied = new TcpListener(IPAddress.Parse(address.Address), port);
+        occupied.Start();
+        try
+        {
+            var draft = fixture.Configuration with { WebLanEnabled = true, WebLanAddress = address.Address,
+                WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(WebAccessKey.Generate()) };
+            await Assert.ThrowsAnyAsync<IOException>(() => InvokeTask(fixture.Window,
+                "CommitSettingsAsync", draft, null, null, null, null));
+            Assert.False(fixture.Configuration.WebLanEnabled);
+            Assert.Equal(before, await File.ReadAllTextAsync(fixture.WorkspacePath));
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            Assert.Equal("[]", await client.GetStringAsync($"http://127.0.0.1:{port}/api/targets"));
+        }
+        finally { occupied.Stop(); }
+    }
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static T Find<T>(Window window, string name) where T : Control
         => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);

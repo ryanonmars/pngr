@@ -31,7 +31,7 @@ public partial class MainWindow
                     case "actions": OpenAlertActions(null, e); break;
                     case "web": OpenWeb(null, e); break;
                 }
-            }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434);
+            }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434, () => _webServer?.Url, () => _webServer?.LastError);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show(this);
     }
@@ -86,6 +86,8 @@ public partial class MainWindow
             Display = draft.Display, RetentionDays = draft.RetentionDays, AggregationSeconds = draft.AggregationSeconds,
             Profiles = draft.Profiles, DesktopNotifications = draft.DesktopNotifications,
             WebEnabled = draft.WebEnabled, WebPort = draft.WebPort,
+            WebLanEnabled = draft.WebLanEnabled, WebLanAddress = draft.WebLanAddress,
+            WebHttpAcknowledged = draft.WebHttpAcknowledged, WebAccessKeyVerifier = draft.WebAccessKeyVerifier,
             Actions = _configuration.Actions with
             {
                 NativeNotificationsEnabled = draft.Actions.NativeNotificationsEnabled,
@@ -106,14 +108,27 @@ public partial class MainWindow
         configuration.Validate();
         await _webLifecycle.WaitAsync(_applicationCancellation.Token);
         LocalWebServer? replacement = null;
+        var previousConfiguration = _configuration;
+        var stoppedPrevious = false;
+        var committed = false;
         try
         {
             _applicationCancellation.Token.ThrowIfCancellationRequested();
-            var replace = configuration.WebEnabled && (_webServer is null || new Uri(_webServer.Url!).Port != configuration.WebPort);
+            var replace = configuration.WebEnabled && (_webServer?.Url is null
+                || previousConfiguration.WebPort != configuration.WebPort
+                || previousConfiguration.WebLanEnabled != configuration.WebLanEnabled
+                || (configuration.WebLanEnabled && previousConfiguration.WebLanAddress != configuration.WebLanAddress));
             if (replace)
             {
+                // Changing mode/address on the same port needs an orderly stop before rebinding.
+                // A different port can be tested while the existing listener remains available.
+                if (_webServer is not null && previousConfiguration.WebPort == configuration.WebPort)
+                {
+                    var stoppedServer = _webServer; _webServer = null; stoppedPrevious = true;
+                    await stoppedServer.DisposeAsync();
+                }
                 replacement = new LocalWebServer(_engine);
-                await replacement.StartAsync(configuration.WebPort, _applicationCancellation.Token);
+                await replacement.StartAsync(WebOptions(configuration), _applicationCancellation.Token);
             }
             var saved = configuration with
             {
@@ -144,9 +159,12 @@ public partial class MainWindow
             }
             var resetTimeRange = _configuration.Display.DefaultTimeRangeMinutes != saved.Display.DefaultTimeRangeMinutes;
             _configuration = saved;
+            committed = true;
             var previous = _webServer;
             if (!configuration.WebEnabled) _webServer = null;
             else if (replacement is not null) { _webServer = replacement; replacement = null; }
+            else if (configuration.WebLanEnabled && configuration.WebAccessKeyVerifier != previousConfiguration.WebAccessKeyVerifier)
+                _webServer?.RotateAccessKey(configuration.WebAccessKeyVerifier!);
             if (previous is not null && previous != _webServer) await previous.DisposeAsync();
             ApplyPreferenceControls(resetTimeRange); ReloadProfiles(); ConfigureActions();
             if (_selected?.Session?.Id == sessionId && options is not null)
@@ -157,12 +175,28 @@ public partial class MainWindow
             CurrentHistoryView.LoadedKey = null; _historyQuery?.Cancel();
             RefreshGraph();
         }
+        catch
+        {
+            if (replacement is not null) { await replacement.DisposeAsync(); replacement = null; }
+            if (stoppedPrevious && !committed && !_applicationCancellation.IsCancellationRequested)
+            {
+                try { await StartWebServerAsync(); }
+                catch { StatusText.Text = "Previous web listener could not be restored. Reopen Web Server settings and apply to retry."; }
+            }
+            throw;
+        }
         finally
         {
             try { if (replacement is not null) await replacement.DisposeAsync(); }
             finally { _webLifecycle.Release(); }
         }
     }
+
+    private static WebServerOptions WebOptions(WorkspaceConfiguration configuration) => new()
+    {
+        Port = configuration.WebPort, LanEnabled = configuration.WebLanEnabled, LanAddress = configuration.WebLanAddress,
+        HttpAcknowledged = configuration.WebHttpAcknowledged, AccessKeyVerifier = configuration.WebAccessKeyVerifier
+    };
 
     private void ApplyPreferenceControls(bool resetTimeRange = true)
     {

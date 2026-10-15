@@ -1,14 +1,54 @@
 ---
-title: "Local Web / API"
-description: "Enable the read-only dashboard on this computer."
+title: "Web Server"
+description: "Use the read-only dashboard locally or share it with authenticated LAN clients."
 ---
 
-The local web interface is disabled by default. Enable **local read-only dashboard and REST API**, choose a port, and press **Apply**.
+The web server is **disabled by default** and runs only while Pngr is open. It uses the existing read-only dashboard and REST API; it cannot change targets, settings, profiles, or history. The desktop application remains trusted local access and never asks for the web access key.
 
-The default address is `http://127.0.0.1:8787`. Supported Settings ports are **1024–65535**. Apply starts or stops the listener immediately; changing the port replaces it. If the requested port is occupied, Pngr reports the error and keeps the previous listener and saved settings.
+## Enable access
 
-Choose **Apply & open local dashboard controls…**, then **Open dashboard** to launch a browser. The dashboard displays targets, per-hop measurements, historical graphs, and saved sessions. Its Earlier, Later, and Live controls navigate the selected history range.
+1. Open **Settings → Web Server** and select **Enable Web Server**.
+2. Keep **Localhost Only** for access from this computer. The default address is `http://127.0.0.1:8787`, with no authentication required.
+3. To connect other devices, explicitly select **Local Network (LAN)** and choose the intended private interface address. Check the HTTP risk acknowledgement before applying.
+4. Copy the generated access key before closing Settings. **Show key** reveals it and **Copy Key** copies it. Save it in a password manager; Pngr cannot display it again after the window closes.
+5. Press **Apply**, confirm the running status, and use **Copy Address**. Open that address on another device connected to the selected network and sign in with the key.
 
-The listener binds only to IPv4 loopback and closes when Pngr exits. It has no authentication token and is intended for local read-only use. It is unavailable to other computers and does not control monitoring.
+Supported Settings ports are **1024–65535**; the default is **8787**. Apply starts, stops, or rebinds the listener immediately. An unavailable address or occupied port produces an error without stopping monitoring. Check the displayed running status before sharing the address.
 
-See [Local API reference](/docs/advanced/local-api) for endpoints, parameters, and examples.
+Choose **Apply & open dashboard controls…**, then **Open dashboard** to launch a browser. The dashboard displays targets, per-hop measurements, historical graphs, and saved sessions. Its Earlier, Later, and Live controls navigate the selected history range. See the [REST API reference](/docs/advanced/local-api) for authenticated API requests.
+
+## Interfaces and exposure
+
+Localhost mode binds only to IPv4 loopback. LAN mode adds exactly the selected assigned private address and requires authentication on **both** listeners, including localhost. It does not bind to every interface. Ethernet and Wi-Fi can appear separately; choose the network you intend to share with. With multiple candidates, select one explicitly. Use **Refresh interfaces** after connecting, disconnecting, or changing networks, then select the current address and Apply.
+
+Available addresses are private IPv4 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) and IPv6 unique-local addresses (`fc00::/7`). Public and link-local addresses are excluded. Interfaces marked as tunnels are excluded, but a VPN presented as another interface type may appear; check its name and address. IPv6 addresses use brackets in URLs, for example `http://[fd00::50]:8787/`; copy Pngr's actual displayed address.
+
+LAN access does not automatically enable internet access. Pngr creates no firewall exception, router port forwarding, or UPnP mapping. Network routing, VPN routes, firewall rules, and proxies determine who can reach the selected address. Do not forward this HTTP port from the public internet.
+
+## Keys and browser sessions
+
+One automatically generated `pngr_` key authenticates browser and API clients. It contains 256 bits of cryptographic randomness. Pngr stores only a SHA-256 verifier in its local settings, never the original key. An unsalted verifier is appropriate here because the key is randomly generated with high entropy rather than chosen by a person. The original secret is held temporarily in the desktop Settings window for copying, and is never returned through the API. Existing macOS Keychain and Windows Credential Manager storage for webhook secrets is unchanged; storing a recoverable web key there would add secret-storage dependencies without being necessary for verification.
+
+Browser sign-in creates an opaque, HttpOnly, SameSite=Strict session cookie. The access key is not saved in browser localStorage or put in a URL. Sessions expire after **30 minutes of inactivity**, with a **12-hour maximum**. Dashboard refreshes count as activity. **Log out** ends the current session. Restarting or rebinding the server signs out browsers because sessions exist only in memory.
+
+**Regenerate Key** asks for confirmation, saves the current Settings draft, and immediately invalidates the previous key and every browser session. Existing API integrations stop authenticating until updated. Copy the replacement before closing Settings. A lost key cannot be recovered; regenerate it. The clipboard and any password manager you choose are outside Pngr's control.
+
+## HTTP and encrypted access
+
+<Callout type="warn" title="LAN HTTP is unencrypted">Authentication does not encrypt traffic. Anyone able to observe or alter this network connection can capture the reusable access key, session cookie, and monitoring data. LAN mode requires explicit acknowledgement of this risk. Use a trusted isolated network or an encrypted VPN/tunnel.</Callout>
+
+This version does not provide built-in HTTPS. Cross-platform certificate provisioning, device trust, renewal, and private-key storage need a separate lifecycle design; automatically issuing a certificate would still leave other devices unable to trust it. Pngr keeps existing localhost HTTP behavior and makes LAN HTTP an explicit choice. There is no automatic HTTPS attempt or downgrade to HTTP.
+
+A user-managed HTTPS reverse proxy can terminate TLS without a cloud service. Enable **LAN mode**, even if the proxy connects through `127.0.0.1`, so the upstream still requires authentication. Restrict direct access to Pngr's HTTP listeners and keep the proxy-to-Pngr connection on loopback or another protected path. The proxy must use an accepted upstream Host and preserve same-origin checks for login/logout; see [proxy requirements](/docs/advanced/local-api#reverse-proxy-requirements). HTTPS protects only the browser-to-proxy connection. An encrypted VPN or tunnel protects only the path it actually carries; selecting a LAN address does not establish encryption.
+
+## Disable access and troubleshoot
+
+Select **Localhost Only** and Apply to remove the LAN listener. Disable **Enable Web Server** and Apply to stop both listeners. Closing Pngr also stops them.
+
+- **Cannot connect:** keep Pngr running, confirm the running address, use its configured port, and connect the other device to the selected network. Guest Wi-Fi and access-point isolation may block device-to-device traffic.
+- **Address unavailable:** the server stops if the selected address disappears; it does not switch interfaces automatically. Reconnect that interface, refresh the list, select its current address, and Apply. DHCP changes can make an old bookmark invalid.
+- **Port already in use:** choose another port or stop the application already using it. Check the status after applying.
+- **Firewall blocks access:** allow only the chosen TCP port on the trusted private network using the operating system's firewall controls. Pngr does not change those rules automatically.
+- **401 or sign-in fails:** use the full current key, including `pngr_`. A key change or server restart can require a fresh browser sign-in. Rate limiting may require waiting five minutes after repeated failed attempts.
+
+Trust authenticated clients with all monitoring data, including target names, addresses, interface inventory, and stored history. The API is read-only but those details can still be sensitive. The local computer, its user account, and other processes running under that account remain trusted; web authentication does not protect against a compromised desktop. This is a self-hosted desktop feature, with no Pngr account, hosted service, or external authentication dependency.

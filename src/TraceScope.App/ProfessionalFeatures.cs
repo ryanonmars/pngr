@@ -422,9 +422,10 @@ public partial class MainWindow
     private async Task StartWebServerAsync()
     {
         _applicationCancellation.Token.ThrowIfCancellationRequested();
-        if (_webServer is not null) return;
+        if (_webServer?.Url is not null) return;
+        if (_webServer is not null) { await _webServer.DisposeAsync(); _webServer = null; }
         var server = new LocalWebServer(_engine);
-        try { await server.StartAsync(_configuration.WebPort, _applicationCancellation.Token); _webServer = server; }
+        try { await server.StartAsync(WebOptions(_configuration), _applicationCancellation.Token); _webServer = server; }
         catch { await server.DisposeAsync(); throw; }
     }
 
@@ -449,11 +450,13 @@ public partial class MainWindow
 
     private async void OpenWeb(object? sender, RoutedEventArgs e)
     {
-        var dialog = ToolWindow("Local read-only web interface", 580, 250);
-        var enabled = new CheckBox { Name = "WebEnabled", Content = "Enable localhost web server", IsChecked = _webServer is not null };
+        var dialog = ToolWindow("Local read-only web interface", 580, 320);
+        var enabled = new CheckBox { Name = "WebEnabled", Content = "Enable web server", IsChecked = _webServer is not null };
         var port = new NumericUpDown { Name = "WebPort", Minimum = 1024, Maximum = 65535, Value = _configuration.WebPort, Width = 150 };
         var apply = new Button { Name = "WebApply", Content = "Apply" }; var browser = new Button { Content = "Open dashboard" };
-        var status = new TextBlock { Name = "WebStatus", Text = _webServer?.Url ?? "Disabled. Listening is restricted to this computer.", TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        var status = new TextBlock { Name = "WebStatus", Text = _webServer?.Url ?? _webServer?.LastError ?? "Disabled. Configure access in Settings → Web Server.", TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        var settings = new Button { Content = "Web Server settings…" };
+        settings.Click += (_, _) => { dialog.Close(); OpenSettings(null, e); _settingsWindow?.SelectPage("Web Server"); };
         apply.Click += async (_, _) =>
         {
             try
@@ -469,7 +472,8 @@ public partial class MainWindow
         {
             if (_webServer?.Url is { } url) Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         };
-        dialog.Content = ToolPanel(enabled, FormRow("Port", port), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { apply, browser } }, status);
+        dialog.Content = ToolPanel(enabled, FormRow("Port", port), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { apply, browser } }, status,
+            new TextBlock { Text = "Runs only while Pngr is running. LAN mode requires a key for browser and API access; HTTP is unencrypted.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }, settings);
         await dialog.ShowDialog(this);
     }
 

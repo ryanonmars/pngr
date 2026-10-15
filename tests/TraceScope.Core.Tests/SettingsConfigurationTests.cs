@@ -16,7 +16,61 @@ public sealed class SettingsConfigurationTests
         Assert.Equal(.68, configuration.HistoryLayout.PanelFraction);
         Assert.Empty(configuration.HistoryLayout.Targets);
         Assert.False(configuration.WebEnabled);
+        Assert.False(configuration.WebLanEnabled);
+        Assert.False(configuration.WebHttpAcknowledged);
+        Assert.Null(configuration.WebAccessKeyVerifier);
+        Assert.Equal(8787, configuration.WebPort);
         Assert.False(configuration.Actions.NativeNotificationsEnabled);
+    }
+
+    [Fact]
+    public async Task LanSettingsPersistOnlyVerifierAndExportsRemoveRemoteAuthentication()
+    {
+        var key = WebAccessKey.Generate();
+        var configuration = new WorkspaceConfiguration
+        {
+            WebEnabled = true, WebLanEnabled = true, WebLanAddress = "192.168.30.50",
+            WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(key),
+            Targets = [new("example.test", new())], Profiles = [new("Preserved", new())]
+        };
+        var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var store = new WorkspaceStore(Path.Combine(directory, "workspace.json"));
+            await store.SaveAsync(configuration);
+            var json = await File.ReadAllTextAsync(store.Path);
+            Assert.DoesNotContain(key, json);
+            var restored = (await store.LoadAsync())!;
+            Assert.True(restored.WebLanEnabled);
+            Assert.True(restored.WebHttpAcknowledged);
+            Assert.Equal(configuration.WebLanAddress, restored.WebLanAddress);
+            Assert.True(WebAccessKey.Verify(key, restored.WebAccessKeyVerifier));
+            Assert.Equal(configuration.Targets.Single(), restored.Targets.Single());
+            Assert.Equal(configuration.Profiles.Single(), restored.Profiles.Single());
+            using var exported = new MemoryStream();
+            await WorkspaceStore.ExportAsync(exported, restored);
+            exported.Position = 0;
+            var imported = await WorkspaceStore.ImportAsync(exported);
+            Assert.False(imported.WebLanEnabled);
+            Assert.False(imported.WebHttpAcknowledged);
+            Assert.Null(imported.WebAccessKeyVerifier);
+            Assert.Null(imported.WebLanAddress);
+            Assert.Equal(configuration.Targets.Single(), imported.Targets.Single());
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [Fact]
+    public void LanConfigurationRequiresExplicitAcknowledgementPrivateAddressAndVerifier()
+    {
+        var valid = new WorkspaceConfiguration { WebLanEnabled = true, WebLanAddress = "10.1.2.3",
+            WebHttpAcknowledged = true, WebAccessKeyVerifier = WebAccessKey.CreateVerifier(WebAccessKey.Generate()) };
+        valid.Validate(); // An unavailable saved address must not prevent restoring desktop history.
+        Assert.Throws<InvalidDataException>(() => (valid with { WebHttpAcknowledged = false }).Validate());
+        Assert.Throws<InvalidDataException>(() => (valid with { WebAccessKeyVerifier = null }).Validate());
+        foreach (var address in new[] { "0.0.0.0", "::", "8.8.8.8", "127.0.0.1", "fe80::1", "invalid" })
+            Assert.Throws<InvalidDataException>(() => (valid with { WebLanAddress = address }).Validate());
     }
 
     [Fact]

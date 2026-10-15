@@ -1,9 +1,9 @@
 ---
-title: "Local API reference"
+title: "REST API reference"
 description: "Read live targets, saved sessions, network information, and aggregated history."
 ---
 
-Enable the [Local Web / API](/docs/settings/local-web-api) first. The default base URL is `http://127.0.0.1:8787`.
+Enable the [Web Server](/docs/settings/local-web-api) first. The default base URL is `http://127.0.0.1:8787`. Localhost Only mode preserves unauthenticated local access. LAN mode requires authentication for every dashboard and API request, including requests made through localhost.
 
 All endpoints below are **GET** and read-only. JSON response properties use camelCase, and enum values are strings. There are no API endpoints to add targets, change settings, acknowledge events, or start/stop monitoring.
 
@@ -11,7 +11,7 @@ All endpoints below are **GET** and read-only. JSON response properties use came
 
 | Path | Response |
 | --- | --- |
-| `/` | Local HTML dashboard |
+| `/` | HTML dashboard; redirects unauthenticated LAN-mode browsers to sign-in |
 | `/api/targets` | Current engine sessions with options, state, capability, health, and latest snapshot |
 | `/api/sessions` | Saved sessions with identifiers, target, destination address, start/stop dates, and sample count |
 | `/api/interfaces` | Local interface inventory |
@@ -27,6 +27,20 @@ curl http://127.0.0.1:8787/api/interfaces
 ```
 
 Copy a session `id` from targets or saved sessions for the history and events requests.
+
+## LAN authentication
+
+Copy the server address and newly generated key from **Settings → Web Server**. API clients send `Authorization: Bearer <access-key>` on each request. For example, with the address and key supplied through environment variables:
+
+```bash
+curl --header "Authorization: Bearer $PNGR_ACCESS_KEY" "$PNGR_SERVER/api/targets"
+```
+
+Set `PNGR_SERVER` to Pngr's displayed address, such as `http://192.168.30.50:8787` (an example only), and `PNGR_ACCESS_KEY` to the full `pngr_` key using your secret-management method. Do not paste a real key into a URL, committed script, shared shell history, or diagnostic output. Avoid curl's verbose/trace output, which can print authorization headers. HTTP transmits both credentials and data unencrypted; use the protections in the [Web Server guide](/docs/settings/local-web-api#http-and-encrypted-access).
+
+Missing or invalid credentials return **401** with `WWW-Authenticate: Bearer`. Repeated authentication attempts can return **429** with `Retry-After`. Keys in query strings are never authentication. There is no endpoint to retrieve a key or change monitoring configuration. Regenerating a key immediately invalidates the previous one and every browser session.
+
+Browser users sign in at `/login` with the same key and use an HttpOnly, SameSite=Strict cookie. Cookies authenticate same-origin dashboard requests without exposing the key to frontend JavaScript. Browser sessions expire after 30 minutes idle or 12 hours total, and are lost when the server restarts. Login and logout use POST forms with CSRF tokens and same-origin checks; logout is available from the dashboard.
 
 ## History query
 
@@ -65,6 +79,16 @@ UDP target health distinguishes `NoResponse`, `ProbeRejected`, `Reachable`, and 
 
 ## Access and lifetime
 
-The listener binds to IPv4 loopback only. It accepts Host values `127.0.0.1` and `localhost`; other hosts return 400. No API authentication or cross-origin access configuration is provided. Responses use `Cache-Control: no-store`. The local dashboard and API require the desktop process to remain open.
+Localhost mode binds to IPv4 loopback only. LAN mode adds one explicitly selected assigned private IPv4 or unique-local IPv6 address and applies authentication to both listeners. Host validation accepts only supported listener hosts, preventing arbitrary hostname access; use the displayed numeric address. There is no permissive CORS configuration. Responses use `Cache-Control: no-store`, and request body/form limits and authentication rate limits bound untrusted input. The dashboard and API require the desktop process to remain open.
 
-If a connection fails, confirm that the listener is enabled, use the configured port and `127.0.0.1`, and check for a port-in-use error in Pngr. Remote access and independent server deployment are not supported.
+The server exposes defined routes and embedded dashboard HTML, not a filesystem directory. All monitoring-data routes are behind the same authentication boundary in LAN mode. Successful authentication grants read access to all available monitoring data; there are no per-client permissions. The desktop GUI and probing engines do not participate in web authentication.
+
+### Reverse proxy requirements
+
+There is no automatic reverse-proxy discovery or trust of forwarded headers. If you operate an HTTPS reverse proxy, enable LAN authentication in Pngr and send requests to an accepted numeric upstream Host (for example, `127.0.0.1:8787`). A public-facing proxy hostname is not an accepted upstream Host.
+
+The proxy must reject cross-origin login/logout requests at its external boundary before normalizing a matching browser Origin to the upstream HTTP origin. Blindly rewriting every Origin would defeat CSRF origin checks. Login and logout also require their CSRF tokens. Rewrite upstream session and login cookies to add **Secure** at the HTTPS edge, while retaining HttpOnly and SameSite=Strict. Pngr adds Secure itself only when its request is HTTPS; it cannot infer TLS terminated elsewhere. Do not enable unvalidated forwarded-header trust to work around this.
+
+Restrict direct HTTP access with firewall rules and keep the upstream connection on loopback or an encrypted protected path. Configure TLS and cookie/origin handling explicitly with your chosen proxy; this version supplies no automatic certificate, proxy, or trust configuration. An ordinary port forward does not add encryption.
+
+For connection failures, confirm the running address and port, the selected interface, device isolation, and firewall rules. See [troubleshooting](/docs/settings/local-web-api#disable-access-and-troubleshoot).

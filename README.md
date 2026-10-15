@@ -8,7 +8,7 @@ Pngr is a standalone network diagnostics application for macOS and Windows, buil
 - Hop latency, jitter, and diagnostic response-loss statistics.
 - Multiple synchronized historical graphs with panning, zooming, and interval selection.
 - Saved sessions, workspace restoration, route-change events, and optional alerts.
-- Optional read-only localhost API, disabled by default.
+- Optional read-only web dashboard and REST API, disabled by default, with authenticated LAN access.
 
 No background monitoring service or cloud account is required. Closing Pngr stops monitoring and the optional API.
 
@@ -67,6 +67,18 @@ The updater SDK and CLI are pinned to Velopack 1.2.161; the packaging scripts re
 Response loss counts eligible diagnostic probes without qualifying replies. It does not prove forwarding loss; intermediate routers can suppress diagnostic replies while forwarding traffic. A UDP destination ICMP Port Unreachable response establishes destination reachability, not UDP application-service availability.
 
 Data is stored locally. Existing TraceScope settings, profiles, workspaces, and sessions remain compatible. Installed builds retain `~/Library/Application Support/TraceScope` on macOS and `%LOCALAPPDATA%\TraceScope` on Windows, with the existing `tracescope.db` filename. The macOS identifier remains `dev.tracescope.desktop`. Source-checkout launches use `artifacts/data`; `--data-dir PATH` selects an explicit location.
+
+## Web dashboard and REST API
+
+Open **Settings → Web Server** to enable the existing read-only server. **Localhost Only** is the default: `http://127.0.0.1:8787` works without authentication on the computer running Pngr. The desktop application never requires web authentication.
+
+To connect another device, explicitly select **Local Network (LAN)**, choose a current private interface address and port, acknowledge the HTTP warning, and apply. Copy the displayed server address and the newly generated `pngr_` access key. Use that address in a browser and enter the key, or send `Authorization: Bearer <access-key>` with API requests. In LAN mode, authentication applies to both the LAN and localhost listeners. The API remains read-only; existing response formats are unchanged.
+
+The original key is available only when generated in the desktop settings window; save it in a password manager before closing the window. Pngr persists a SHA-256 verifier, not the original secret. **Regenerate Key** requires confirmation and immediately invalidates the previous key and all browser sessions. A lost key must be regenerated. Existing macOS Keychain and Windows Credential Manager webhook storage is unchanged.
+
+LAN HTTP is **unencrypted**: someone who can observe or alter network traffic can capture the key, browser session, and monitoring data. Use a trusted isolated network or an encrypted VPN/tunnel; a user-managed HTTPS reverse proxy needs the restrictions described in the [Web Server guide](website/content/docs/settings/local-web-api.mdx). Pngr does not provision TLS certificates, router forwarding, UPnP, or firewall exceptions. LAN access does not itself enable internet access; the network owner remains responsible for routing, firewall and proxy exposure.
+
+Choose **Localhost Only** and apply to remove LAN access, or disable **Enable Web Server** to stop both listeners. Pngr must remain open. Address changes require refreshing/reselecting the interface; unavailable addresses and port conflicts are reported without changing monitoring. See the [Web Server guide](website/content/docs/settings/local-web-api.mdx) and [API reference](website/content/docs/advanced/local-api.mdx) for login, API examples and troubleshooting.
 
 ## Automated releases
 

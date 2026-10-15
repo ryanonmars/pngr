@@ -27,6 +27,10 @@ public sealed record WorkspaceConfiguration
     public int AggregationSeconds { get; init; } = 5;
     public int WebPort { get; init; } = 8787;
     public bool WebEnabled { get; init; }
+    public bool WebLanEnabled { get; init; }
+    public string? WebLanAddress { get; init; }
+    public bool WebHttpAcknowledged { get; init; }
+    public string? WebAccessKeyVerifier { get; init; }
     public bool DesktopNotifications { get; init; }
     public ProbeOptions DefaultProbeOptions { get; init; } = new();
     public bool UseDefaultProbeOptionsForNewTargets { get; init; }
@@ -49,6 +53,11 @@ public sealed record WorkspaceConfiguration
         if (RetentionDays is < 1 or > 3650) throw new InvalidDataException("Retention must be between 1 and 3650 days.");
         if (AggregationSeconds is < 1 or > 3600) throw new InvalidDataException("Aggregation must be between 1 and 3600 seconds.");
         if (WebPort is < 1024 or > 65535) throw new InvalidDataException("Web port must be between 1024 and 65535.");
+        if (WebAccessKeyVerifier is not null && !WebAccessKey.IsValidVerifier(WebAccessKeyVerifier))
+            throw new InvalidDataException("Invalid web access key verifier.");
+        if (WebLanEnabled && (!WebHttpAcknowledged || !WebAccessKey.IsValidVerifier(WebAccessKeyVerifier)
+            || !System.Net.IPAddress.TryParse(WebLanAddress, out var webAddress) || !WebServerNetwork.IsPrivateAddress(webAddress)))
+            throw new InvalidDataException("LAN access requires a private interface address, a generated key and acknowledgement of unencrypted HTTP.");
         if (DefaultProbeOptions is null || Display is null) throw new InvalidDataException("Monitoring and display settings are required.");
         DefaultProbeOptions.Validate();
         LastUsedProbeOptions?.Validate();
@@ -209,7 +218,9 @@ public sealed class WorkspaceStore
     public static Task ExportAsync(Stream stream, WorkspaceConfiguration configuration, CancellationToken cancellationToken = default)
     {
         configuration.Validate();
-        var exported = configuration with { Actions = configuration.Actions with
+        // Sharing a workspace must not share authentication state or enable remote access on import.
+        var exported = configuration with { WebLanEnabled = false, WebLanAddress = null,
+            WebHttpAcknowledged = false, WebAccessKeyVerifier = null, Actions = configuration.Actions with
         { Webhook = configuration.Actions.Webhook with { Enabled = false, Url = "", UrlSecretId = "" } } };
         return JsonSerializer.SerializeAsync(stream, exported, JsonOptions, cancellationToken);
     }
