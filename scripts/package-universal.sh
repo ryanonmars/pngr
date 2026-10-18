@@ -72,7 +72,7 @@ fi
 # BEFORE generating the immutable portable and update packages.
 if [ "$release_signing" = 1 ]; then
     set -- --signAppIdentity 'Developer ID Application: Ryan Poelker (VRNY8KM56D)' \
-        --signDisableDeep --signEntitlements "$project_root/scripts/macos/launcher.entitlements.plist" \
+        --signDisableDeep --signEntitlements "$project_root/scripts/macos/launcher.entitlements" \
         --keychain "$PNGR_MACOS_SIGN_KEYCHAIN" --notaryProfile "$PNGR_MACOS_NOTARY_PROFILE"
 else
     set -- --signAppIdentity -

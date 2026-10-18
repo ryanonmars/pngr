@@ -20,7 +20,7 @@ class VerificationPolicyTests(unittest.TestCase):
         values = {'GITHUB_ACTIONS': 'true', 'GITHUB_REPOSITORY': POLICY.REPOSITORY,
                   'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_REF': 'refs/heads/main',
                   'GITHUB_WORKFLOW_REF': POLICY.WORKFLOW, 'GITHUB_SHA': SHA,
-                  'PNGR_SIGNING_ENVIRONMENT': POLICY.ENVIRONMENT, 'PNGR_REVIEWED_MAIN_SHA': SHA}
+                  'PNGR_SIGNING_ENVIRONMENT': POLICY.ENVIRONMENT}
         return values | changes
 
     def protections(self):
@@ -31,14 +31,13 @@ class VerificationPolicyTests(unittest.TestCase):
     def branches(self):
         return {'total_count': 1, 'branch_policies': [{'name': 'main', 'type': 'branch'}]}
 
-    def test_main_dispatch_requires_exact_preapproved_commit(self):
+    def test_only_canonical_main_dispatch_is_accepted(self):
         with mock.patch.dict(os.environ, self.environment(), clear=True):
             self.assertEqual(POLICY.context(), SHA)
         for changes in ({'GITHUB_ACTIONS': 'false'}, {'GITHUB_REPOSITORY': 'fork/pngr'},
                         {'GITHUB_EVENT_NAME': 'pull_request'}, {'GITHUB_EVENT_NAME': 'push'},
                         {'GITHUB_REF': 'refs/heads/feature'}, {'GITHUB_REF': 'refs/tags/main'},
                         {'GITHUB_WORKFLOW_REF': POLICY.WORKFLOW.replace('main', 'feature')},
-                        {'PNGR_REVIEWED_MAIN_SHA': ''}, {'PNGR_REVIEWED_MAIN_SHA': 'b' * 40},
                         {'PNGR_SIGNING_ENVIRONMENT': 'unprotected'}, {'GITHUB_SHA': 'invalid'}):
             with self.subTest(changes=changes), mock.patch.dict(os.environ, self.environment(**changes), clear=True):
                 with self.assertRaises(RuntimeError):
@@ -58,7 +57,7 @@ class VerificationPolicyTests(unittest.TestCase):
             with self.subTest(branches=branches), self.assertRaises(RuntimeError):
                 POLICY.validate_protections(self.protections(), branches)
 
-    def test_checkout_and_live_main_must_match_reviewed_sha(self):
+    def test_checkout_and_live_main_must_match_dispatch_sha(self):
         with mock.patch.dict(os.environ, self.environment(), clear=True), \
                 mock.patch.object(POLICY.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, SHA + '\n')):
             for main in (SHA, 'b' * 40):
@@ -94,6 +93,7 @@ class VerificationPolicyTests(unittest.TestCase):
     def test_workflow_has_no_inputs_caches_release_or_write_permissions(self):
         self.assertIn('workflow_dispatch:', WORKFLOW)
         self.assertNotIn('inputs:', WORKFLOW)
+        self.assertNotIn('PNGR_REVIEWED_MAIN_SHA', WORKFLOW)
         self.assertNotIn('secrets: inherit', WORKFLOW)
         self.assertNotIn('actions/cache@', WORKFLOW)
         self.assertNotIn('download-artifact@', WORKFLOW)

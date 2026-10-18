@@ -1,7 +1,7 @@
 name: Verify macOS signing and notarization
 
-# No user-supplied refs, SHAs, versions, paths or commands. Approval binds the
-# dispatch SHA to PNGR_REVIEWED_MAIN_SHA in the protected environment.
+# No user-supplied refs, SHAs, versions, paths or commands. Environment
+# approval authorizes the immutable main commit captured by this dispatch.
 on:
   workflow_dispatch:
 
@@ -32,10 +32,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Verify reviewed commit and protected environment
+      - name: Verify main commit and protected environment
         env:
           GH_TOKEN: ${{ github.token }}
-          PNGR_REVIEWED_MAIN_SHA: ${{ vars.PNGR_REVIEWED_MAIN_SHA }}
         run: python3 scripts/macos/verification-policy.py
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
@@ -54,7 +53,6 @@ jobs:
         id: signing
         env:
           GH_TOKEN: ${{ github.token }}
-          PNGR_REVIEWED_MAIN_SHA: ${{ vars.PNGR_REVIEWED_MAIN_SHA }}
           PNGR_MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.PNGR_MACOS_CERTIFICATE_P12_BASE64 }}
           PNGR_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.PNGR_MACOS_CERTIFICATE_PASSWORD }}
           PNGR_APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.PNGR_APPLE_NOTARY_KEY_P8_BASE64 }}

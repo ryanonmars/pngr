@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed before manual signing: canonical main, reviewed SHA and approval gate."""
+"""Fail closed before manual signing: canonical main, immutable dispatch SHA and approval gate."""
 import json
 import os
 import re
@@ -20,9 +20,8 @@ def context():
             or os.environ.get("GITHUB_REF") != "refs/heads/main"
             or os.environ.get("GITHUB_WORKFLOW_REF") != WORKFLOW
             or os.environ.get("PNGR_SIGNING_ENVIRONMENT") != ENVIRONMENT
-            or not re.fullmatch(r"[0-9a-f]{40}", sha)
-            or os.environ.get("PNGR_REVIEWED_MAIN_SHA") != sha):
-        raise RuntimeError("Verification requires canonical main and an exact reviewed SHA in the signing environment.")
+            or not re.fullmatch(r"[0-9a-f]{40}", sha)):
+        raise RuntimeError("Verification requires a canonical main dispatch and the signing environment.")
     return sha
 
 
@@ -58,11 +57,11 @@ def verify():
     sha = context()
     head = subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     if head != sha:
-        raise RuntimeError("The checkout differs from the reviewed workflow commit.")
+        raise RuntimeError("The checkout differs from the dispatched workflow commit.")
     validate_protections(get(f"environments/{ENVIRONMENT}"),
                          get(f"environments/{ENVIRONMENT}/deployment-branch-policies?per_page=100"))
     if get("commits/main").get("sha") != sha:
-        raise RuntimeError("Main changed since dispatch; review the new commit and start a new verification run.")
+        raise RuntimeError("Main changed since dispatch; start a new verification run.")
     print(f"Verified main commit {sha} and required signing-environment approval policy.")
 
 

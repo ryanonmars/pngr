@@ -79,6 +79,15 @@ class ReleaseSigningTests(unittest.TestCase):
                 SIGNER.run(['/usr/bin/security', 'import', 'secret-password'])
         self.assertNotIn('secret', str(error.exception))
 
+    def test_velopack_entitlements_use_required_extension(self):
+        script = (ROOT / 'scripts/package-universal.sh').read_text()
+        import re
+        match = re.search(r'--signEntitlements "\$project_root/([^"\n]+)"', script)
+        self.assertIsNotNone(match)
+        path = ROOT / match.group(1)
+        self.assertEqual(path.suffix, '.entitlements')  # vpk 1.2.161 rejects .plist.
+        self.assertEqual(plistlib.loads(path.read_bytes()), {})
+
     def test_release_never_silently_falls_back_without_configuration(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError):
