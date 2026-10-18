@@ -9,6 +9,8 @@ import re
 import stat
 import subprocess
 import tempfile
+import time
+import sys
 import zipfile
 
 TEAM = "VRNY8KM56D"
@@ -24,8 +26,35 @@ MACHO = {bytes.fromhex(value) for value in (
     "feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca", "cafebabf", "bfbafeca")}
 
 
+def diagnostic(error):
+    # Verification commands receive no credentials. Still emit only known error
+    # categories/codes, never raw tool output, URLs, tickets or host paths.
+    text = b"\n".join(value if isinstance(value, bytes) else str(value).encode()
+                       for value in (error.stdout, error.stderr) if value).decode("utf-8", errors="replace")
+    lowered = text.lower()
+    categories = [label for needle, label in (
+        ("timed out", "network timeout"), ("could not resolve", "DNS failure"),
+        ("could not establish secure connection", "TLS connection failure"),
+        ("certificate authority pinning mismatch", "Apple certificate pinning mismatch"),
+        ("record not found", "ticket record not found"),
+        ("could not validate ticket", "ticket validation failed")) if needle in lowered]
+    codes = re.findall(r"(?:NSURLErrorDomain|NSOSStatusErrorDomain)\s+Code=(-?\d+)", text)
+    return "; ".join([*categories, *("native error " + code for code in codes)]) or "no classified native diagnostic"
+
+
 def run(*args):
-    return subprocess.run(list(map(str, args)), check=True, capture_output=True).stdout
+    # EX_NOHOST (68) from stapler is a ticket-service/network failure. Retry only
+    # that code, with a hard bound; invalid signatures/tickets still fail closed.
+    attempts = 3 if args[:3] == ("xcrun", "stapler", "validate") else 1
+    for attempt in range(attempts):
+        try:
+            return subprocess.run(list(map(str, args)), check=True, capture_output=True).stdout
+        except subprocess.CalledProcessError as error:
+            print(f"Verification {Path(args[0]).name} failed (exit {error.returncode}; {diagnostic(error)}).", file=sys.stderr)
+            if error.returncode != 68 or attempt + 1 == attempts:
+                raise
+            print(f"Retrying Apple ticket validation ({attempt + 2}/{attempts}).", file=sys.stderr)
+            time.sleep(10 * (attempt + 1))
 
 
 def native(path):

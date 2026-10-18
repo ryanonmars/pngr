@@ -167,7 +167,9 @@ def notarize_dmg(path):
                             "--output-format", "json", "--keychain-profile", profile, "--keychain", keychain]))
     if result.get("status") != "Accepted":
         raise RuntimeError("Apple did not accept the DMG notarization submission.")
+    print(f"DMG notarization accepted: {result.get('id', 'accepted')}.")
     run(["/usr/bin/xcrun", "stapler", "staple", str(path)])
+    print("DMG ticket stapled successfully.")
 
 
 if __name__ == "__main__":

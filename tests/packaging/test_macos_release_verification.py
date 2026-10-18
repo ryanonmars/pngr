@@ -86,6 +86,33 @@ class ReleaseVerificationTests(unittest.TestCase):
                 with self.assertRaises(subprocess.CalledProcessError):
                     VERIFY.verify_app(self.bundle)
 
+    def test_ticket_service_failure_is_retried_with_a_hard_bound(self):
+        error = subprocess.CalledProcessError(68, ['xcrun'], output=b'', stderr=b'NSURLErrorDomain Code=-1001 The request timed out. https://private-url sensitive-text')
+        success = subprocess.CompletedProcess([], 0, b'validated', b'')
+        with mock.patch.object(VERIFY.subprocess, 'run', side_effect=[error, success]) as run, \
+                mock.patch.object(VERIFY.time, 'sleep') as sleep, mock.patch('builtins.print') as log:
+            self.assertEqual(VERIFY.run('xcrun', 'stapler', 'validate', self.bundle), b'validated')
+            self.assertEqual(run.call_count, 2)
+            sleep.assert_called_once_with(10)
+            messages = str(log.call_args_list)
+            self.assertIn('network timeout', messages)
+            self.assertNotIn('private-url', messages)
+            self.assertNotIn('sensitive-text', messages)
+        with mock.patch.object(VERIFY.subprocess, 'run', side_effect=error) as run, mock.patch.object(VERIFY.time, 'sleep'):
+            with self.assertRaises(subprocess.CalledProcessError):
+                VERIFY.run('xcrun', 'stapler', 'validate', self.bundle)
+            self.assertEqual(run.call_count, 3)
+
+    def test_invalid_ticket_and_signature_errors_are_not_retried(self):
+        for arguments, code in ((('xcrun', 'stapler', 'validate', self.bundle), 65),
+                                (('codesign', '--verify', self.bundle), 68)):
+            with mock.patch.object(VERIFY.subprocess, 'run', side_effect=subprocess.CalledProcessError(code, arguments)) as run, \
+                    mock.patch.object(VERIFY.time, 'sleep') as sleep:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    VERIFY.run(*arguments)
+                self.assertEqual(run.call_count, 1)
+                sleep.assert_not_called()
+
     def test_dmg_requires_signature_staple_and_gatekeeper(self):
         with mock.patch.object(VERIFY, "run") as run, mock.patch.object(VERIFY, "inspect_signature") as inspect:
             VERIFY.verify_dmg(self.root / "test.dmg")
