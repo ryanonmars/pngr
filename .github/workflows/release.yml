@@ -18,6 +18,19 @@ jobs:
     outputs:
       publish: ${{ steps.release.outputs.publish }}
     steps:
+      - name: Validate release tag
+        env:
+          PNGR_EVENT: ${{ github.event_name }}
+          PNGR_REF: ${{ github.ref }}
+          PNGR_TAG: ${{ github.ref_name }}
+        shell: python
+        run: |
+          import os, re
+          tag = os.environ['PNGR_TAG']
+          if (os.environ['PNGR_EVENT'] != 'push'
+                  or os.environ['PNGR_REF'] != f'refs/tags/{tag}'
+                  or not re.fullmatch(r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?', tag)):
+              raise SystemExit('Release signing and publication require a semantic version tag push.')
       - name: Skip an already published tag
         id: release
         env:
@@ -52,6 +65,13 @@ jobs:
     with:
       version: ${{ github.ref_name }}
       package: true
+      release_signing: true
+    secrets:
+      PNGR_MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.PNGR_MACOS_CERTIFICATE_P12_BASE64 }}
+      PNGR_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.PNGR_MACOS_CERTIFICATE_PASSWORD }}
+      PNGR_APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.PNGR_APPLE_NOTARY_KEY_P8_BASE64 }}
+      PNGR_APPLE_NOTARY_KEY_ID: ${{ secrets.PNGR_APPLE_NOTARY_KEY_ID }}
+      PNGR_APPLE_NOTARY_ISSUER_ID: ${{ secrets.PNGR_APPLE_NOTARY_ISSUER_ID }}
   publish:
     if: github.event_name == 'push'
     needs: platforms

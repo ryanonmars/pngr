@@ -57,7 +57,11 @@ else
     /usr/libexec/PlistBuddy -c "Add :pngrReleaseVersion string $version" "$bundle/Contents/Info.plist"
     cp src/TraceScope.App/Assets/Icons/pngr.icns "$bundle/Contents/Resources/pngr.icns"
     cp -R src/TraceScope.App/Platforms/macOS/en.lproj "$bundle/Contents/Resources/"
-    codesign --force --deep --sign - "$bundle"
+    if [ -n "${PNGR_MACOS_SIGN_IDENTITY:-}" ]; then
+        python3 scripts/macos/sign-local.py "$bundle"
+    else
+        codesign --force --deep --sign - "$bundle"
+    fi
     codesign --verify --deep --strict "$bundle"
     touch "$bundle"
     # Keep a single current archive for each platform instead of stacking versions.

@@ -1,0 +1,85 @@
+name: Verify macOS signing and notarization
+
+# No user-supplied refs, SHAs, versions, paths or commands. Approval binds the
+# dispatch SHA to PNGR_REVIEWED_MAIN_SHA in the protected environment.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: macos-signing-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: >-
+      github.repository == 'ryanonmars/pngr' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.workflow_ref == 'ryanonmars/pngr/.github/workflows/verify-macos-signing.yml@refs/heads/main'
+    environment: macos-signing-verification
+    runs-on: macos-15
+    timeout-minutes: 150
+    env:
+      PNGR_SIGNING_ENVIRONMENT: macos-signing-verification
+      PNGR_VERSION: ${{ format('0.8.0-signingcheck.{0}.{1}', github.run_id, github.run_attempt) }}
+      NUGET_PACKAGES: ${{ github.workspace }}/.tools/nuget
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify reviewed commit and protected environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PNGR_REVIEWED_MAIN_SHA: ${{ vars.PNGR_REVIEWED_MAIN_SHA }}
+        run: python3 scripts/macos/verification-policy.py
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      # No restored caches or downloaded cross-workflow artifacts in this signing job.
+      - name: Test application and packaging
+        run: |
+          dotnet test TraceScope.slnx -c Release
+          python3 -m unittest discover -s tests/packaging -v
+          python3 -m unittest discover -s scripts/licensing -p 'test_*.py' -v
+      - name: Build both self-contained macOS payloads
+        run: |
+          scripts/package.sh osx-arm64 "$PNGR_VERSION"
+          scripts/package.sh osx-x64 "$PNGR_VERSION"
+      - name: Prepare isolated verification signing credentials
+        id: signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PNGR_REVIEWED_MAIN_SHA: ${{ vars.PNGR_REVIEWED_MAIN_SHA }}
+          PNGR_MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.PNGR_MACOS_CERTIFICATE_P12_BASE64 }}
+          PNGR_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.PNGR_MACOS_CERTIFICATE_PASSWORD }}
+          PNGR_APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.PNGR_APPLE_NOTARY_KEY_P8_BASE64 }}
+          PNGR_APPLE_NOTARY_KEY_ID: ${{ secrets.PNGR_APPLE_NOTARY_KEY_ID }}
+          PNGR_APPLE_NOTARY_ISSUER_ID: ${{ secrets.PNGR_APPLE_NOTARY_ISSUER_ID }}
+        run: python3 scripts/macos/release-signing.py prepare-verification
+      - name: Sign, notarize, staple and verify universal distributions
+        env:
+          PNGR_UNIVERSAL_USE_ARCHIVES: '1'
+        run: scripts/package-universal.sh "$PNGR_VERSION"
+      - name: Prepare allowlisted artifacts and sanitized verification report
+        run: |
+          python3 scripts/macos/verification-artifacts.py \
+            artifacts/installers/osx-universal artifacts/universal/pngr.app "$PNGR_VERSION" \
+            artifacts/signing-verification --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID"
+      - name: Remove temporary signing credentials
+        if: always() && steps.signing.outcome != 'skipped' && steps.signing.outcome != ''
+        run: python3 scripts/macos/release-signing.py cleanup
+      # Default success() prevents uploads after verification or cleanup failure.
+      # Packages are publicly readable Actions artifacts; credentials never belong here.
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-signing-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/signing-verification/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1

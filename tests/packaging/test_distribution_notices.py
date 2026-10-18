@@ -67,7 +67,9 @@ class DistributionNoticeTests(unittest.TestCase):
 
     def test_private_reverse_engineering_material_is_rejected(self):
         for name in ('.rea/evidence.json', 'docs/internal/ip-compliance-review.md',
-                     'helper.hop', 'native-pseudocode.txt', 'capture.pcapng'):
+                     'helper.hop', 'native-pseudocode.txt', 'capture.pcapng',
+                     'identity.p12', 'identity.pfx', 'notary.p8', 'private.key', 'identity.pem',
+                     'signing.keychain', 'signing.keychain-db', 'profile.mobileprovision'):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Private analysis'):
                 NOTICES.reject_private_material(name)
 

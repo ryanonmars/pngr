@@ -14,7 +14,7 @@ SPEC.loader.exec_module(LICENSES)
 def reject_private_material(name):
     path = PurePosixPath(name.replace('\\', '/').lower())
     if (any(part in {'.rea', '.codex', '.agents', 'internal'} for part in path.parts)
-            or path.suffix in {'.hop', '.hopper', '.hdb', '.pcap', '.pcapng'}
+            or path.suffix in {'.hop', '.hopper', '.hdb', '.pcap', '.pcapng', '.p12', '.pfx', '.p8', '.pem', '.key', '.keychain', '.keychain-db', '.mobileprovision'}
             or any(token in path.name for token in ('pseudocode', 'disassembly', 'rea-evidence', 'ip-compliance-review'))):
         raise ValueError('Private analysis material in distribution: ' + name)
 

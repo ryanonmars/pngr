@@ -13,6 +13,22 @@ on:
         required: false
         default: false
         type: boolean
+      release_signing:
+        description: Sign and notarize macOS packages (actual release-tag pushes only)
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      PNGR_MACOS_CERTIFICATE_P12_BASE64:
+        required: false
+      PNGR_MACOS_CERTIFICATE_PASSWORD:
+        required: false
+      PNGR_APPLE_NOTARY_KEY_P8_BASE64:
+        required: false
+      PNGR_APPLE_NOTARY_KEY_ID:
+        required: false
+      PNGR_APPLE_NOTARY_ISSUER_ID:
+        required: false
 
 env:
   NUGET_PACKAGES: ${{ github.workspace }}/.tools/nuget
@@ -164,8 +180,27 @@ jobs:
     if: inputs.package
     needs: build
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
+      - name: Validate release signing eligibility
+        shell: python
+        env:
+          PNGR_REQUEST_RELEASE_SIGNING: ${{ inputs.release_signing }}
+          PNGR_PACKAGE: ${{ inputs.package }}
+          PNGR_EVENT: ${{ github.event_name }}
+          PNGR_REF: ${{ github.ref }}
+          PNGR_VERSION: ${{ inputs.version }}
+        run: |
+          import os, re
+          if os.environ['PNGR_REQUEST_RELEASE_SIGNING'] == 'true':
+              tag = os.environ['PNGR_REF'].removeprefix('refs/tags/')
+              valid = (os.environ['PNGR_PACKAGE'] == 'true'
+                       and os.environ['PNGR_EVENT'] == 'push'
+                       and os.environ['PNGR_REF'].startswith('refs/tags/v')
+                       and os.environ['PNGR_VERSION'] == tag
+                       and re.fullmatch(r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?', tag))
+              if not valid:
+                  raise SystemExit('Developer ID signing requires a matching release-tag push.')
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
@@ -187,12 +222,26 @@ jobs:
         with:
           path: ~/Library/Caches/pip
           key: pip-dmg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/macos/dmg-requirements.txt') }}
+      - name: Prepare isolated release signing credentials
+        id: signing
+        if: inputs.release_signing && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          PNGR_VERSION: ${{ inputs.version }}
+          PNGR_MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.PNGR_MACOS_CERTIFICATE_P12_BASE64 }}
+          PNGR_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.PNGR_MACOS_CERTIFICATE_PASSWORD }}
+          PNGR_APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.PNGR_APPLE_NOTARY_KEY_P8_BASE64 }}
+          PNGR_APPLE_NOTARY_KEY_ID: ${{ secrets.PNGR_APPLE_NOTARY_KEY_ID }}
+          PNGR_APPLE_NOTARY_ISSUER_ID: ${{ secrets.PNGR_APPLE_NOTARY_ISSUER_ID }}
+        run: python3 scripts/macos/release-signing.py prepare
       - name: Assemble universal application, DMG and update feed
         shell: bash
         env:
           PNGR_VERSION: ${{ inputs.version }}
           PNGR_UNIVERSAL_USE_ARCHIVES: '1'
         run: scripts/package-universal.sh "$PNGR_VERSION"
+      - name: Remove temporary signing credentials
+        if: always() && steps.signing.outcome != 'skipped' && steps.signing.outcome != ''
+        run: python3 scripts/macos/release-signing.py cleanup
       - name: Upload universal installer assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -88,6 +88,9 @@ workspace.json
 *.key
 *.p12
 *.pfx
+*.p8
+*.keychain
+*.keychain-db
 *.mobileprovision
 credentials*.json
 secrets*.json

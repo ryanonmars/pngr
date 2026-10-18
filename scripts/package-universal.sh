@@ -6,6 +6,12 @@ cd "$project_root"
 version=${1:-0.8.0}
 version=${version#v}
 archive_directory=${PNGR_UNIVERSAL_ARCHIVE_DIR:-artifacts}
+release_signing=${PNGR_MACOS_RELEASE_SIGNING:-0}
+case "$release_signing" in
+    0) ;;
+    1) test -n "${PNGR_MACOS_SIGN_KEYCHAIN:-}"; test -n "${PNGR_MACOS_NOTARY_PROFILE:-}" ;;
+    *) echo "Invalid release signing mode" >&2; exit 1 ;;
+esac
 # CI provides validated architecture ZIPs; local builds can publish both payloads here.
 if [ "${PNGR_UNIVERSAL_USE_ARCHIVES:-0}" != 1 ]; then
     scripts/package.sh osx-arm64 "$version"
@@ -33,7 +39,9 @@ for rid in osx-arm64 osx-x64; do
     # The apphost carried its original bundle's Info.plist signature slot.
     # Re-sign it as a standalone tool after relocation; outer --deep signing
     # treats Resources as data and does not repair the running host's identity.
-    codesign --force --sign - --identifier dev.tracescope.desktop "$bundle/Contents/Resources/runtimes/$rid/pngr"
+    if [ "$release_signing" = 0 ]; then
+        codesign --force --sign - --identifier dev.tracescope.desktop "$bundle/Contents/Resources/runtimes/$rid/pngr"
+    fi
 done
 cp "$stage/osx-arm64/pngr.app/Contents/Info.plist" "$bundle/Contents/Info.plist"
 cp -R "$stage/osx-arm64/pngr.app/Contents/Resources/." "$bundle/Contents/Resources/"
@@ -43,7 +51,11 @@ rm "$bundle/Contents/Resources/third-party-inventory.json"
 xcrun clang -O2 -Wall -Wextra -arch arm64 -arch x86_64 -mmacosx-version-min=12.0 \
     scripts/macos/universal-launcher.c -o "$bundle/Contents/MacOS/pngr"
 # Ad-hoc signatures satisfy runtime integrity; this is NOT Developer ID signing or notarization.
-codesign --force --deep --sign - "$bundle"
+if [ "$release_signing" = 1 ]; then
+    python3 scripts/macos/release-signing.py sign "$bundle"
+else
+    codesign --force --deep --sign - "$bundle"
+fi
 codesign --verify --deep --strict "$bundle"
 python3 scripts/verify-macos-universal.py "$bundle" "$version"
 output="$stage/releases"
@@ -56,9 +68,18 @@ fi
 # vpk accepts prebuilt bundles and preserves the legacy identifier and universal launcher.
 # '-' is ad-hoc integrity signing, not a trusted identity. Gatekeeper remains unchanged.
 "$sdk" tool restore
+# Velopack signs its added updater and final bundle, then notarizes/staples
+# BEFORE generating the immutable portable and update packages.
+if [ "$release_signing" = 1 ]; then
+    set -- --signAppIdentity 'Developer ID Application: Ryan Poelker (VRNY8KM56D)' \
+        --signDisableDeep --signEntitlements "$project_root/scripts/macos/launcher.entitlements.plist" \
+        --keychain "$PNGR_MACOS_SIGN_KEYCHAIN" --notaryProfile "$PNGR_MACOS_NOTARY_PROFILE"
+else
+    set -- --signAppIdentity -
+fi
 "$sdk" tool run vpk -- pack --packId pngr --packVersion "$version" --packTitle Pngr \
     --packDir "$bundle" --mainExe pngr --runtime osx-arm64 --channel osx-universal \
-    --bundleId dev.tracescope.desktop --noInst --signAppIdentity - --outputDir "$output" \
+    --bundleId dev.tracescope.desktop --noInst "$@" --outputDir "$output" \
     --delta None --skip-updates
 # DMG and the internal update package must contain the same updater-enabled application.
 portable=$(find "$output" -maxdepth 1 -name '*-Portable.zip' -print | head -1)
@@ -71,6 +92,10 @@ rm -rf "$bundle"
 mv "$stage/enriched/Pngr.app" "$bundle"
 python3 scripts/verify-macos-universal.py "$bundle" "$version" --require-updater --verify-update-permissions
 codesign --verify --deep --strict "$bundle"
+if [ "$release_signing" = 1 ]; then
+    python3 scripts/macos/verify-release.py app "$bundle"
+    python3 scripts/macos/verify-release.py updates "$output" "$version" "$bundle"
+fi
 mkdir "$stage/image"
 mv "$bundle" "$stage/image/pngr.app"
 cp compliance/THIRD-PARTY-NOTICES.txt "$stage/image/THIRD-PARTY-NOTICES.txt"
@@ -93,6 +118,10 @@ mounted_volume="$stage/mounted"
 hdiutil detach -quiet "$mounted_volume"
 mounted_volume=
 hdiutil convert -quiet "$stage/install-writable.dmg" -format UDZO -o "$stage/Pngr-macos-universal.dmg"
+if [ "$release_signing" = 1 ]; then
+    python3 scripts/macos/release-signing.py dmg "$stage/Pngr-macos-universal.dmg"
+    python3 scripts/macos/verify-release.py dmg "$stage/Pngr-macos-universal.dmg"
+fi
 hdiutil verify -quiet "$stage/Pngr-macos-universal.dmg"
 # Validate the final read-only image, not only staging metadata.
 hdiutil attach -quiet -nobrowse -mountpoint "$stage/mounted" "$stage/Pngr-macos-universal.dmg"
@@ -101,6 +130,9 @@ mounted_volume="$stage/mounted"
 cmp compliance/THIRD-PARTY-NOTICES.txt "$mounted_volume/THIRD-PARTY-NOTICES.txt"
 cmp LICENSE "$mounted_volume/LICENSE"
 python3 scripts/verify-macos-universal.py "$mounted_volume/pngr.app" "$version" --require-updater
+if [ "$release_signing" = 1 ]; then
+    python3 scripts/macos/verify-release.py app "$mounted_volume/pngr.app"
+fi
 hdiutil detach -quiet "$mounted_volume"
 mounted_volume=
 rm -rf artifacts/universal/pngr.app
