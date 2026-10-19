@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import plistlib
+import os
 import stat
 import subprocess
 import tempfile
@@ -136,11 +137,20 @@ class ReleaseVerificationTests(unittest.TestCase):
     def test_update_extraction_decodes_velopack_links_and_normalizes_permissions(self):
         package = self.package({"lib/app/Contents/Resources/sq.version": b"version",
                                 "lib/app/Contents/MacOS/sq.version.__symlink": b"../Resources/sq.version"})
-        VERIFY.extract_update(package, self.bundle)
+        native_chmod = Path.chmod
+        with mock.patch.object(Path, "chmod", autospec=True, side_effect=native_chmod) as chmod:
+            VERIFY.extract_update(package, self.bundle)
+        file = self.bundle / "Contents/Info.plist"
+        self.assertIn(mock.call(file, 0o755), chmod.call_args_list)
         link = self.bundle / "Contents/MacOS/sq.version"
         self.assertTrue(link.is_symlink())
         self.assertEqual(link.read_bytes(), b"version")
-        self.assertEqual(stat.S_IMODE((self.bundle / "Contents/Info.plist").stat().st_mode), 0o755)
+        if os.name == "posix":
+            self.assertEqual(stat.S_IMODE(file.stat().st_mode), 0o755)
+        else:
+            # NTFS chmod models read-only/writable, not Unix execute bits. The
+            # call assertion above still verifies updater permission normalization.
+            self.assertTrue(os.access(file, os.W_OK))
 
     def test_unsafe_update_paths_and_links_fail_before_extraction(self):
         for name, value in (("../escape", b"bad"), ("/escape", b"bad"), ("lib\\app\\escape", b"bad"),
