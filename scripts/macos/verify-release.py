@@ -127,7 +127,9 @@ def extract_update(package, destination):
             raise ValueError("Corrupt update ZIP")
         seen = set()
         for item in archive.infolist():
-            name = item.filename
+            # ZipInfo normalizes Windows separators in filename; inspect the
+            # original archive spelling before accepting any entry.
+            name = item.orig_filename
             parts = PurePosixPath(name).parts
             if ("\\" in name or name.startswith("/") or ".." in parts or name in seen
                     or not parts or ":" in parts[0] or PurePosixPath(name).as_posix() != name.rstrip("/")):
@@ -171,7 +173,7 @@ def extract_update(package, destination):
         for name, target in links.items():
             path = destination / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.symlink_to(target)
+            path.symlink_to(Path(target))
         for name in links:
             target = destination / name
             try:

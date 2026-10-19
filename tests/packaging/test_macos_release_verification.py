@@ -67,7 +67,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         for call in calls:
             path, arch, entitlements, *identifier = call.args
             self.assertIn(arch, ("arm64", "x86_64"))
-            if "/runtimes/" in str(path) and path.name == "pngr":
+            if "runtimes" in path.parts and path.name == "pngr":
                 self.assertEqual(entitlements, VERIFY.JIT)
                 self.assertEqual(identifier, [VERIFY.BUNDLE_ID])
             elif path.name == "UpdateMac":
@@ -126,7 +126,11 @@ class ReleaseVerificationTests(unittest.TestCase):
         with zipfile.ZipFile(package, "w") as archive:
             archive.writestr("lib/app/Contents/Info.plist", b"metadata")
             for name, data in entries.items():
-                archive.writestr(name, data)
+                # Preserve malicious raw names even on Windows, where ZipInfo's
+                # constructor otherwise normalizes backslashes before writing.
+                info = zipfile.ZipInfo(name)
+                info.filename = name
+                archive.writestr(info, data)
         return package
 
     def test_update_extraction_decodes_velopack_links_and_normalizes_permissions(self):
@@ -148,6 +152,18 @@ class ReleaseVerificationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     VERIFY.extract_update(package, self.bundle)
                 self.assertFalse(self.bundle.exists())
+
+    def test_original_zip_spelling_is_checked_before_windows_normalization(self):
+        entry = zipfile.ZipInfo("lib/app/escape")
+        entry.orig_filename = "lib\\app\\escape"
+        with mock.patch.object(VERIFY.zipfile, "ZipFile") as opened:
+            archive = opened.return_value.__enter__.return_value
+            archive.testzip.return_value = None
+            archive.infolist.return_value = [entry]
+            with self.assertRaisesRegex(ValueError, "Unsafe or duplicate update entry"):
+                VERIFY.extract_update(self.root / "malicious.nupkg", self.bundle)
+            archive.read.assert_not_called()
+        self.assertFalse(self.bundle.exists())
 
     def test_decoded_link_collision_is_rejected(self):
         package = self.package({"lib/app/file": b"x", "lib/app/file.__symlink": b"Contents/Info.plist"})
