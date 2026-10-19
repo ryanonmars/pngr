@@ -13,6 +13,7 @@ internal sealed class WebhookDeliveryException(string message) : IOException(mes
 
 internal sealed class WebhookDelivery(HttpClient http, IWebhookSecretStore secrets)
 {
+    private readonly TelegramDelivery _telegram = new(http, secrets);
     private string? _rateLimitKey;
     private DateTimeOffset _notBefore;
 
@@ -22,6 +23,20 @@ internal sealed class WebhookDelivery(HttpClient http, IWebhookSecretStore secre
             throw new InvalidDataException("Invalid webhook configuration or format.");
         if (config.UrlSecretId.Length > 0 && !Guid.TryParseExact(config.UrlSecretId, "N", out _))
             throw new InvalidDataException("Invalid webhook credential reference.");
+        if (config.TelegramChatId is null || config.TelegramBotTokenSecretId is null || config.TelegramBotToken is null)
+            throw new InvalidDataException("Invalid Telegram configuration.");
+        if (config.TelegramBotTokenSecretId.Length > 0 && !Guid.TryParseExact(config.TelegramBotTokenSecretId, "N", out _))
+            throw new InvalidDataException("Invalid Telegram credential reference.");
+        if (config.Format == WebhookFormat.Telegram)
+        {
+            if (config.Enabled)
+            {
+                TelegramDelivery.ValidateChatId(config.TelegramChatId);
+                if (config.TelegramBotToken.Length > 0) TelegramDelivery.ValidateBotToken(config.TelegramBotToken);
+                else if (config.TelegramBotTokenSecretId.Length == 0) throw new InvalidDataException("Telegram Bot Token is required.");
+            }
+            return;
+        }
         if (config.Enabled && config.UrlSecretId.Length == 0) ValidateUrl(config.Url, config.Format);
     }
 
@@ -39,6 +54,11 @@ internal sealed class WebhookDelivery(HttpClient http, IWebhookSecretStore secre
     internal async Task SendAsync(MonitoringEvent e, WebhookAlertConfiguration config, WebhookEventContext? context,
         Func<bool> isCurrent, CancellationToken ct)
     {
+        if (config.Format == WebhookFormat.Telegram)
+        {
+            await _telegram.SendAsync(e, config, context, isCurrent, ct);
+            return;
+        }
         var url = config.UrlSecretId.Length > 0 ? secrets.Retrieve(config.UrlSecretId) : config.Url;
         var uri = ValidateUrl(url, config.Format);
         var discord = config.Format == WebhookFormat.Discord;

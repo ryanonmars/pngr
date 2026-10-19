@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -77,9 +78,15 @@ public sealed partial class SettingsWindow : Window
         IReadOnlyList<ProbeSourceChoice> sources, string dataDirectory, Func<SettingsChange, Task> apply,
         Func<Task<NotificationResult>> permission, Action<string> openTool,
         int selectedTcpPort = 443, int selectedUdpPort = 33434, Func<string?>? serverAddress = null, Func<string?>? serverError = null,
-        Func<CancellationToken, Task<WebServerAddress?>>? automaticAddress = null)
+        Func<CancellationToken, Task<WebServerAddress?>>? automaticAddress = null,
+        Func<WebhookAlertConfiguration>? savedWebhook = null,
+        Func<WebhookAlertConfiguration, Task<NotificationResult>>? testWebhook = null,
+        Func<WebhookAlertConfiguration, Func<TelegramPairingPrompt, Task>, CancellationToken, Task<TelegramPairingResult>>? pairTelegram = null,
+        Action<string>? openTelegram = null)
     {
         _original = configuration;
+        _pairTelegram = pairTelegram;
+        _openTelegram = openTelegram;
         _defaults = configuration.DefaultProbeOptions;
         _ports[0] = (configuration.LastTcpPort, configuration.LastUdpPort);
         _ports[1] = (selectedTcpPort, selectedUdpPort);
@@ -149,8 +156,9 @@ public sealed partial class SettingsWindow : Window
             _toasts, _native, _recoveries, Row("Notification spacing (seconds)", _spacing), permissionButton,
             Note("OS permission is requested only when you press the button. Native notifications also require the enable checkbox."),
             ToolButton("Apply & edit alert rules / history…", "alerts"),
-            ToolButton("Apply & configure email, webhooks and scripts…", "actions"),
-            Note("Email, webhooks and executable actions stay disabled until explicitly configured in the action editor."));
+            BuildWebhookSettings(configuration.Actions.Webhook, savedWebhook, testWebhook),
+            ToolButton("Apply & configure email and scripts…", "actions"),
+            Note("Email and executable actions stay disabled until explicitly configured in the action editor."));
         _pages["Web Server"] = BuildWebPage();
         var nav = new ListBox { Name = "SettingsNavigation", ItemsSource = _pages.Keys.ToArray(), SelectedIndex = 0, Background = Brushes.Transparent };
         _navigation = nav;
@@ -191,11 +199,22 @@ public sealed partial class SettingsWindow : Window
         _applyButton.Click += async (_, _) => await SaveAsync(false);
         _okButton.Click += async (_, _) => await SaveAsync(true);
         _cancelButton.Click += (_, _) => Close();
-        Closing += (_, e) => { if (_busy) e.Cancel = true; };
-        KeyDown += (_, e) => { if (e.Key == Key.Escape && !_busy) { Close(); e.Handled = true; } };
+        Closing += (_, e) => { if (_busy || _testingWebhook) e.Cancel = true; };
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+        {
+            void CancelForShutdown(object? sender, ShutdownRequestedEventArgs e) => CancelTelegramPairing();
+            lifetime.ShutdownRequested += CancelForShutdown;
+            Closed += (_, _) => lifetime.ShutdownRequested -= CancelForShutdown;
+        }
+        KeyDown += (_, e) => { if (e.Key == Key.Escape && !_busy && !_testingWebhook) { Close(); e.Handled = true; } };
     }
 
     public static int[] TimeRanges { get; } = [1, 5, 10, 15, 60, 360, 1440, 10080];
+    public void SelectTelegramSettings()
+    {
+        SelectPage("Alerts & notifications");
+        _webhookFormat.SelectedIndex = (int)WebhookFormat.Telegram;
+    }
     public void SelectPage(string name) => _navigation.SelectedItem = name == "Local web / API" ? "Web Server" : name;
 
     private void CaptureProbe()
@@ -262,7 +281,7 @@ public sealed partial class SettingsWindow : Window
     }
     private async Task<bool> SaveAsync(bool close)
     {
-        if (_busy) return false;
+        if (_busy || _testingWebhook || _pairingTelegram is not null) return false;
         try
         {
             CaptureProbe();
@@ -277,17 +296,19 @@ public sealed partial class SettingsWindow : Window
                 WebLanAutomatic = IsAutomaticWebInterface,
                 WebHttpAcknowledged = _webAcknowledged.IsChecked == true, WebAccessKeyVerifier = _webVerifier,
                 Actions = _original.Actions with { NativeNotificationsEnabled = _native.IsChecked == true, IncludeRecovery = _recoveries.IsChecked == true,
-                    MinimumNotificationSpacingSeconds = (int)Value(_spacing) },
+                    MinimumNotificationSpacingSeconds = (int)Value(_spacing), Webhook = ReadWebhookDraft() },
                 Display = new DisplayConfiguration { WarningLatencyMs = (double)Value(_warning), CriticalLatencyMs = (double)Value(_critical),
                     FixedMaximumMs = (double)Value(_maximum), DefaultTimeRangeMinutes = TimeRanges[Math.Clamp(_range.SelectedIndex, 0, 7)],
                     ShowJitter = _jitter.IsChecked == true, ShowPacketLoss = _loss.IsChecked == true, ShowEventMarkers = _events.IsChecked == true }
             };
             configuration.Validate();
             _busy = true; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = false;
+            UpdateTelegramConnection();
             await _apply(new SettingsChange(configuration, _selected != _initialSelected ? _selected : null,
                 _selected != _initialSelected ? _ports[1].Tcp : null,
                 _selected != _initialSelected ? _ports[1].Udp : null,
                 _webNetworkChanged || _navigation.SelectedItem as string == "Web Server"));
+            WebhookSettingsSaved();
             _webNetworkChanged = false;
             if (IsAutomaticWebInterface && _webLan.IsChecked == true && _serverAddress?.Invoke() is { } running)
                 _webAutomaticAddress = new WebServerAddress("Running network", new Uri(running).Host.Trim('[', ']'));
@@ -301,7 +322,10 @@ public sealed partial class SettingsWindow : Window
         catch (Exception ex) { _status.Text = "Settings were not applied: " + ex.Message; return false; }
         finally
         {
-            _busy = false; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = true;
+            _busy = false; _cancelButton.IsEnabled = true;
+            // Credential fields are cleared while saving. Recompute action availability
+            // only after leaving the busy state, using the persisted secret reference.
+            UpdateTelegramConnection();
             UpdateWebControls();
         }
     }

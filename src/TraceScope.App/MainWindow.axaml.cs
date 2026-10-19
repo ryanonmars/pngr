@@ -150,6 +150,11 @@ public partial class MainWindow : Window
                 else if (profileOperation == "save") ExecuteAppMenuCommand("Save Current Configuration…");
                 else if (profileOperation == "manage") ExecuteAppMenuCommand("Manage/Delete Profiles…");
             }
+            if (ArgumentValue("--verify-telegram-replacement-apply") is { } telegramApplyReport)
+            {
+                await VerifyTelegramReplacementApplyAsync(telegramApplyReport);
+                return;
+            }
             if (ArgumentValue("--capture") is { } capture)
             {
                 await Task.Delay(TimeSpan.FromSeconds(int.TryParse(ArgumentValue("--capture-after"), out var secs) ? secs : 15), _applicationCancellation.Token);

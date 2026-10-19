@@ -1,9 +1,9 @@
 ---
 title: "Email, webhooks, and scripts"
-description: "Configure Discord notifications, generic JSON webhooks, email, and local scripts."
+description: "Configure Telegram and Discord notifications, generic JSON webhooks, email, and local scripts."
 ---
 
-Open **Alerts → Notifications and actions…**, or **Settings → Alerts & notifications → Apply & configure email, webhooks and scripts…**. Each action is disabled until explicitly configured and enabled. Press **Save actions** to persist changes.
+Open **Alerts → Notifications and actions…**, or **Settings → Alerts & notifications → Apply & configure email and scripts…**. Each action is disabled until explicitly configured and enabled. Press **Save actions** to persist changes.
 
 ## Delivery controls
 
@@ -24,12 +24,13 @@ The subject is `Pngr — <event kind>`; the body includes the timestamp, message
 
 ## Webhooks
 
-On **Webhook**, enable **webhook POST** and choose **Webhook format**:
+Use **Settings → Alerts & notifications → Webhooks**, select **Enable webhook delivery**, and choose **Webhook format**. **Apply** or **OK** saves settings; **Cancel** discards unapplied edits. The existing **Webhook** tab in the action editor remains available. Available formats:
 
 | Format | Use it for | Payload |
 | --- | --- | --- |
 | **Generic JSON** (default) | Your own HTTP(S) endpoint or existing integration | The original Pngr monitoring event JSON |
 | **Discord** | A Discord incoming webhook | A colored Discord embed |
+| **Telegram** | A Telegram bot paired with your personal chat | A readable plain-text bot message |
 
 Existing configurations without a format stay **Generic JSON**. Switching formats does not change your alert rules. Pngr sends directly from your computer, without a relay service.
 
@@ -89,9 +90,13 @@ Alert rule: Monitoring alert
 
 A recovery uses a green embed with the existing recovery description; a route change uses a blue embed with the existing route description. These are illustrative messages, not screenshots. Actual details depend on the generated event. Discord delivery disables mention parsing, including `@everyone`, `@here`, users, and roles; alert text does not intentionally ping channel members.
 
+### Telegram
+
+Select **Telegram**, paste a BotFather token, and click **Connect Telegram**. Open the bot conversation and press **Start**; Pngr discovers your personal chat and confirms delivery automatically. Use **Send Test**, then Apply or save the staged settings. Groups, channels, and existing bot integrations can use **Advanced → Manual Chat ID**. The token is stored securely and existing URL-based configuration is retained. Follow the [Telegram setup and troubleshooting guide](/docs/settings/telegram-notifications).
+
 ### Delivery and retries
 
-Neither format follows HTTP redirects. Non-success responses are failures; Pngr records an action result without logging the URL, webhook token, response body, or bearer token.
+None of the formats follows HTTP redirects. Non-success responses are failures; Pngr records an action result without logging the URL, webhook token, response body, or bearer token.
 
 Discord delivery makes up to **three requests** for HTTP **429** rate limits and **5xx** server errors. It respects Discord's `Retry-After` response header or JSON `retry_after` value, waiting for the longer value when both are valid. Without a valid retry signal, it waits one second before the first retry and two seconds before the second. Rate-limit waits also apply to subsequent queued events for the same webhook. Retries and their waits share the configured **Action timeout**; a long requested wait can end in a timeout instead of another request. Permanent errors, such as an invalid or deleted webhook, need a configuration change. There is no retry setting in the UI. Connection failures and action timeouts are reported without retrying; monitoring continues.
 
@@ -126,7 +131,7 @@ Choose a live target and click **Test enabled actions**. This saves settings and
     Confirm that an action is enabled and a live target is selected. Check the persisted action result for a missing environment variable, unreachable SMTP server, non-success webhook response, missing executable, or timeout. A closely repeated test can be suppressed by action spacing.
   </Accordion>
   <Accordion title="Does Pngr retry a failed delivery?">
-    There is no delivery retry setting. Discord retries HTTP 429 and 5xx responses, making up to three requests within the action timeout. Generic JSON, SMTP, and local executable actions make one attempt. A continuing breached condition can also generate another alert after its rule cooldown.
+    There is no delivery retry setting. Discord and Telegram retry HTTP 429 and 5xx responses, making up to three requests within the action timeout. Telegram also handles API-level errors and its `parameters.retry_after` rate-limit signal. Generic JSON, SMTP, and local executable actions make one attempt. A continuing breached condition can also generate another alert after its rule cooldown.
   </Accordion>
   <Accordion title="Discord rejected the URL or returned HTTP 401/403/404">
     Copy the complete incoming webhook URL again and select Discord format. Check that the webhook still exists and uses a supported Discord HTTPS host. A deleted webhook or revoked token needs a replacement URL. Do not append `/github`; generic JSON is not a Discord message payload. Never include the URL in a support report.

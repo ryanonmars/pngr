@@ -7,6 +7,7 @@
     "display",
     "history-storage",
     "alerts-notifications",
+    "telegram-notifications",
     "local-web-api",
     "probing-profiles"
   ]

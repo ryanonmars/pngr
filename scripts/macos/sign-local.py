@@ -37,30 +37,26 @@ def sign(bundle, identity, team):
         # permission for each private-key use, including each architecture.
         # Libraries inherit host entitlements; native helpers need no JIT.
         subprocess.run([*common, *(str(path) for path in nested)], check=True)
-    # The existing architecture bundle keeps managed PE assemblies in MacOS.
-    # codesign treats these as nested generic code, even without executable bits.
-    # Explicitly replace their signatures after every publish rather than relying
-    # on stale extended attributes from an earlier build. ditto preserves these
-    # generic signatures in the generated ZIP. They do not need runtime flags.
-    managed = []
-    for path in sorted((bundle / "Contents/MacOS").glob("*.dll")):
-        if not path.is_symlink() and path.is_file():
-            with path.open("rb") as stream:
-                if stream.read(2) == b"MZ":
-                    managed.append(path)
-    if managed:
+    # The architecture bundle keeps .NET assemblies and runtime JSON in MacOS.
+    # Apple treats every ordinary file there as nested code, including JSON.
+    # Explicitly sign ancillary files as generic code before sealing the app.
+    # Their signatures live in xattrs, which ditto preserves for the thin ZIP;
+    # universal packaging relocates these data files into Resources instead.
+    ancillary = sorted(path for path in (bundle / "Contents/MacOS").rglob("*")
+                       if path.is_file() and not path.is_symlink() and not native(path))
+    if ancillary:
         subprocess.run(["codesign", "--force", "--sign", identity, "--timestamp",
-                        *(str(path) for path in managed)], check=True)
+                        *(str(path) for path in ancillary)], check=True)
     subprocess.run([*common, "--entitlements", str(entitlements), str(bundle)], check=True)
     subprocess.run(["codesign", "--verify", "--deep", "--strict", "--all-architectures", str(bundle)], check=True)
-    for path in [*nested, *managed, bundle]:
+    for path in [*nested, *ancillary, bundle]:
         details = subprocess.run(["codesign", "-d", "--verbose=4", str(path)],
                                  check=True, capture_output=True, text=True).stderr
         runtime = re.search(r"^CodeDirectory.*flags=0x[0-9a-f]+\([^)]*\bruntime\b", details, re.MULTILINE)
         if (f"TeamIdentifier={team}\n" not in details or f"Authority={identity}\n" not in details
-                or (path not in managed and not runtime)):
+                or (path not in ancillary and not runtime)):
             raise ValueError(f"Unexpected signing identity or runtime flags: {path.name}")
-    print(f"Developer ID verified: Team {team}, hardened runtime, {len(nested)} nested native files, {len(managed)} managed assemblies.")
+    print(f"Developer ID verified: Team {team}, hardened runtime, {len(nested)} nested native files, {len(ancillary)} ancillary files.")
 
 
 if __name__ == "__main__":

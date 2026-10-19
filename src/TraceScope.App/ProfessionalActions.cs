@@ -70,7 +70,7 @@ public partial class MainWindow
         var passwordVariable = Input(settings.Smtp.PasswordEnvironmentVariable, "Password environment variable name");
         var from = Input(settings.Smtp.From, "Sender email"); var to = Input(settings.Smtp.To, "Recipient email");
         var webhookEnabled = new CheckBox { Content = "Enable webhook POST", IsChecked = settings.Webhook.Enabled };
-        var format = new ComboBox { Name = "WebhookFormat", ItemsSource = new[] { "Generic JSON", "Discord" }, SelectedIndex = (int)settings.Webhook.Format };
+        var format = new ComboBox { Name = "WebhookFormat", ItemsSource = new[] { "Generic JSON", "Discord", "Telegram" }, SelectedIndex = (int)settings.Webhook.Format };
         var url = Input(settings.Webhook.Url, settings.Webhook.UrlSecretId.Length > 0 ? "Stored securely — leave blank to keep, or paste a replacement URL" : "HTTP(S) webhook URL");
         url.Name = "WebhookUrl";
         url.PasswordChar = '●';
@@ -94,7 +94,7 @@ public partial class MainWindow
                 Smtp = new() { Enabled = smtpEnabled.IsChecked == true, Host = host.Text?.Trim() ?? "", Port = (int)(port.Value ?? 587),
                     UseTls = tls.IsChecked == true, Username = username.Text ?? "", PasswordEnvironmentVariable = passwordVariable.Text?.Trim() ?? "",
                     From = from.Text?.Trim() ?? "", To = to.Text?.Trim() ?? "" },
-                Webhook = new() { Enabled = webhookEnabled.IsChecked == true && clearUrl.IsChecked != true, Format = (WebhookFormat)format.SelectedIndex,
+                Webhook = _configuration.Actions.Webhook with { Enabled = webhookEnabled.IsChecked == true && (format.SelectedIndex == (int)WebhookFormat.Telegram || clearUrl.IsChecked != true), Format = (WebhookFormat)format.SelectedIndex,
                     Url = clearUrl.IsChecked == true ? "" : url.Text?.Trim() ?? "",
                     UrlSecretId = clearUrl.IsChecked == true || !string.IsNullOrWhiteSpace(url.Text) ? "" : _configuration.Actions.Webhook.UrlSecretId,
                     BearerTokenEnvironmentVariable = tokenVariable.Text?.Trim() ?? "" },
@@ -147,10 +147,26 @@ public partial class MainWindow
             FormRow("Action timeout (s)", timeout), permission);
         var email = ToolPanel(smtpEnabled, FormRow("SMTP server", host), FormRow("Port", port), tls, FormRow("Username", username),
             FormRow("Password reference", passwordVariable), FormRow("From", from), FormRow("To", to));
-        format.SelectionChanged += (_, _) => tokenVariable.IsEnabled = format.SelectedIndex == (int)WebhookFormat.GenericJson;
-        tokenVariable.IsEnabled = format.SelectedIndex == (int)WebhookFormat.GenericJson;
-        var webhook = ToolPanel(webhookEnabled, FormRow("Webhook format", format), url, clearUrl, tokenVariable,
-            new TextBlock { Text = "URLs are credentials, stored in macOS Keychain or Windows Credential Manager and omitted from exports. Discord uses embeds with mentions disabled.", TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+        var urlFields = ToolPanel(url, clearUrl, tokenVariable,
+            new TextBlock { Text = "URLs are stored in macOS Keychain or Windows Credential Manager and omitted from exports. Discord uses embeds with mentions disabled.", TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+        var openTelegramSetup = new Button { Content = "Open Telegram setup…", Name = "OpenTelegramSetup" };
+        openTelegramSetup.Click += (_, _) =>
+        {
+            dialog.Close();
+            OpenSettings(null, new RoutedEventArgs());
+            _settingsWindow?.SelectTelegramSettings();
+        };
+        var telegramFields = ToolPanel(
+            new TextBlock { Text = "Connect Telegram in Settings → Alerts & notifications. Opening setup discards unsaved edits in this action editor.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+            openTelegramSetup);
+        void UpdateFormat()
+        {
+            var telegram = format.SelectedIndex == (int)WebhookFormat.Telegram;
+            urlFields.IsVisible = !telegram; telegramFields.IsVisible = telegram;
+            tokenVariable.IsEnabled = tokenVariable.IsVisible = format.SelectedIndex == (int)WebhookFormat.GenericJson;
+        }
+        format.SelectionChanged += (_, _) => UpdateFormat(); UpdateFormat();
+        var webhook = ToolPanel(webhookEnabled, FormRow("Webhook format", format), urlFields, telegramFields);
         var script = ToolPanel(scriptEnabled, new TextBlock { Text = "An enabled executable runs locally for matching alerts. Enable only programs you trust.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }, executable, arguments, directory);
         var tabs = new TabControl { ItemsSource = new[] { new TabItem { Header = "Notifications", Content = general }, new TabItem { Header = "SMTP", Content = email },
             new TabItem { Header = "Webhook", Content = webhook }, new TabItem { Header = "Executable", Content = script } } };

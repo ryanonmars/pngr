@@ -49,6 +49,19 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
     private const int NotFoundWindows = 1168;
     public static IWebhookSecretStore Default { get; } = new WebhookSecretStore();
     public static IWebhookSecretStore Create() => new WebhookSecretStore();
+    private static Func<string, string>? _macCredentialReader;
+
+    /// <summary>
+    /// Installs the desktop application's isolated, noninteractive macOS reader at
+    /// startup. The helper process deliberately does not register this callback.
+    /// No credentials are retained by the store or this registration.
+    /// </summary>
+    public static void RegisterMacCredentialReader(Func<string, string> reader)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        if (Interlocked.CompareExchange(ref _macCredentialReader, reader, null) is not null)
+            throw new InvalidOperationException("The macOS credential reader is already registered.");
+    }
 
     public string Store(string url, string? existingId = null)
     {
@@ -76,6 +89,13 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
         byte[]? bytes = null;
         try
         {
+            if (OperatingSystem.IsMacOS() && Volatile.Read(ref _macCredentialReader) is { } reader)
+            {
+                var value = reader(id);
+                if (string.IsNullOrWhiteSpace(value) || Encoding.UTF8.GetByteCount(value) > 2560)
+                    throw new InvalidOperationException();
+                return value;
+            }
             bytes = OperatingSystem.IsMacOS() ? RetrieveMac(id) : RetrieveWindows(id);
             return Encoding.UTF8.GetString(bytes);
         }
@@ -92,8 +112,7 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
         {
             if (OperatingSystem.IsMacOS())
             {
-                var status = FindMac(id, out var length, out var data, out var item);
-                ClearMacData(data, length);
+                var status = FindMacItem(id, out var item);
                 if (status == NotFoundMac) return;
                 try
                 {
@@ -122,17 +141,18 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
     }
 
     private static string Target(string id) => $"{Service}/{id}";
-    private static int FindMac(string id, out uint length, out nint data, out nint item)
+    private static int FindMacItem(string id, out nint item)
     {
         var service = Encoding.UTF8.GetBytes(Service);
         var account = Encoding.UTF8.GetBytes(id);
-        return SecKeychainFindGenericPassword(0, (uint)service.Length, service, (uint)account.Length, account, out length, out data, out item);
+        // Updates/deletes need only the item handle. Passing NULL for both data
+        // outputs avoids decrypting its old secret just to locate that handle.
+        return SecKeychainFindGenericPasswordItem(0, (uint)service.Length, service, (uint)account.Length, account, 0, 0, out item);
     }
 
     private static void StoreMac(string id, byte[] bytes)
     {
-        var status = FindMac(id, out var oldLength, out var oldData, out var item);
-        ClearMacData(oldData, oldLength);
+        var status = FindMacItem(id, out var item);
         try
         {
             if (status == 0)
@@ -154,7 +174,10 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
 
     private static byte[] RetrieveMac(string id)
     {
-        var status = FindMac(id, out var length, out var data, out var item);
+        var service = Encoding.UTF8.GetBytes(Service);
+        var account = Encoding.UTF8.GetBytes(id);
+        // Reading requires the data, but no separately retained item reference.
+        var status = SecKeychainFindGenericPasswordData(0, (uint)service.Length, service, (uint)account.Length, account, out var length, out var data, 0);
         try
         {
             CheckMac(status, WebhookCredentialOperation.Read);
@@ -166,7 +189,6 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
         finally
         {
             ClearMacData(data, length);
-            if (item != 0) CFRelease(item);
         }
     }
 
@@ -232,7 +254,10 @@ public sealed class WebhookSecretStore : IWebhookSecretStore
     }
 
     private const string Security = "/System/Library/Frameworks/Security.framework/Security";
-    [DllImport(Security)] private static extern int SecKeychainFindGenericPassword(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, out uint length, out nint data, out nint item);
+    [DllImport(Security, EntryPoint = "SecKeychainFindGenericPassword")]
+    private static extern int SecKeychainFindGenericPasswordItem(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, nint length, nint data, out nint item);
+    [DllImport(Security, EntryPoint = "SecKeychainFindGenericPassword")]
+    private static extern int SecKeychainFindGenericPasswordData(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, out uint length, out nint data, nint item);
     [DllImport(Security)] private static extern int SecKeychainAddGenericPassword(nint keychain, uint serviceLength, byte[] service, uint accountLength, byte[] account, uint length, byte[] data, out nint item);
     [DllImport(Security)] private static extern int SecKeychainItemModifyAttributesAndData(nint item, nint attributes, uint length, byte[] data);
     [DllImport(Security)] private static extern int SecKeychainItemFreeContent(nint attributes, nint data);

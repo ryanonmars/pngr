@@ -1,0 +1,69 @@
+---
+title: "Telegram notifications"
+description: "Connect a Telegram bot to Pngr with automatic private-chat pairing and test notifications."
+---
+
+Telegram delivery is an optional webhook format in **Settings → Alerts & notifications → Webhooks**. It uses the same alert rules, recovery toggle, action spacing, queue, and action timeout as other external actions.
+
+## Connect Telegram
+
+1. Open Telegram and contact the official [@BotFather](https://t.me/BotFather).
+2. Send `/newbot`, follow the prompts, and copy the generated bot token. Treat it as a password. A new bot dedicated to Pngr is recommended.
+3. In **Settings → Alerts & notifications → Webhooks**, choose **Telegram** and select **Enable webhook delivery**.
+4. Paste the token into **Bot Token** and click **Connect Telegram**. Pngr checks the token with Telegram and displays your bot's username.
+5. Pngr opens the bot conversation. If needed, click **Open Telegram** again, then press **Start** in Telegram. Use the link from the current pairing attempt; simply messaging the bot is not enough.
+6. Wait for **Pngr Connected** in Telegram and the connected status in Pngr. Pngr discovers your personal chat automatically. You do not need a Chat ID or API URL.
+7. Click **Send Test** and confirm the **Pngr — Telegram Test** message arrives. A successful test means Telegram confirmed delivery.
+8. Click **Apply** to save and keep settings open, or **OK** to save and close. Pairing and testing use staged values; they do not save other edited settings. **Cancel** discards unapplied changes.
+
+See Telegram's [bot creation instructions](https://core.telegram.org/bots/features#creating-a-new-bot) and [deep-link documentation](https://core.telegram.org/bots/features#deep-linking).
+
+## Pairing, disconnecting, and reconnecting
+
+Pairing runs only after you click **Connect Telegram**. The link contains a temporary, unpredictable pairing code, never the bot token. Pngr accepts the matching Start message only in a private chat, then sends a confirmation before marking the destination connected. Codes expire after five minutes; start a new attempt if time runs out. Do not share a pairing link or code with someone else.
+
+Polling stops on success, cancellation, expiration, a token change, or closing settings. Pngr does not run a permanent Telegram listener. Closing the settings editor cancels a pending attempt.
+
+Use **Disconnect** to clear the destination while retaining the bot token. Apply or save the change to stop saved notifications to that destination. **Reconnect** starts a fresh pairing attempt with the same bot; open the new link using the Telegram account you want to receive notifications, press Start, then apply the new destination. Until saved, monitoring continues to use the previously saved configuration.
+
+Saved tokens stay hidden. Use **Change Bot Token** to stage a replacement and connect again, then apply or save. Existing manually configured destinations remain usable without pairing again. Changing formats retains the existing webhook URL and bearer-token setting, so Telegram setup does not erase Discord or Generic JSON configuration.
+
+## Advanced: manual destinations and existing integrations
+
+Expand **Advanced → Manual Chat ID** for groups, supergroups, channels, or a bot whose updates belong to another application. Enter a known numeric Chat ID, including its leading minus sign, or a public channel's `@channelusername`. A personal username or the bot's username is not a destination. Test the staged values before applying them.
+
+Group and supergroup IDs can exceed 32-bit limits; preserve the entire number and any `-100` prefix. Add the bot to the destination group. For a channel, grant it permission to post. Use the destination identifier from the trusted application or administrator that already manages it. Do not submit your token to third-party bots or lookup websites. For API integration details, consult Telegram's official [Chat](https://core.telegram.org/bots/api#chat) and [sendMessage](https://core.telegram.org/bots/api#sendmessage) references.
+
+Before automatic pairing, Pngr checks whether the bot already has a receiving webhook. If so, pairing stops without changing it; use a dedicated new bot or manual entry. Pngr never deletes webhooks, resets pending updates, advances the update offset, or changes the bot's update-type subscription.
+
+Telegram permits competing polling clients to interfere with each other, and Pngr cannot reliably detect every existing consumer. Do not pair a bot while another application polls its updates. A conflict response stops pairing with an explanation. Pngr leaves pending updates unacknowledged to protect other integrations; a large backlog can therefore hide a new Start message. Use a fresh dedicated bot or manual entry rather than discarding someone else's queue. Read Telegram's [receiving-updates documentation](https://core.telegram.org/bots/api#getting-updates) if you maintain an existing integration.
+
+## Messages and delivery
+
+Telegram messages use plain text with red alert, green recovery, and blue route-change headings. They include the recorded event message, timestamp, session, and available target and alert-rule context. Measurements appear only when present in the existing event. Pngr shortens unusually long text to fit Telegram's message limit, without splitting Unicode surrogate pairs. Web page previews are disabled.
+
+Pngr sends JSON to Telegram's official HTTPS `sendMessage` endpoint and checks the API's `ok` result. It does not follow redirects. Rate limits and temporary server failures use bounded retries within the action timeout; Telegram's `retry_after` wait is respected. Authentication, permission, and destination errors require a configuration change. Monitoring continues while delivery runs.
+
+See the official [Telegram Bot API](https://core.telegram.org/bots/api) and [sendMessage reference](https://core.telegram.org/bots/api#sendmessage).
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| Invalid bot token | Copy the full token from BotFather. Replace revoked tokens in Pngr. |
+| Pairing expired or Start did not connect | Click Connect Telegram again, open the new link, and press Start. Use a dedicated bot if it has a large pending backlog or another polling client. |
+| Existing webhook or polling conflict | Leave the other integration intact. Use a new bot or Advanced manual entry. Pngr cannot detect every competing polling client. |
+| Chat ID not found | Check the complete ID, its minus sign, or the channel's `@username`. Start the private conversation or add the bot to the destination. |
+| Permission denied or bot blocked | Unblock the bot, restore group membership, or grant the channel's posting permission. |
+| Rate limit reached | Reduce traffic with action spacing. A Telegram-requested wait may exceed the action timeout. |
+| Network connection failed or timeout | Check direct internet access, DNS, firewall policy, and access to `api.telegram.org`. Telegram delivery does not use system or HTTP proxies. |
+| Telegram temporarily unavailable | Retry later. Pngr bounds automatic retries rather than building an unlimited retry backlog. |
+| Secure token could not be saved | Restore macOS Keychain or Windows Credential Manager access and save again. Pngr does not fall back to plaintext token storage. |
+
+## Privacy and security
+
+Direct internet connectivity is required. Telegram requests bypass system and HTTP proxies so proxy-resolution diagnostics cannot expose the credential-bearing request URL; networks that require a proxy cannot use Telegram delivery currently. Pngr makes outbound HTTPS requests; no inbound ports, Telegram server, or Pngr LAN web server are required. Telegram receives and processes notification content through its service. Choose destinations appropriate for the network details in your alerts.
+
+Pngr stores bot tokens through its existing operating-system credential store: macOS Keychain or Windows Credential Manager. The Chat ID is stored in normal settings. Tokens are omitted from workspace exports, REST responses, and diagnostic messages. Imported workspaces need a new local token and explicit action enablement.
+
+Never paste tokens into support reports, screenshots, repositories, third-party bots, or token lookup websites. Telegram request URLs contain the token, so do not share those URLs either. If a token is compromised, revoke it through BotFather, generate a replacement, replace it in Pngr, and send a test notification.

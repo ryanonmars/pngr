@@ -31,7 +31,15 @@ public partial class MainWindow
                     case "actions": OpenAlertActions(null, e); break;
                     case "web": OpenWeb(null, e); break;
                 }
-            }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434, () => _webServer?.Url, () => _webServer?.LastError);
+            }, _selected?.TcpPort ?? 443, _selected?.UdpPort ?? 33434, () => _webServer?.Url, () => _webServer?.LastError,
+            savedWebhook: () => _configuration.Actions.Webhook,
+            testWebhook: async webhook =>
+            {
+                ConfigureActions();
+                var actions = _actions!;
+                var timeout = _configuration.Actions.ActionTimeoutSeconds;
+                return await Task.Run(() => actions.SendTestWebhookAsync(webhook, timeout, _applicationCancellation.Token));
+            });
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show(this);
     }
@@ -93,7 +101,8 @@ public partial class MainWindow
             {
                 NativeNotificationsEnabled = draft.Actions.NativeNotificationsEnabled,
                 IncludeRecovery = draft.Actions.IncludeRecovery,
-                MinimumNotificationSpacingSeconds = draft.Actions.MinimumNotificationSpacingSeconds
+                MinimumNotificationSpacingSeconds = draft.Actions.MinimumNotificationSpacingSeconds,
+                Webhook = draft.Actions.Webhook
             }
         };
         var selectedOptions = selectedSessionId.HasValue && change.SelectedTargetOptions is { } options

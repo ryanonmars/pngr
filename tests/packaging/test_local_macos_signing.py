@@ -3,6 +3,8 @@ import importlib.util
 from pathlib import Path
 import plistlib
 import subprocess
+import shutil
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -27,6 +29,8 @@ class LocalSigningTests(unittest.TestCase):
         for name in ("pngr", "helper", "native.dylib"):
             (self.payload / name).write_bytes(bytes.fromhex("cffaedfe") + bytes(28))
         (self.payload / "managed.dll").write_bytes(b"MZ managed image")
+        (self.payload / "pngr.runtimeconfig.json").write_text('{}')
+        (self.payload / "pngr.deps.json").write_text('{}')
 
     def details(self, team=TEAM, flags="0x10000(runtime)"):
         return subprocess.CompletedProcess([], 0, "", f"CodeDirectory v=20500 flags={flags}\nAuthority={IDENTITY}\nTeamIdentifier={team}\n")
@@ -42,14 +46,15 @@ class LocalSigningTests(unittest.TestCase):
         self.assertNotIn("--entitlements", nested)
         self.assertIn("--timestamp", nested)
         self.assertEqual(nested[nested.index("--options") + 1], "runtime")
-        self.assertEqual(managed[-1], str(self.payload / "managed.dll"))
+        self.assertEqual(managed[-3:], [str(self.payload / name) for name in
+                                      ("managed.dll", "pngr.deps.json", "pngr.runtimeconfig.json")])
         self.assertIn(IDENTITY, managed)
         self.assertNotIn("--entitlements", managed)
         self.assertNotIn("--options", managed)
         self.assertIn("--entitlements", outer)
         self.assertEqual(outer[-1], str(self.bundle))
         self.assertEqual(verify, ["codesign", "--verify", "--deep", "--strict", "--all-architectures", str(self.bundle)])
-        self.assertEqual(len(calls[4:]), 4)  # Verify identity on native files, managed assembly, and app.
+        self.assertEqual(len(calls[4:]), 6)  # Verify identity on native files, managed assembly, and app.
 
     def test_unexpected_identity_or_team_cannot_start_signing(self):
         with mock.patch.object(SIGNER.subprocess, "run") as run:
@@ -77,3 +82,25 @@ class LocalSigningTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 SIGNER.sign(self.bundle, IDENTITY, TEAM)
             run.assert_not_called()
+
+    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("clang"), "Requires macOS compiler and codesign")
+    def test_runtime_json_requires_generic_signature_in_a_clean_bundle(self):
+        # Disposable ad-hoc probe: exercises Apple's layout rules without a private key.
+        with tempfile.TemporaryDirectory(prefix="pngr-local-signing-layout-") as directory:
+            root = Path(directory)
+            bundle = root / "probe.app"
+            payload = bundle / "Contents/MacOS"
+            payload.mkdir(parents=True)
+            (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({
+                "CFBundleIdentifier": "dev.tracescope.signing-layout-probe", "CFBundleExecutable": "probe"}))
+            source = root / "main.c"
+            source.write_text("int main(void) { return 0; }\n")
+            subprocess.run(["clang", str(source), "-o", str(payload / "probe")], check=True, capture_output=True)
+            data = payload / "probe.runtimeconfig.json"
+            data.write_text('{}')
+            unsigned = subprocess.run(["codesign", "--force", "--sign", "-", str(bundle)], capture_output=True)
+            self.assertNotEqual(unsigned.returncode, 0)
+            self.assertIn(b"probe.runtimeconfig.json", unsigned.stderr)
+            subprocess.run(["codesign", "--force", "--sign", "-", str(data)], check=True, capture_output=True)
+            subprocess.run(["codesign", "--force", "--sign", "-", str(bundle)], check=True, capture_output=True)
+            subprocess.run(["codesign", "--verify", "--deep", "--strict", str(bundle)], check=True, capture_output=True)

@@ -1,0 +1,39 @@
+name: Verify Windows Telegram credentials
+
+# Explicit opt-in native Credential Manager test. No Telegram or signing secrets.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-telegram-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: >-
+      github.repository == 'ryanonmars/pngr' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.workflow_ref == 'ryanonmars/pngr/.github/workflows/verify-windows-telegram.yml@refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      PNGR_NATIVE_SECRET_TESTS: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify native credential persistence and mocked Telegram delivery
+        shell: pwsh
+        run: >-
+          dotnet test tests/TraceScope.Core.Tests/TraceScope.Core.Tests.csproj
+          -c Release
+          --filter "FullyQualifiedName~WindowsTelegramCredentialTests|FullyQualifiedName~WebhookSecretStoreTests|FullyQualifiedName~TelegramWebhookTests|FullyQualifiedName~TelegramPairingTests|FullyQualifiedName~CredentialAccessLifecycleTests|FullyQualifiedName~DiscordWebhookTests"
+          --logger "console;verbosity=normal"

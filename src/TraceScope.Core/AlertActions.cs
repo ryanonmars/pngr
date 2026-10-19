@@ -17,7 +17,7 @@ public sealed record SmtpAlertConfiguration
     public string From { get; init; } = "";
     public string To { get; init; } = "";
 }
-public enum WebhookFormat { GenericJson, Discord }
+public enum WebhookFormat { GenericJson, Discord, Telegram }
 public sealed record WebhookEventContext(string? Target = null, string? AlertRule = null);
 
 public sealed record WebhookAlertConfiguration
@@ -27,6 +27,12 @@ public sealed record WebhookAlertConfiguration
     public string Url { get; init; } = "";
     public string UrlSecretId { get; init; } = "";
     public WebhookFormat Format { get; init; } = WebhookFormat.GenericJson;
+    public string TelegramChatId { get; init; } = "";
+    public string TelegramBotUsername { get; init; } = "";
+    public string TelegramBotTokenSecretId { get; init; } = "";
+    // Only a settings draft may carry a replacement. It never enters JSON or diagnostics.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string TelegramBotToken { get; init; } = "";
     public override string ToString() => $"WebhookAlertConfiguration {{ Enabled = {Enabled}, Format = {Format}, Url = [redacted] }}";
     public string BearerTokenEnvironmentVariable { get; init; } = "";
 }
@@ -88,6 +94,8 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
     private readonly IDesktopNotifier _notifier;
     private readonly HttpClient _http;
     private readonly WebhookDelivery _webhooks;
+    private readonly WebhookDelivery _testWebhooks;
+    private readonly IWebhookSecretStore _secretStore;
     private readonly Func<MonitoringEvent, WebhookEventContext?>? _webhookContext;
     private readonly Task _worker;
     private readonly Dictionary<(Guid Session, string Rule, string Kind), DateTimeOffset> _lastActions = [];
@@ -103,8 +111,18 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         _configuration = configuration ?? new(); _configuration.Validate();
         _configuration = _configuration with { Script = _configuration.Script with { Arguments = _configuration.Script.Arguments.ToArray() } };
         _notifier = notifier ?? DesktopNotifier.Create();
-        _http = new HttpClient(httpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
-        _webhooks = new WebhookDelivery(_http, secretStore ?? WebhookSecretStore.Default);
+        _http = new HttpClient(new TelegramCredentialHandler(
+            httpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false },
+            httpHandler is null ? new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false, ActivityHeadersPropagator = null,
+                // Proxy-resolution diagnostics can include the full request URL.
+                // Telegram therefore uses a direct HTTPS connection.
+                UseProxy = false
+            } : null)) { Timeout = Timeout.InfiniteTimeSpan };
+        _secretStore = secretStore ?? WebhookSecretStore.Default;
+        _webhooks = new WebhookDelivery(_http, _secretStore);
+        _testWebhooks = new WebhookDelivery(_http, _secretStore);
         _webhookContext = webhookContext;
         _worker = ProcessQueueAsync();
     }
@@ -120,6 +138,29 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         => Volatile.Read(ref _configuration).NativeNotificationsEnabled
             ? _notifier.SendAsync("Pngr — notification test", "Native desktop notifications are enabled.", cancellationToken)
             : Task.FromResult(new NotificationResult(false, "Enable native notifications before sending a test."));
+    /// <summary>Tests a private settings draft without saving it or running other alert actions.</summary>
+    public async Task<NotificationResult> SendTestWebhookAsync(WebhookAlertConfiguration configuration,
+        int timeoutSeconds = 15, CancellationToken cancellationToken = default)
+    {
+        var telegram = configuration.Format == WebhookFormat.Telegram;
+        var service = telegram ? "Telegram" : "Webhook";
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token, cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 1, 120)));
+        try
+        {
+            WebhookDelivery.ValidateConfiguration(configuration with { Enabled = true });
+            var item = new MonitoringEvent(Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow,
+                "Test", telegram ? "Your Telegram notification configuration is working." : "Pngr: user-requested webhook test.", null);
+            // Tests retain cooldown across clicks without modifying the live dispatcher.
+            await _testWebhooks.SendAsync(item, configuration, null,
+                () => Volatile.Read(ref _disposed) == 0, deadline.Token);
+            return new(true, $"{service} test notification sent successfully.");
+        }
+        catch (OperationCanceledException) { return new(false, $"{service} request timed out or was canceled."); }
+        catch (WebhookDeliveryException ex) { return new(false, ex.Message); }
+        catch (InvalidDataException ex) { return new(false, ex.Message); }
+        catch { return new(false, $"{service} delivery failed; check secure credential storage and the network connection."); }
+    }
     public bool Enqueue(MonitoringEvent monitoringEvent) => TryEnqueue(monitoringEvent);
     public bool TryEnqueue(MonitoringEvent monitoringEvent)
     {
@@ -128,7 +169,7 @@ public sealed class AlertActionDispatcher : IAsyncDisposable
         if (monitoringEvent.Kind == "Recovery" && !config.IncludeRecovery) return false;
         if (!config.NativeNotificationsEnabled && !config.Smtp.Enabled && !config.Webhook.Enabled && !config.Script.Enabled) return false;
         WebhookEventContext? context = null;
-        if (config.Webhook.Format == WebhookFormat.Discord)
+        if (config.Webhook.Format is WebhookFormat.Discord or WebhookFormat.Telegram)
             try { context = _webhookContext?.Invoke(monitoringEvent); } catch { /* Optional context must not prevent delivery. */ }
         return _queue.Writer.TryWrite(new(monitoringEvent, config, context));
     }

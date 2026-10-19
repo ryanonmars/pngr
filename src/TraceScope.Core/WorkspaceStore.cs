@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace TraceScope.Core;
 
@@ -175,11 +177,29 @@ public sealed class WorkspaceStore
     public async Task<WorkspaceConfiguration> SaveAsync(WorkspaceConfiguration configuration, CancellationToken cancellationToken = default)
     {
         configuration.Validate();
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var secured = ProtectWebhook(configuration);
-            await WriteAsync(secured, cancellationToken);
+            // Native secure-store APIs are synchronous and may wait for macOS.
+            // Never run creation/readback on the caller's desktop UI thread. Keep
+            // the save gate until this worker and the durable write/rollback finish;
+            // cancellation must not abandon a worker owning a new credential.
+            var secured = await Task.Run(() => ProtectWebhook(configuration), cancellationToken).ConfigureAwait(false);
+            try { await WriteAsync(secured, cancellationToken).ConfigureAwait(false); }
+            catch
+            {
+                // Remove only newly created draft credentials. The previous saved settings remain usable.
+                await Task.Run(() =>
+                {
+                    foreach (var id in new[] { secured.Actions.Webhook.UrlSecretId, secured.Actions.Webhook.TelegramBotTokenSecretId }
+                        .Where(id => id.Length > 0 && id != configuration.Actions.Webhook.UrlSecretId && id != configuration.Actions.Webhook.TelegramBotTokenSecretId))
+                        try { _secrets.Delete(id); } catch { }
+                }).ConfigureAwait(false);
+                throw;
+            }
+            // Retain superseded credentials. Accessing an old ad-hoc-authorized
+            // Keychain item just to clean it up can prompt again; replacement must
+            // never depend on its availability or silently change its permissions.
             CredentialWarning = null;
             return secured;
         }
@@ -191,19 +211,62 @@ public sealed class WorkspaceStore
         var webhook = configuration.Actions.Webhook;
         try
         {
-            if (webhook.Url.Length == 0)
+            // Existing references are settings, not a request to unlock credentials.
+            // Resolve them only for explicit pairing or delivery; saving an unrelated
+            // rule or preference must not decrypt or rewrite a stored credential.
+            var secured = webhook;
+            if (webhook.TelegramBotToken.Length > 0)
             {
-                if (webhook.Enabled && webhook.UrlSecretId.Length > 0)
-                    WebhookDelivery.ValidateUrl(_secrets.Retrieve(webhook.UrlSecretId), webhook.Format);
-                return configuration;
+                TelegramDelivery.ValidateBotToken(webhook.TelegramBotToken);
+                secured = secured with { TelegramBotToken = "", TelegramBotTokenSecretId = StoreVerifiedTelegramToken(webhook.TelegramBotToken) };
             }
-            // A new immutable credential preserves the old saved workspace on write failure.
-            var id = _secrets.Store(webhook.Url);
-            return configuration with { Actions = configuration.Actions with
-            { Webhook = webhook with { Url = "", UrlSecretId = id } } };
+            try
+            {
+                if (webhook.Url.Length > 0)
+                    secured = secured with { Url = "", UrlSecretId = _secrets.Store(webhook.Url) };
+                return configuration with { Actions = configuration.Actions with { Webhook = secured } };
+            }
+            catch
+            {
+                if (secured.TelegramBotTokenSecretId != webhook.TelegramBotTokenSecretId)
+                    try { _secrets.Delete(secured.TelegramBotTokenSecretId); } catch { }
+                throw;
+            }
         }
         catch (WebhookCredentialException) { throw; }
-        catch { throw new InvalidOperationException("Webhook URL could not be stored securely. Check access to the secure credential store."); }
+        catch { throw new InvalidOperationException("Webhook credential could not be stored securely. Check access to the secure credential store."); }
+    }
+
+    private string StoreVerifiedTelegramToken(string token)
+    {
+        // Own the new identifier before writing, so even a partially failed create
+        // can be rolled back without touching the saved credential reference.
+        var id = Guid.NewGuid().ToString("N");
+        try
+        {
+            if (_secrets.Store(token, id) != id)
+                throw new InvalidOperationException("Secure credential storage returned an unexpected reference.");
+            var actual = Encoding.UTF8.GetBytes(_secrets.Retrieve(id));
+            var expected = Encoding.UTF8.GetBytes(token);
+            try
+            {
+                if (!CryptographicOperations.FixedTimeEquals(expected, actual))
+                    throw new InvalidOperationException("Secure credential verification failed.");
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(expected);
+                CryptographicOperations.ZeroMemory(actual);
+            }
+            return id;
+        }
+        catch
+        {
+            // This identifier belongs exclusively to this attempt, never to an
+            // existing Discord or Telegram credential.
+            try { _secrets.Delete(id); } catch { }
+            throw;
+        }
     }
 
     private async Task WriteAsync(WorkspaceConfiguration configuration, CancellationToken cancellationToken)
@@ -225,7 +288,7 @@ public sealed class WorkspaceStore
         // Sharing a workspace must not share authentication state or enable remote access on import.
         var exported = configuration with { WebLanEnabled = false, WebLanAddress = null, WebLanAutomatic = null,
             WebHttpAcknowledged = false, WebAccessKeyVerifier = null, Actions = configuration.Actions with
-        { Webhook = configuration.Actions.Webhook with { Enabled = false, Url = "", UrlSecretId = "" } } };
+        { Webhook = configuration.Actions.Webhook with { Enabled = false, Url = "", UrlSecretId = "", TelegramBotToken = "", TelegramBotTokenSecretId = "" } } };
         return JsonSerializer.SerializeAsync(stream, exported, JsonOptions, cancellationToken);
     }
 }

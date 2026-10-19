@@ -3,8 +3,61 @@ using Xunit;
 
 namespace TraceScope.Core.Tests;
 
+[CollectionDefinition("Credential reader bootstrap", DisableParallelization = true)]
+public sealed class CredentialReaderBootstrapCollection { }
+
+[Collection("Credential reader bootstrap")]
 public sealed class WebhookSecretStoreTests
 {
+    [Fact]
+    public void IsolatedMacReaderValidatesIdentifiersAndSanitizesFailuresWithoutCaching()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        // Registration is process-wide startup state. This nonparallel test restores
+        // it afterward so optional native-storage tests exercise the native path.
+        var registration = typeof(WebhookSecretStore).GetField("_macCredentialReader",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        var original = registration.GetValue(null);
+        var calls = 0;
+        var mode = 0;
+        var id = Guid.NewGuid().ToString("N");
+        try
+        {
+            Assert.Throws<ArgumentNullException>(() => WebhookSecretStore.RegisterMacCredentialReader(null!));
+            WebhookSecretStore.RegisterMacCredentialReader(requestedId =>
+            {
+                calls++;
+                Assert.Equal(id, requestedId);
+                return mode switch
+                {
+                    0 => "disposable-reader-value",
+                    1 => throw new WebhookCredentialException(WebhookCredentialOperation.Read, -25293),
+                    2 => throw new IOException("Do not expose disposable-reader-value"),
+                    3 => " ",
+                    _ => new string('x', 2561)
+                };
+            });
+            Assert.Throws<InvalidOperationException>(() => WebhookSecretStore.RegisterMacCredentialReader(_ => "other"));
+            var store = WebhookSecretStore.Create();
+            Assert.Throws<ArgumentException>(() => store.Retrieve("not-a-credential-id"));
+            Assert.Equal(0, calls);
+            Assert.Equal("disposable-reader-value", store.Retrieve(id));
+            Assert.Equal("disposable-reader-value", store.Retrieve(id));
+            Assert.Equal(2, calls); // No secret cache across logical requests.
+            mode = 1;
+            var native = Assert.Throws<WebhookCredentialException>(() => store.Retrieve(id));
+            Assert.Equal(-25293, native.OSStatus);
+            Assert.Equal(WebhookCredentialOperation.Read, native.Operation);
+            for (mode = 2; mode <= 4; mode++)
+            {
+                var failure = Assert.Throws<InvalidOperationException>(() => store.Retrieve(id));
+                Assert.Equal("Unable to access the secure webhook credential store.", failure.Message);
+                Assert.Null(failure.InnerException);
+            }
+        }
+        finally { registration.SetValue(null, original); }
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -95,4 +148,5 @@ public sealed class WebhookSecretStoreTests
                 Skip = "Set PNGR_NATIVE_SECRET_TESTS=1 to exercise native credential storage (macOS may request Keychain access).";
         }
     }
+
 }
