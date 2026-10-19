@@ -126,7 +126,7 @@ public partial class MainWindow : Window
             await InitializeProfessionalOnOpenAsync();
             if (_closing) return;
             // Avoid update traffic in headless tests and explicit capture-only runs.
-            if (_runtimeFeatures && !_args.Contains("--capture")) _ = CheckForUpdatesAsync(false);
+            if (_runtimeFeatures && !_args.Contains("--capture")) StartAutomaticUpdateChecks();
             _windowLayoutReady = true;
             RememberMainWindowLayout();
             // Capture-only sizing keeps native visual verification repeatable.
@@ -669,7 +669,7 @@ public partial class MainWindow : Window
     private async Task ShutdownAsync()
     {
         _clock.Stop(); _workspaceSaveTimer.Stop(); _historyQuery?.Cancel(); _historyRefreshTimer.Stop();
-        _maintenanceClock.Stop();
+        _maintenanceClock.Stop(); _automaticUpdateTimer.Stop();
         await _applicationCancellation.CancelAsync();
         // Each step must run even when an earlier operation fails (e.g. an unwritable workspace).
         try { if (_runtimeFeatures) await SaveWorkspaceNowAsync(); }

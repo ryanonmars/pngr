@@ -105,6 +105,62 @@ public sealed class UpdateServiceTests
         Assert.Equal(UpdateCheckStatus.Available, (await service.CheckAsync(false)).Status);
     }
     [Fact]
+    public async Task CachedAvailabilitySurvivesRestartAndOfflineAttemptsButNotAnInstalledUpdate()
+    {
+        using var data = new TempData();
+        var offline = false;
+        var handler = new FakeHttp(_ => offline ? throw new HttpRequestException("offline")
+            : new(HttpStatusCode.OK) { Content = new StringContent(Release) });
+        using var client = new HttpClient(handler);
+        var now = DateTimeOffset.Parse("2026-10-14T10:00:00Z");
+        UpdateService Service(Version version) => new(data.Path, version, client, () => now);
+        Assert.Equal(UpdateCheckStatus.Available, (await Service(new(0, 7, 1)).CheckAsync(false)).Status);
+        var restarted = await Service(new(0, 7, 1)).CheckAsync(false);
+        Assert.Equal(UpdateCheckStatus.Skipped, restarted.Status);
+        Assert.Equal(new Version(0, 7, 2), restarted.Release!.Version);
+        Assert.Equal(1, handler.Calls);
+        now += UpdateService.AutomaticCheckInterval; offline = true;
+        var offlineRestart = await Service(new(0, 7, 1)).CheckAsync(false);
+        Assert.Equal(UpdateCheckStatus.Failed, offlineRestart.Status);
+        Assert.NotNull(offlineRestart.Release);
+        Assert.NotNull((await Service(new(0, 7, 1)).CheckAsync(false)).Release);
+        Assert.Null((await Service(new(0, 7, 2)).CheckAsync(false)).Release);
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.OK)]
+    public async Task ConfirmedCurrentReleaseClearsCachedAvailability(HttpStatusCode status)
+    {
+        using var data = new TempData();
+        var current = false;
+        using var client = new HttpClient(new FakeHttp(_ => current
+            ? new(status) { Content = new StringContent(Release.Replace("v0.7.2", "v0.7.1")) }
+            : new(HttpStatusCode.OK) { Content = new StringContent(Release) }));
+        var service = new UpdateService(data.Path, new(0, 7, 1), client);
+        await service.CheckAsync(false); current = true;
+        Assert.Equal(UpdateCheckStatus.Current, (await service.CheckAsync(true)).Status);
+        Assert.Null((await new UpdateService(data.Path, new(0, 7, 1), client).CheckAsync(false)).Release);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task UnavailableFeedsRemainThrottledAndPreserveKnownAvailability(HttpStatusCode status)
+    {
+        using var data = new TempData(); var unavailable = false;
+        var handler = new FakeHttp(_ => unavailable ? new(status) : new(HttpStatusCode.OK) { Content = new StringContent(Release) });
+        using var client = new HttpClient(handler);
+        var service = new UpdateService(data.Path, new(0, 7, 1), client);
+        await service.CheckAsync(false); unavailable = true;
+        Assert.Equal(UpdateCheckStatus.Failed, (await service.CheckAsync(true)).Status);
+        var cached = await service.CheckAsync(false);
+        Assert.Equal(UpdateCheckStatus.Skipped, cached.Status); Assert.NotNull(cached.Release);
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Fact]
     public async Task IntegrityCheckRejectsCorruptionWithoutChangingInstallation()
     {
         using var data = new TempData();

@@ -1,14 +1,12 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:TraceScope.App.Controls" xmlns:views="clr-namespace:TraceScope.App.Views" x:Class="TraceScope.App.MainWindow" Title="Pngr — Network diagnostics" Icon="avares://pngr/Assets/Icons/pngr.png" Width="1200" Height="800" MinWidth="980" MinHeight="640" Background="#191A1D">
+  <Window.Styles>
+    <Style Selector="Button.update-indicator"><Setter Property="MinHeight" Value="18"/><Setter Property="Height" Value="18"/><Setter Property="Padding" Value="4,0"/><Setter Property="FontSize" Value="10"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Foreground" Value="#9CC7A5"/></Style>
+    <Style Selector="Button.update-indicator:pointerover"><Setter Property="Background" Value="#2C3330"/><Setter Property="Foreground" Value="#B4DFBB"/></Style>
+    <Style Selector="Button.update-indicator:focus-visible"><Setter Property="BorderBrush" Value="#9CC7A5"/></Style>
+  </Window.Styles>
   <DockPanel>
     <NativeMenuBar x:Name="ApplicationMenuBar" DockPanel.Dock="Top" IsVisible="False"/>
-    <Border x:Name="UpdateNotice" DockPanel.Dock="Top" IsVisible="False" Background="#23252A" Padding="8,5">
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <TextBlock x:Name="UpdateNoticeText" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="View Update" Click="ViewAvailableUpdate"/>
-        <Button Grid.Column="2" Content="Later" Click="DismissUpdateNotice"/>
-      </Grid>
-    </Border>
-  <Grid RowDefinitions="28,28,38,*,20" Background="#191A1D">
+  <Grid RowDefinitions="28,28,38,*,24" Background="#191A1D">
     <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
         <Image x:Name="BrandWordmark" Source="{StaticResource PngrWordmark}" Width="50" Height="18" Stretch="Uniform" VerticalAlignment="Center" AutomationProperties.Name="Pngr"/>
@@ -118,7 +116,7 @@
       <Grid Grid.Row="1" Margin="8,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8"><TextBlock Text="History" Foreground="#8C929C" FontSize="10" VerticalAlignment="Center"/><Slider Grid.Column="1" x:Name="HistorySlider" Height="18" MinHeight="18" Minimum="0" Maximum="100" Value="100" ValueChanged="HistoryPositionChanged"/><TextBlock Grid.Column="2" x:Name="HistoryPosition" Text="LIVE" FontSize="9" Foreground="#91C898" VerticalAlignment="Center"/></Grid>
       </Grid>
     </Grid>
-    <Border Grid.Row="4" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,1,0,0" Padding="7,2"><Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatusText" Text="Ready · ICMP · saved locally" Foreground="#8F95A0" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" x:Name="VersionLabel" Text="Pngr 0.7.0" FontSize="9" Foreground="#737A86"/></Grid></Border>
+    <Border Grid.Row="4" Background="#22242A" BorderBrush="#373A40" BorderThickness="0,1,0,0" Padding="7,2"><Grid ColumnDefinitions="*,Auto"><TextBlock x:Name="StatusText" Text="Ready · ICMP · saved locally" Foreground="#8F95A0" FontSize="9" TextTrimming="CharacterEllipsis"/><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><Button x:Name="UpdateIndicator" Classes="update-indicator" IsVisible="False" Click="ViewAvailableUpdate" AutomationProperties.Name="Review available update"/><TextBlock x:Name="VersionLabel" Text="Pngr 0.7.0" MaxWidth="200" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" FontSize="9" Foreground="#737A86" VerticalAlignment="Center"/></StackPanel></Grid></Border>
   </Grid>
   </DockPanel>
 </Window>

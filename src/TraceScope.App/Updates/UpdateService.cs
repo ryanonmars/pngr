@@ -21,6 +21,7 @@ public interface IAppUpdateService
 /// <summary>Discovers stable releases independently of installation layout; only Velopack installs may self-update.</summary>
 public sealed class UpdateService : IAppUpdateService
 {
+    public static readonly TimeSpan AutomaticCheckInterval = TimeSpan.FromHours(24);
     private static readonly Uri Latest = new("https://api.github.com/repos/ryanonmars/pngr/releases/latest");
     private readonly HttpClient _http;
     private readonly string _statePath;
@@ -75,24 +76,32 @@ public sealed class UpdateService : IAppUpdateService
     public async Task<UpdateCheckResult> CheckAsync(bool manual, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        CheckState? state = null;
         try
         {
-            if (!manual && ReadLastCheck() is { } last && last <= _clock() && _clock() - last < TimeSpan.FromHours(24))
-                return new(UpdateCheckStatus.Skipped);
-            // Persist attempts, including offline failures, so a unavailable server is never hammered on every launch.
-            WriteLastCheck();
+            state = ReadCheckState();
+            var now = _clock();
+            if (!manual && state is { } saved && saved.LastAttemptUtc <= now && now - saved.LastAttemptUtc < AutomaticCheckInterval)
+                return new(UpdateCheckStatus.Skipped, CachedRelease(saved));
+            // Preserve known availability across offline restarts without bypassing the existing cadence.
+            WriteCheckState(new(now, state?.AvailableReleaseJson));
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             using var response = await GetAsync(Latest, timeout.Token).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.NotFound) return new(UpdateCheckStatus.Current);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                WriteCheckState(new(now));
+                return new(UpdateCheckStatus.Current);
+            }
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
             var release = ParseRelease(json, _current);
+            WriteCheckState(new(now, release is null ? null : json));
             return release is null ? new(UpdateCheckStatus.Current) : new(UpdateCheckStatus.Available, release);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or FormatException or OperationCanceledException or UnauthorizedAccessException or KeyNotFoundException or InvalidOperationException or ArgumentException)
-        { return new(UpdateCheckStatus.Failed, Message: "Could not check for updates. Check your internet connection and try again later."); }
+        { return new(UpdateCheckStatus.Failed, state is null ? null : CachedRelease(state), "Could not check for updates. Check your internet connection and try again later."); }
         finally { _gate.Release(); }
     }
     public static UpdateRelease? ParseRelease(string json, Version current)
@@ -203,19 +212,24 @@ public sealed class UpdateService : IAppUpdateService
         if (uri.Scheme != "https" || uri.UserInfo.Length != 0 || !uri.IsDefaultPort || uri.Host != (api ? "api.github.com" : "github.com"))
             throw new FormatException("Untrusted update location.");
     }
-    private DateTimeOffset? ReadLastCheck()
+    private CheckState? ReadCheckState()
     {
-        try { return JsonSerializer.Deserialize<CheckState>(File.ReadAllText(_statePath))?.LastAttemptUtc; }
+        try { return JsonSerializer.Deserialize<CheckState>(File.ReadAllText(_statePath)); }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException) { return null; }
     }
-    private void WriteLastCheck()
+    private UpdateRelease? CachedRelease(CheckState state)
+    {
+        try { return state.AvailableReleaseJson is { } json ? ParseRelease(json, _current) : null; }
+        catch (Exception error) when (error is not OutOfMemoryException) { return null; }
+    }
+    private void WriteCheckState(CheckState state)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_statePath)!);
         var temporary = _statePath + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new CheckState(_clock())));
+        File.WriteAllText(temporary, JsonSerializer.Serialize(state));
         File.Move(temporary, _statePath, true);
     }
-    private sealed record CheckState(DateTimeOffset LastAttemptUtc);
+    private sealed record CheckState(DateTimeOffset LastAttemptUtc, string? AvailableReleaseJson = null);
     private sealed class SecureReleaseSource(UpdateService service, Uri baseUri, CancellationToken checkToken) : IUpdateSource
     {
         public async Task<VelopackAssetFeed> GetReleaseFeed(IVelopackLogger logger, string? appId, string channel, Guid? stagingId = null, VelopackAsset? latestLocalRelease = null)
