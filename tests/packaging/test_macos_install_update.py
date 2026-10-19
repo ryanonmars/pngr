@@ -63,7 +63,7 @@ class MacInstallUpdateTests(unittest.TestCase):
                         'pngrReleaseVersion': '0.8.0-updatecheck.123.1'}
             (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(metadata))
             results = [subprocess.CompletedProcess([], 0, '', 'CDHash=aaaa\n'),
-                       subprocess.CompletedProcess([], 0, '', 'designated => identifier "dev.tracescope.desktop" and certificate leaf[subject.OU] = "VRNY8KM56D"\n'),
+                       subprocess.CompletedProcess([], 0, 'designated => identifier "dev.tracescope.desktop" and certificate leaf[subject.OU] = "VRNY8KM56D"\n', 'Executable=/app\n'),
                        subprocess.CompletedProcess([], 0, '', 'CDHash=bbbb\n')]
             with mock.patch.object(VERIFY, 'run'), mock.patch.object(VERIFY.RELEASE, 'native', return_value=False), \
                     mock.patch.object(VERIFY.subprocess, 'run', side_effect=results):

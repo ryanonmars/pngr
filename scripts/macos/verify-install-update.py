@@ -62,7 +62,7 @@ def signature(app):
     if not digest:
         raise ValueError('Missing host CodeDirectory hash')
     requirement = subprocess.run(['codesign', '-d', '-r-', str(host)],
-                                 check=True, capture_output=True, text=True).stderr
+                                 check=True, capture_output=True, text=True).stdout
     requirement = next((line for line in requirement.splitlines() if line.startswith('designated => ')), '')
     if not requirement or RELEASE.BUNDLE_ID not in requirement or RELEASE.TEAM not in requirement:
         raise ValueError('Unexpected host designated requirement')
