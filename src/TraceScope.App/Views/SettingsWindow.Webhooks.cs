@@ -67,8 +67,13 @@ public sealed partial class SettingsWindow
         };
         ToolTip.SetTip(_telegramToken, "Stored in your operating system credential store. Saved tokens cannot be displayed.");
         ToolTip.SetTip(_telegramChat, "A numeric user/group ID (including negative IDs), or a public channel username beginning with @.");
-        var urlPanel = new StackPanel { Spacing = 8, Children = { Row("Webhook URL", _webhookUrl), replaceUrl } };
-        var bearerRow = Row("Bearer token variable", _webhookBearer);
+        replaceUrl.VerticalAlignment = VerticalAlignment.Bottom;
+        var urlPanel = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 8 };
+        urlPanel.Children.Add(Row("Webhook URL", _webhookUrl)); Grid.SetColumn(replaceUrl, 1); urlPanel.Children.Add(replaceUrl);
+        var bearerRow = Row("Bearer token environment variable", _webhookBearer);
+        var bearerAdvanced = new Expander { Name = "SettingsWebhookAdvanced", Header = "Advanced webhook options",
+            HorizontalAlignment = HorizontalAlignment.Stretch, Content = bearerRow };
+        _webhookEnabled.VerticalAlignment = VerticalAlignment.Bottom;
         var docs = new Button { Content = "Telegram Bot API documentation ↗", HorizontalAlignment = HorizontalAlignment.Left };
         docs.Click += (_, _) =>
         {
@@ -120,18 +125,18 @@ public sealed partial class SettingsWindow
         var telegramPanel = new StackPanel { Spacing = 9, Children =
         {
             _telegramTokenRow, _telegramConnection,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _openTelegramButton, _cancelTelegram } }
+            SettingsUi.Actions(_openTelegramButton, _cancelTelegram)
         } };
         var telegramGuidance = new StackPanel { Spacing = 8, Children =
         {
-            Note("Create a bot with @BotFather using /newbot, paste its token, then click Connect Telegram. Pngr opens the bot conversation; press Start to connect. Use a dedicated bot: other polling applications can interfere. No inbound ports or LAN web server are required."), docs
+            new Expander { Header = "Telegram setup guide", Name = "SettingsTelegramHelp", HorizontalAlignment = HorizontalAlignment.Stretch, Content = new StackPanel { Spacing = 8, Children = { Note("Create a bot with @BotFather using /newbot, paste its token, then click Connect Telegram. Press Start in Telegram. Use a dedicated bot to avoid conflicts with other integrations. No inbound ports or LAN web server are required."), docs } } }
         } };
         void UpdateFormat()
         {
             var telegram = _webhookFormat.SelectedIndex == (int)WebhookFormat.Telegram;
             telegramPanel.IsVisible = telegramGuidance.IsVisible = advanced.IsVisible = telegram;
             urlPanel.IsVisible = !telegram;
-            bearerRow.IsVisible = _webhookFormat.SelectedIndex == (int)WebhookFormat.GenericJson;
+            bearerAdvanced.IsVisible = bearerRow.IsVisible = _webhookFormat.SelectedIndex == (int)WebhookFormat.GenericJson;
             if (!telegram) CancelTelegramPairing();
             _testWebhookButton.Content = telegram ? "Send Test" : "Test Webhook Notification";
             UpdateTelegramConnection();
@@ -174,11 +179,11 @@ public sealed partial class SettingsWindow
         UpdateFormat();
         return new StackPanel { Spacing = 10, Children =
         {
-            Heading("Webhooks"), _webhookEnabled, Row("Webhook format", _webhookFormat), urlPanel, bearerRow,
+            Heading("Delivery integrations"), SettingsUi.Columns(Row("Webhook format", _webhookFormat), _webhookEnabled), urlPanel, bearerAdvanced,
             telegramPanel,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _testWebhookButton, _connectTelegram, _disconnectTelegram } },
+            SettingsUi.Actions(_testWebhookButton, _connectTelegram, _disconnectTelegram),
             _replaceTelegramToken, _webhookTestStatus, advanced,
-            Note("Test uses the current fields without saving. Apply or OK saves changes; Cancel discards them."), telegramGuidance
+            Note("Tests use unsaved values. Apply or OK saves changes; Cancel discards them."), telegramGuidance
         } };
     }
 

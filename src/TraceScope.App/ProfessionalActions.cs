@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using TraceScope.Core;
+using TraceScope.App.Controls;
 
 namespace TraceScope.App;
 
@@ -53,18 +54,21 @@ public partial class MainWindow
     {
         var settings = _configuration.Actions;
         var dialog = ToolWindow("Notifications and alert actions", 720, 650);
+        Views.SettingsUi.Apply(dialog);
+        SettingsNumberField Number(string name, int minimum, int maximum, int value)
+            => new() { Name = name.Replace(" ", ""), Label = name, Minimum = minimum, Maximum = maximum, Value = value };
         var native = new CheckBox { Name = "NativeNotifications", Content = "Enable native OS notifications", IsChecked = settings.NativeNotificationsEnabled };
         var recovery = new CheckBox { Content = "Send recovery notifications and actions", IsChecked = settings.IncludeRecovery };
-        var notificationSpacing = new NumericUpDown { Minimum = 0, Maximum = 86400, Value = settings.MinimumNotificationSpacingSeconds, Width = 120 };
-        var actionSpacing = new NumericUpDown { Minimum = 0, Maximum = 86400, Value = settings.MinimumActionSpacingSeconds, Width = 120 };
-        var timeout = new NumericUpDown { Minimum = 1, Maximum = 120, Value = settings.ActionTimeoutSeconds, Width = 120 };
+        var notificationSpacing = Number("Native notification spacing", 0, 86400, settings.MinimumNotificationSpacingSeconds);
+        var actionSpacing = Number("Action spacing", 0, 86400, settings.MinimumActionSpacingSeconds);
+        var timeout = Number("Action timeout", 1, 120, settings.ActionTimeoutSeconds);
         var permission = new Button { Name = "NotificationPermission", Content = "Request OS notification permission" };
         var test = new Button { Name = "TestAlertActions", Content = "Test enabled actions" };
         var status = new TextBlock { Name = "ActionStatus", TextWrapping = Avalonia.Media.TextWrapping.Wrap };
         var save = new Button { Name = "SaveAlertActions", Content = "Save actions" };
         var smtpEnabled = new CheckBox { Content = "Enable SMTP email", IsChecked = settings.Smtp.Enabled };
         var host = Input(settings.Smtp.Host, "SMTP server");
-        var port = new NumericUpDown { Minimum = 1, Maximum = 65535, Value = settings.Smtp.Port, Width = 120 };
+        var port = Number("SMTP port", 1, 65535, settings.Smtp.Port);
         var tls = new CheckBox { Content = "Use STARTTLS", IsChecked = settings.Smtp.UseTls };
         var username = Input(settings.Smtp.Username, "Username (optional)");
         var passwordVariable = Input(settings.Smtp.PasswordEnvironmentVariable, "Password environment variable name");
@@ -89,9 +93,9 @@ public partial class MainWindow
             var configuration = new AlertActionConfiguration
             {
                 NativeNotificationsEnabled = native.IsChecked == true, IncludeRecovery = recovery.IsChecked == true,
-                MinimumNotificationSpacingSeconds = (int)(notificationSpacing.Value ?? 30), MinimumActionSpacingSeconds = (int)(actionSpacing.Value ?? 30),
-                ActionTimeoutSeconds = (int)(timeout.Value ?? 15),
-                Smtp = new() { Enabled = smtpEnabled.IsChecked == true, Host = host.Text?.Trim() ?? "", Port = (int)(port.Value ?? 587),
+                MinimumNotificationSpacingSeconds = (int)notificationSpacing.Read(), MinimumActionSpacingSeconds = (int)actionSpacing.Read(),
+                ActionTimeoutSeconds = (int)timeout.Read(),
+                Smtp = new() { Enabled = smtpEnabled.IsChecked == true, Host = host.Text?.Trim() ?? "", Port = (int)port.Read(),
                     UseTls = tls.IsChecked == true, Username = username.Text ?? "", PasswordEnvironmentVariable = passwordVariable.Text?.Trim() ?? "",
                     From = from.Text?.Trim() ?? "", To = to.Text?.Trim() ?? "" },
                 Webhook = _configuration.Actions.Webhook with { Enabled = webhookEnabled.IsChecked == true && (format.SelectedIndex == (int)WebhookFormat.Telegram || clearUrl.IsChecked != true), Format = (WebhookFormat)format.SelectedIndex,
@@ -157,7 +161,7 @@ public partial class MainWindow
             _settingsWindow?.SelectTelegramSettings();
         };
         var telegramFields = ToolPanel(
-            new TextBlock { Text = "Connect Telegram in Settings → Alerts & notifications. Opening setup discards unsaved edits in this action editor.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+            new TextBlock { Text = "Connect Telegram in Settings → Notification actions. Opening setup discards unsaved edits in this action editor.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
             openTelegramSetup);
         void UpdateFormat()
         {

@@ -9,14 +9,14 @@ namespace TraceScope.App.Views;
 
 public sealed partial class SettingsWindow
 {
-    private readonly RadioButton _webLocal = new() { Name = "SettingsWebLocalhost", Content = "Localhost Only", GroupName = "WebAccessMode" };
-    private readonly RadioButton _webLan = new() { Name = "SettingsWebLan", Content = "Local Network (LAN)", GroupName = "WebAccessMode" };
+    private readonly RadioButton _webLocal = new() { Name = "SettingsWebLocalhost", Content = "Localhost only", GroupName = "WebAccessMode" };
+    private readonly RadioButton _webLan = new() { Name = "SettingsWebLan", Content = "Local network (LAN)", GroupName = "WebAccessMode" };
     private readonly ComboBox _webInterface = new() { Name = "SettingsWebInterface", MinWidth = 270, MaxWidth = 360 };
     private readonly ComboBox _webNetworkMode = new() { Name = "SettingsWebNetworkMode", Width = 270,
         ItemsSource = new[] { "Automatic (Recommended)", "Choose manually…" } };
     private readonly Expander _webAdvanced = new() { Name = "SettingsWebAdvanced", Header = "Advanced network options",
         HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brush.Parse("#22242A"), BorderBrush = Brush.Parse("#3A3D46") };
-    private readonly TextBlock _webSelectedAddress = Note("");
+    private readonly TextBlock _webSelectedAddress = new SelectableTextBlock { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _webSelectionHelp = Note("");
     private Func<CancellationToken, Task<WebServerAddress?>> _findAutomaticAddress = WebServerNetwork.GetAutomaticLanAddressAsync;
     private WebServerAddress? _webAutomaticAddress;
@@ -30,7 +30,7 @@ public sealed partial class SettingsWindow
     private readonly Button _webCopyKey = new() { Name = "SettingsWebCopyKey", Content = "Copy Key" };
     private readonly Button _webRegenerate = new() { Name = "SettingsWebRegenerateKey", Content = "Regenerate Key" };
     private readonly TextBlock _webKeyHelp = Note("");
-    private readonly TextBlock _webAddress = new() { Name = "SettingsWebAddress", TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _webAddress = new SelectableTextBlock() { Name = "SettingsWebAddress", TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _webRunning = Note("");
     private readonly Button _webCopyAddress = new() { Name = "SettingsWebCopyAddress", Content = "Copy Address" };
     private readonly StackPanel _webLanOptions = new() { Name = "SettingsWebLanOptions", Spacing = 9 };
@@ -112,24 +112,22 @@ public sealed partial class SettingsWindow
             ReloadWebInterfaces((_webInterface.SelectedItem as WebServerAddress)?.Address);
             if (IsAutomaticWebInterface) await RefreshAutomaticWebAddressAsync();
         };
-        _webAdvanced.Content = new StackPanel { Spacing = 9, Children = {
-            Note("Choose manually to override Automatic. IPv6 and other private interfaces are available here."),
-            _webInterface, refresh } };
+        _webAdvanced.Background = Brushes.Transparent;
+        _webAdvanced.BorderThickness = new Thickness(0);
+        _webAdvanced.Content = SettingsUi.Section("Manual interface", _webInterface, refresh);
         foreach (var control in new Control[] {
-            Row("Network Interface", _webNetworkMode), Row("Selected Address", _webSelectedAddress), _webSelectionHelp, _webAdvanced })
+            Heading("Network"), Row("Interface selection", _webNetworkMode), Row("Selected address", _webSelectedAddress), _webSelectionHelp, _webAdvanced })
             _webLanOptions.Children.Add(control);
+        ToolTip.SetTip(_webSelectedAddress, "The address chosen for the staged configuration. Apply activates changes; the running server does not switch networks by itself.");
         foreach (var control in new Control[] {
-            Heading("Generated Access Key"), _webKey,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _webCopyKey, _webRegenerate, _webReveal } }, _webKeyHelp,
-            _webAcknowledged, Note("HTTP is unencrypted. Use a trusted network, an encrypted VPN, or your own HTTPS reverse proxy.") })
+            Heading("Access"), _webKey,
+            SettingsUi.Actions(_webCopyKey, _webRegenerate, _webReveal), _webKeyHelp, _webAcknowledged })
             _webAuthenticationOptions.Children.Add(control);
-        return Page("Web Server", "Read-only dashboard and REST API. The desktop application never requires web authentication.",
-            _web, Row("Access Mode", new StackPanel { Spacing = 7, Children = { _webLocal, _webLan } }),
-            Row("Port", _webPort), _webLanOptions,
-            Heading("Server Address"), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { _webAddress, _webCopyAddress } }, _webRunning,
-            _webAuthenticationOptions,
-            Note("Runs only while Pngr is open. LAN access does not enable internet access or change firewall or router settings."),
-            ToolButton("Apply & open dashboard controls…", "web"));
+        return SettingsUi.Page(SettingsUi.Section("Server", _web,
+                Row("Access mode", SettingsUi.Actions(_webLocal, _webLan)), SettingsUi.Field("Port", _webPort, "TCP")),
+            _webLanOptions, _webAuthenticationOptions, SettingsUi.Divider(),
+            SettingsUi.Section("Connection", _webAddress, _webCopyAddress, _webRunning,
+                ToolButton("Apply & open dashboard controls…", "web")));
     }
 
     private void ReloadWebInterfaces(string? address)
@@ -207,6 +205,7 @@ public sealed partial class SettingsWindow
         _webSelectionHelp.Text = !IsAutomaticWebInterface ? "Your manual address will be kept until you change it."
             : address is null && !_webResolvingAddress ? "Automatic could not find a suitable LAN network. Choose manually in Advanced network options."
             : "Automatic is checked again when you apply Web Server settings. A running server stays on its selected address.";
+        _webSelectionHelp.IsVisible = address is null && !_webResolvingAddress;
         var host = address?.Contains(':') == true ? "[" + address + "]" : address;
         _webAddress.Text = running ?? (host is null ? "Select an available LAN interface." : $"http://{host}:{_webPort.Value ?? 8787}/");
         _webRunning.Text = running is null ? _serverError?.Invoke() ?? "Stopped. The selected address becomes active after Apply." : "Running at the address above. Apply to activate any changes.";
@@ -228,6 +227,7 @@ public sealed partial class SettingsWindow
         if (_busy) return;
         var dialog = new Window { Name = "WebKeyRotationConfirmation", Title = "Regenerate access key?", Width = 460, Height = 270,
             CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Brush.Parse("#191A1D") };
+        SettingsUi.Apply(dialog);
         var confirm = new Button { Name = "ConfirmWebKeyRotation", Content = "Regenerate Key", Classes = { "primary" } };
         var cancel = new Button { Name = "CancelWebKeyRotation", Content = "Cancel" };
         confirm.Click += (_, _) => dialog.Close(true);

@@ -1,3 +1,4 @@
+using TraceScope.App.Controls;
 using Avalonia.Controls;
 using Avalonia;
 using Avalonia.Headless.XUnit;
@@ -24,7 +25,7 @@ public sealed class WebServerSettingsTests
         Assert.True(fixture.Get<RadioButton>("SettingsWebLocalhost").IsChecked);
         Assert.False(fixture.Get<RadioButton>("SettingsWebLan").IsChecked);
         Assert.False(fixture.Get<StackPanel>("SettingsWebLanOptions").IsVisible);
-        Assert.Equal(8787m, fixture.Get<NumericUpDown>("SettingsWebPort").Value);
+        Assert.Equal(8787m, fixture.Get<SettingsNumberField>("SettingsWebPort").Value);
         Assert.Empty(fixture.Get<TextBox>("SettingsWebAccessKey").Text ?? "");
         // The settings window remains usable without a key or any desktop login.
         fixture.Get<CheckBox>("SettingsWebEnabled").IsChecked = true;
@@ -139,7 +140,7 @@ public sealed class WebServerSettingsTests
         await fixture.ApplyAsync(success: false);
         Assert.Contains("Select a LAN interface", fixture.Get<TextBlock>("SettingsStatus").Text);
         interfaces.SelectedIndex = 1;
-        fixture.Get<NumericUpDown>("SettingsWebPort").Value = 8799;
+        fixture.Get<SettingsNumberField>("SettingsWebPort").Value = 8799;
         Assert.Equal("http://10.1.2.3:8799/", fixture.Get<TextBlock>("SettingsWebAddress").Text);
         await fixture.ApplyAsync();
         Assert.Equal("10.1.2.3", fixture.Configuration.WebLanAddress);

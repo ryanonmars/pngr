@@ -340,76 +340,10 @@ public partial class MainWindow
         await dialog.ShowDialog(this);
     }
 
-    private async void OpenAlerts(object? sender, RoutedEventArgs e)
+    private void OpenAlerts(object? sender, RoutedEventArgs e)
     {
-        var dialog = ToolWindow("Alert rules and events", 820, 650);
-        var rules = new ObservableCollection<AlertRule>(_configuration.Alerts);
-        var ruleGrid = new DataGrid { ItemsSource = rules, IsReadOnly = true, AutoGenerateColumns = false, Height = 140 };
-        foreach (var (header, member) in new[] { ("Rule", "Name"), ("Condition", "Condition"), ("Threshold", "Threshold"), ("Target", "Target"), ("Group", "Group"), ("Enabled", "Enabled") })
-            ruleGrid.Columns.Add(new DataGridTextColumn { Header = header, Binding = new Binding(member) { Mode = BindingMode.OneWay }, Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        var name = new TextBox { Text = "Monitoring alert", MaxLength = 80 };
-        var condition = new ComboBox { ItemsSource = Enum.GetValues<AlertCondition>(), SelectedIndex = 1, Width = 180 };
-        var threshold = new NumericUpDown { Minimum = 0, Maximum = 100000, Value = 5, Width = 120 };
-        var period = new NumericUpDown { Minimum = 0, Maximum = 3600, Value = 30, Width = 120 };
-        var cooldown = new NumericUpDown { Minimum = 0, Maximum = 86400, Value = 300, Width = 120 };
-        var recovery = new NumericUpDown { Minimum = 0, Maximum = 3600, Value = 10, Width = 120 };
-        var scope = new ComboBox { ItemsSource = new[] { "All targets", "Selected target", "Selected group" }, SelectedIndex = 0, Width = 180 };
-        var notify = new CheckBox { Content = "Show in-app desktop notifications", IsChecked = _configuration.DesktopNotifications };
-        var actions = new Button { Content = "Notifications and actions…", Name = "AlertActions" };
-        actions.Click += OpenAlertActions;
-        var add = new Button { Content = "Add rule" }; var remove = new Button { Content = "Remove selected" }; var toggle = new Button { Content = "Enable / disable selected" };
-        async Task PersistRules()
-        {
-            try
-            {
-                var configuration = _configuration with { Alerts = rules.ToArray(), DesktopNotifications = notify.IsChecked == true };
-                configuration.Validate(); _configuration = configuration;
-                foreach (var item in _targets) AssignAlerts(item);
-                await SaveWorkspaceNowAsync();
-            }
-            catch (Exception ex) { StatusText.Text = "Could not save alert rules: " + ex.Message; }
-        }
-        add.Click += async (_, _) =>
-        {
-            if (rules.Count >= 200) { StatusText.Text = "A workspace supports up to 200 alert rules."; return; }
-            if (string.IsNullOrWhiteSpace(name.Text)) return;
-            if (scope.SelectedIndex > 0 && _selected is null) return;
-            rules.Add(new AlertRule { Name = name.Text.Trim(), Condition = (AlertCondition)condition.SelectedItem!,
-                Threshold = (double)(threshold.Value ?? 0), EvaluationPeriod = TimeSpan.FromSeconds((double)(period.Value ?? 30)),
-                Cooldown = TimeSpan.FromSeconds((double)(cooldown.Value ?? 300)), RecoveryPeriod = TimeSpan.FromSeconds((double)(recovery.Value ?? 10)),
-                Target = scope.SelectedIndex == 1 ? _selected?.Target : null, Group = scope.SelectedIndex == 2 ? _selected?.Group : null });
-            await PersistRules();
-        };
-        remove.Click += async (_, _) => { if (ruleGrid.SelectedItem is AlertRule rule) { rules.Remove(rule); await PersistRules(); } };
-        toggle.Click += async (_, _) => { if (ruleGrid.SelectedItem is AlertRule rule) { rules[rules.IndexOf(rule)] = rule with { Enabled = !rule.Enabled }; await PersistRules(); } };
-        notify.IsCheckedChanged += async (_, _) => await PersistRules();
-        var events = new DataGrid { ItemsSource = _monitoringEvents, IsReadOnly = true, AutoGenerateColumns = false, Height = 160 };
-        events.Columns.Add(new DataGridTextColumn { Header = "Time", Binding = new Binding("Timestamp") { Mode = BindingMode.OneWay, StringFormat = "{0:HH:mm:ss}" }, Width = new DataGridLength(90) });
-        events.Columns.Add(new DataGridTextColumn { Header = "Event", Binding = new Binding("Kind") { Mode = BindingMode.OneWay }, Width = new DataGridLength(90) });
-        events.Columns.Add(new DataGridTextColumn { Header = "Message", Binding = new Binding("Message") { Mode = BindingMode.OneWay }, Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        events.Columns.Add(new DataGridTextColumn { Header = "Acknowledged", Binding = new Binding("AcknowledgedAt") { Mode = BindingMode.OneWay, StringFormat = "{0:HH:mm:ss}" }, Width = new DataGridLength(100) });
-        var acknowledge = new Button { Content = "Acknowledge selected event", Name = "AcknowledgeEvent" };
-        acknowledge.Click += async (_, _) =>
-        {
-            if (events.SelectedItem is not MonitoringEvent selectedEvent) return;
-            try
-            {
-                if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in Pngr")) return;
-                var index = _monitoringEvents.IndexOf(selectedEvent);
-                if (index >= 0) _monitoringEvents[index] = selectedEvent with
-                { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in Pngr" };
-            }
-            catch (Exception ex) { StatusText.Text = "Acknowledgment failed: " + ex.Message; }
-        };
-        if (_selected is { } selected)
-            foreach (var item in (await _engine.Storage.LoadEventsAsync(selected.Id)).OrderByDescending(e => e.Timestamp))
-                if (!_monitoringEvents.Any(e => e.Id == item.Id)) _monitoringEvents.Add(item);
-        dialog.Content = new ScrollViewer { Content = ToolPanel(ruleGrid, FormRow("Rule name", name),
-            FormRow("Condition / threshold", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { condition, threshold } }),
-            FormRow("Evaluation / cooldown / recovery (s)", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { period, cooldown, recovery } }),
-            FormRow("Applies to", scope), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { notify, actions } }, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { add, remove, toggle } },
-            new TextBlock { Text = "Persisted events · alerts, recoveries and confirmed route changes" }, events, acknowledge) };
-        await dialog.ShowDialog(this);
+        OpenSettings(sender, e);
+        _settingsWindow?.SelectPage("Alerts & notifications");
     }
 
     private async Task EnableWebAsync()
@@ -455,30 +389,11 @@ public partial class MainWindow
 
     private async void OpenWeb(object? sender, RoutedEventArgs e)
     {
-        var dialog = ToolWindow("Local read-only web interface", 580, 320);
-        var enabled = new CheckBox { Name = "WebEnabled", Content = "Enable web server", IsChecked = _webServer is not null };
-        var port = new NumericUpDown { Name = "WebPort", Minimum = 1024, Maximum = 65535, Value = _configuration.WebPort, Width = 150 };
-        var apply = new Button { Name = "WebApply", Content = "Apply" }; var browser = new Button { Content = "Open dashboard" };
-        var status = new TextBlock { Name = "WebStatus", Text = _webServer?.Url ?? _webServer?.LastError ?? "Disabled. Configure access in Settings → Web Server.", TextWrapping = Avalonia.Media.TextWrapping.Wrap };
-        var settings = new Button { Content = "Web Server settings…" };
-        settings.Click += (_, _) => { dialog.Close(); OpenSettings(null, e); _settingsWindow?.SelectPage("Web Server"); };
-        apply.Click += async (_, _) =>
+        var dialog = new WebDashboardWindow(() => (_webServer?.Url, _webServer?.LastError, _configuration.WebLanEnabled), () =>
         {
-            try
-            {
-                apply.IsEnabled = false;
-                await ConfigureWebAsync(enabled.IsChecked == true, (int)(port.Value ?? 8787));
-                status.Text = _webServer?.Url ?? "Web server disabled.";
-            }
-            catch (Exception ex) { status.Text = ex.Message; }
-            finally { apply.IsEnabled = true; }
-        };
-        browser.Click += (_, _) =>
-        {
-            if (_webServer?.Url is { } url) Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        };
-        dialog.Content = ToolPanel(enabled, FormRow("Port", port), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { apply, browser } }, status,
-            new TextBlock { Text = "Runs only while Pngr is running. LAN mode requires a key for browser and API access; HTTP is unencrypted.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }, settings);
+            OpenSettings(null, e);
+            _settingsWindow?.SelectPage("Web Server");
+        });
         await dialog.ShowDialog(this);
     }
 

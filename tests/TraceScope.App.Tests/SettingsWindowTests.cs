@@ -1,3 +1,4 @@
+using Avalonia.LogicalTree;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -53,8 +54,9 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("Alerts & notifications");
         Find<CheckBox>(dialog, "SettingsNativeNotifications").IsChecked = true;
         Find<CheckBox>(dialog, "SettingsInAppNotifications").IsChecked = true;
+        dialog.SelectPage("Notification actions");
         Find<CheckBox>(dialog, "SettingsIncludeRecovery").IsChecked = false;
-        Find<NumericUpDown>(dialog, "SettingsNotificationSpacing").Value = 120;
+        Find<SettingsNumberField>(dialog, "SettingsNotificationSpacing").Value = 120;
         await Apply(dialog);
         Assert.True(configuration.Actions.NativeNotificationsEnabled);
         Assert.True(configuration.DesktopNotifications);
@@ -80,7 +82,7 @@ public sealed class SettingsWindowTests
         Assert.Equal(9, changed.MaxHops);
         Assert.Equal(ProbeProtocol.Tcp, changed.Protocol);
         dialog.SelectPage("History");
-        Find<NumericUpDown>(dialog, "SettingsRetention").Value = 55;
+        Find<SettingsNumberField>(dialog, "SettingsRetention").Value = 55;
         await Apply(dialog);
         Assert.Equal(changed, session.Options);
         Assert.Equal(changed, (await fixture.LoadWorkspace()).Targets.Single().Options);
@@ -101,9 +103,9 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("General");
         Find<CheckBox>(dialog, "SettingsRestore").IsChecked = false;
         dialog.SelectPage("Monitoring");
-        Find<NumericUpDown>(dialog, "SettingsInterval").Value = 9;
+        Find<SettingsNumberField>(dialog, "SettingsInterval").Value = 9;
         Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 8443;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 8443;
         dialog.SelectPage("Local web / API");
         Find<CheckBox>(dialog, "SettingsWebEnabled").IsChecked = true;
         Click(Find<Button>(dialog, "SettingsCancel"));
@@ -128,24 +130,24 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("Monitoring");
         Find<CheckBox>(dialog, "SettingsUseDefaults").IsChecked = true;
         Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Udp;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 33450;
-        Find<NumericUpDown>(dialog, "SettingsInterval").Value = 3.7m;
-        Find<NumericUpDown>(dialog, "SettingsTimeout").Value = 1.4m;
-        Find<NumericUpDown>(dialog, "SettingsMaxHops").Value = 7;
-        Find<NumericUpDown>(dialog, "SettingsConcurrency").Value = 3;
-        Find<NumericUpDown>(dialog, "SettingsHistoryLimit").Value = 240;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 33450;
+        Find<SettingsNumberField>(dialog, "SettingsInterval").Value = 3.7m;
+        Find<SettingsNumberField>(dialog, "SettingsTimeout").Value = 1.4m;
+        Find<SettingsNumberField>(dialog, "SettingsMaxHops").Value = 7;
+        Find<SettingsNumberField>(dialog, "SettingsConcurrency").Value = 3;
+        Find<SettingsNumberField>(dialog, "SettingsHistoryLimit").Value = 240;
         Find<CheckBox>(dialog, "SettingsResolveHostnames").IsChecked = false;
         dialog.SelectPage("Display");
-        Find<NumericUpDown>(dialog, "SettingsWarningLatency").Value = 45;
-        Find<NumericUpDown>(dialog, "SettingsCriticalLatency").Value = 90;
-        Find<NumericUpDown>(dialog, "SettingsGraphMaximum").Value = 150;
+        Find<SettingsNumberField>(dialog, "SettingsWarningLatency").Value = 45;
+        Find<SettingsNumberField>(dialog, "SettingsCriticalLatency").Value = 90;
+        Find<SettingsNumberField>(dialog, "SettingsGraphMaximum").Value = 150;
         Find<ComboBox>(dialog, "SettingsTimeRange").SelectedIndex = 4;
         Find<CheckBox>(dialog, "SettingsShowJitter").IsChecked = false;
         Find<CheckBox>(dialog, "SettingsShowPacketLoss").IsChecked = false;
         Find<CheckBox>(dialog, "SettingsShowEvents").IsChecked = false;
         dialog.SelectPage("History");
-        Find<NumericUpDown>(dialog, "SettingsRetention").Value = 60;
-        Find<NumericUpDown>(dialog, "SettingsAggregation").Value = 15;
+        Find<SettingsNumberField>(dialog, "SettingsRetention").Value = 60;
+        Find<SettingsNumberField>(dialog, "SettingsAggregation").Value = 15;
         await Apply(dialog);
         var saved = await fixture.LoadWorkspace();
         Assert.False(saved.RestoreOnStartup);
@@ -186,8 +188,8 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("Monitoring");
         Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
         Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Tcp;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 8443;
-        Find<NumericUpDown>(dialog, "SettingsInterval").Value = 4;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 8443;
+        Find<SettingsNumberField>(dialog, "SettingsInterval").Value = 4;
         await fixture.AddTarget("127.0.0.2");
         var second = fixture.Engine.Sessions.Single(s => s.Id != first.Id);
         var secondOptions = second.Options;
@@ -215,7 +217,7 @@ public sealed class SettingsWindowTests
         var dialog = fixture.OpenSettings();
         dialog.SelectPage("Monitoring");
         Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Tcp;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 9443;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 9443;
         Find<TextBox>(dialog, "SettingsProfileName").Text = "Custom TCP";
         Click(Find<Button>(dialog, "SettingsSaveProfile"));
         Assert.DoesNotContain(fixture.Configuration.Profiles, p => p.Name == "Custom TCP");
@@ -227,7 +229,7 @@ public sealed class SettingsWindowTests
         var reopened = fixture.OpenSettings();
         reopened.SelectPage("Monitoring");
         Find<ComboBox>(reopened, "SettingsProfiles").SelectedItem = "Custom TCP";
-        Assert.Equal(9443, Find<NumericUpDown>(reopened, "SettingsDestinationPort").Value);
+        Assert.Equal(9443, Find<SettingsNumberField>(reopened, "SettingsDestinationPort").Value);
         Click(Find<Button>(reopened, "SettingsDeleteProfile"));
         await Apply(reopened);
         Assert.DoesNotContain((await fixture.LoadWorkspace()).Profiles, p => p.Name == "Custom TCP");
@@ -245,7 +247,7 @@ public sealed class SettingsWindowTests
         Assert.False(enabled.IsChecked);
         Assert.Null(Field<LocalWebServer?>(fixture.Window, "_webServer"));
         var port = AvailablePort();
-        Find<NumericUpDown>(dialog, "SettingsWebPort").Value = port;
+        Find<SettingsNumberField>(dialog, "SettingsWebPort").Value = port;
         enabled.IsChecked = true;
         await Apply(dialog);
         var server = Field<LocalWebServer>(fixture.Window, "_webServer");
@@ -281,8 +283,8 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("General");
         Find<CheckBox>(dialog, "SettingsRestore").IsChecked = false;
         dialog.SelectPage("Display");
-        Find<NumericUpDown>(dialog, "SettingsWarningLatency").Value = 200;
-        Find<NumericUpDown>(dialog, "SettingsCriticalLatency").Value = 100;
+        Find<SettingsNumberField>(dialog, "SettingsWarningLatency").Value = 200;
+        Find<SettingsNumberField>(dialog, "SettingsCriticalLatency").Value = 100;
         await Apply(dialog, expectSuccess: false);
         Assert.Equal(before, fixture.Configuration);
         Assert.False(File.Exists(fixture.WorkspacePath));
@@ -297,7 +299,7 @@ public sealed class SettingsWindowTests
         var dialog = fixture.OpenSettings();
         dialog.SelectPage("Local web / API");
         Find<CheckBox>(dialog, "SettingsWebEnabled").IsChecked = true;
-        Find<NumericUpDown>(dialog, "SettingsWebPort").Value = AvailablePort();
+        Find<SettingsNumberField>(dialog, "SettingsWebPort").Value = AvailablePort();
         await Apply(dialog);
         var previous = Field<LocalWebServer>(fixture.Window, "_webServer");
         var url = previous.Url!;
@@ -307,9 +309,9 @@ public sealed class SettingsWindowTests
         occupied.Start();
         try
         {
-            Find<NumericUpDown>(dialog, "SettingsWebPort").Value = ((IPEndPoint)occupied.LocalEndpoint).Port;
+            Find<SettingsNumberField>(dialog, "SettingsWebPort").Value = ((IPEndPoint)occupied.LocalEndpoint).Port;
             dialog.SelectPage("History");
-            Find<NumericUpDown>(dialog, "SettingsRetention").Value = 90;
+            Find<SettingsNumberField>(dialog, "SettingsRetention").Value = 90;
             await Apply(dialog, expectSuccess: false);
             Assert.Same(previous, Field<LocalWebServer>(fixture.Window, "_webServer"));
             Assert.Equal(config, fixture.Configuration);
@@ -330,7 +332,7 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("Monitoring");
         Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
         var protocol = Find<ComboBox>(dialog, "SettingsProtocol");
-        var port = Find<NumericUpDown>(dialog, "SettingsDestinationPort");
+        var port = Find<SettingsNumberField>(dialog, "SettingsDestinationPort");
         Assert.False(port.IsEnabled);
         protocol.SelectedItem = ProbeProtocol.Udp;
         port.Value = 33625;
@@ -404,10 +406,10 @@ public sealed class SettingsWindowTests
         dialog.SelectPage("Monitoring");
         Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
         Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Udp;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 33434;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 33434;
         Find<ComboBox>(dialog, "SettingsUdpPortMode").SelectedIndex = 1;
-        Find<NumericUpDown>(dialog, "SettingsUdpEndPort").Value = 33625;
-        Find<NumericUpDown>(dialog, "SettingsUdpPacketSize").Value = 1280;
+        Find<SettingsNumberField>(dialog, "SettingsUdpEndPort").Value = 33625;
+        Find<SettingsNumberField>(dialog, "SettingsUdpPacketSize").Value = 1280;
         Find<CheckBox>(dialog, "SettingsUdpAllowFragmentation").IsChecked = true;
         Find<TextBox>(dialog, "SettingsProfileName").Text = "UDP range 1280";
         Click(Find<Button>(dialog, "SettingsSaveProfile"));
@@ -456,10 +458,37 @@ public sealed class SettingsWindowTests
         Find<ComboBox>(dialog, "ProbeScope").SelectedIndex = 1;
         Find<ComboBox>(dialog, "SettingsProtocol").SelectedItem = ProbeProtocol.Udp;
         Find<ComboBox>(dialog, "SettingsUdpPortMode").SelectedIndex = 1;
-        Find<NumericUpDown>(dialog, "SettingsDestinationPort").Value = 40000;
-        Find<NumericUpDown>(dialog, "SettingsUdpEndPort").Value = 33434;
+        Find<SettingsNumberField>(dialog, "SettingsDestinationPort").Value = 40000;
+        Find<SettingsNumberField>(dialog, "SettingsUdpEndPort").Value = 33434;
         await Apply(dialog, expectSuccess: false);
         Assert.Equal(original, fixture.Engine.Sessions.Single().Options);
+    }
+
+    [AvaloniaFact]
+    public async Task UneditedRulesPreserveExternalChangesAndEditedRulesUpdateTheRunningSession()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.AddTarget("127.0.0.1");
+        var original = new AlertRule { Id = "stable-rule", Name = "Initial", Threshold = 200 };
+        await InvokeTask(fixture.Window, "CommitSettingsAsync", fixture.Configuration with { Alerts = new[] { original } }, null, null, null, null);
+        var settings = fixture.OpenSettings();
+        var external = original with { Name = "Changed outside Settings", Threshold = 225 };
+        await InvokeTask(fixture.Window, "CommitSettingsAsync", fixture.Configuration with { Alerts = new[] { external } }, null, null, null, null);
+        settings.SelectPage("History");
+        Find<SettingsNumberField>(settings, "SettingsRetention").Value = 45;
+        await Apply(settings);
+        Assert.Equal(external, Assert.Single(fixture.Configuration.Alerts));
+        Assert.Equal(external, Assert.Single((await fixture.LoadWorkspace()).Alerts));
+        settings.Close();
+        settings = fixture.OpenSettings(); settings.SelectPage("Alerts & notifications");
+        Find<TextBox>(settings, "AlertRuleThreshold").Text = "250.125";
+        await Apply(settings);
+        var expected = external with { Threshold = 250.125 };
+        Assert.Equal(expected, Assert.Single(fixture.Configuration.Alerts));
+        Assert.Equal(expected, Assert.Single((await fixture.LoadWorkspace()).Alerts));
+        var field = typeof(TraceEngine).GetField("_alertRules", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var rules = Assert.IsAssignableFrom<System.Collections.Concurrent.ConcurrentDictionary<Guid, IReadOnlyList<AlertRule>>>(field.GetValue(fixture.Engine));
+        Assert.Equal(expected, Assert.Single(rules[fixture.Engine.Sessions.Single().Id]));
     }
 
     private static async Task Apply(SettingsWindow dialog, bool expectSuccess = true)
@@ -566,7 +595,10 @@ public sealed class SettingsWindowTests
     }
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static T Find<T>(Window window, string name) where T : Control
-        => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+    {
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        return window.GetVisualDescendants().OfType<T>().Concat(window.GetLogicalDescendants().OfType<T>()).Distinct().Single(control => control.Name == name);
+    }
     private static T Field<T>(MainWindow window, string name)
         => (T)typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
     private static Task InvokeTask(MainWindow window, string method, params object?[] args)

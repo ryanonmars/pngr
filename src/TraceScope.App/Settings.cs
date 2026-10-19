@@ -39,9 +39,42 @@ public partial class MainWindow
                 var actions = _actions!;
                 var timeout = _configuration.Actions.ActionTimeoutSeconds;
                 return await Task.Run(() => actions.SendTestWebhookAsync(webhook, timeout, _applicationCancellation.Token));
-            });
+            }, alertEvents: _monitoringEvents,
+            alertTargets: _targets.Select(t => t.Target), alertGroups: _targets.Select(t => t.Group),
+            eventTarget: id => _alertSessionTargets.GetValueOrDefault(id) ?? _targets.FirstOrDefault(t => t.Id == id)?.Target ?? "Previous session",
+            acknowledgeEvent: AcknowledgeSettingsEventAsync);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show(this);
+        _ = LoadSettingsAlertEventsAsync(_settingsWindow);
+    }
+
+    private readonly Dictionary<Guid, string> _alertSessionTargets = [];
+
+    private async Task LoadSettingsAlertEventsAsync(SettingsWindow settings)
+    {
+        try
+        {
+            foreach (var session in await _engine.Storage.LoadSessionsAsync(_applicationCancellation.Token))
+                _alertSessionTargets[session.Id] = session.Target;
+            if (_selected is { } selected)
+            {
+                foreach (var item in await _engine.Storage.LoadEventsAsync(selected.Id, cancellationToken: _applicationCancellation.Token))
+                    if (!_monitoringEvents.Any(e => e.Id == item.Id)) _monitoringEvents.Add(item);
+            }
+            if (settings.IsVisible) settings.AlertRulesEditor.SetEvents(_monitoringEvents);
+        }
+        catch (OperationCanceledException) { }
+        catch { if (settings.IsVisible) StatusText.Text = "Stored alert events could not be loaded. Live events remain available."; }
+    }
+
+    private async Task<bool> AcknowledgeSettingsEventAsync(MonitoringEvent selectedEvent)
+    {
+        if (selectedEvent.AcknowledgedAt is not null) return false;
+        if (!await _engine.Storage.AcknowledgeEventAsync(selectedEvent.Id, "Acknowledged in Pngr")) return false;
+        var index = _monitoringEvents.ToList().FindIndex(e => e.Id == selectedEvent.Id);
+        if (index >= 0) _monitoringEvents[index] = selectedEvent with
+        { AcknowledgedAt = DateTimeOffset.UtcNow, AcknowledgmentNote = "Acknowledged in Pngr" };
+        return true;
     }
 
     internal void OpenSettingsFromMenu() => OpenSettings(null, new RoutedEventArgs());
@@ -85,13 +118,14 @@ public partial class MainWindow
 
     private async Task ApplySettingsAsync(SettingsChange change, Guid? selectedSessionId)
     {
-        // Keep targets, rules and summaries that may have changed while the modeless editor was open.
+        // Keep running targets and externally updated rules unless this draft actually edits rules.
         var draft = change.Configuration;
         var configuration = _configuration with
         {
             RestoreOnStartup = draft.RestoreOnStartup, DefaultProbeOptions = draft.DefaultProbeOptions,
             UseDefaultProbeOptionsForNewTargets = draft.UseDefaultProbeOptionsForNewTargets,
             Display = draft.Display, RetentionDays = draft.RetentionDays, AggregationSeconds = draft.AggregationSeconds,
+            Alerts = change.AlertRulesChanged ? draft.Alerts : _configuration.Alerts,
             Profiles = draft.Profiles, DesktopNotifications = draft.DesktopNotifications,
             WebEnabled = draft.WebEnabled, WebPort = draft.WebPort,
             WebLanEnabled = draft.WebLanEnabled, WebLanAddress = draft.WebLanAddress,
@@ -178,7 +212,9 @@ public partial class MainWindow
                 }
             }
             var resetTimeRange = _configuration.Display.DefaultTimeRangeMinutes != saved.Display.DefaultTimeRangeMinutes;
+            var alertRulesChanged = !_configuration.Alerts.SequenceEqual(saved.Alerts);
             _configuration = saved;
+            if (alertRulesChanged) foreach (var item in _targets) AssignAlerts(item);
             committed = true;
             var previous = _webServer;
             if (!configuration.WebEnabled) _webServer = null;

@@ -22,8 +22,10 @@ public sealed class DesktopLifecycleTests
         Invoke(fixture.Window, "OpenWeb", null, new RoutedEventArgs(Button.ClickEvent));
         await Until(() => fixture.Window.OwnedWindows.Any());
         var dialog = fixture.Window.OwnedWindows.Single();
-        Assert.False(Find<CheckBox>(dialog, "WebEnabled").IsChecked);
-        Assert.StartsWith("Disabled.", Find<TextBlock>(dialog, "WebStatus").Text);
+        Assert.Equal("Stopped", Find<TextBlock>(dialog, "WebStatus").Text);
+        Assert.False(Find<Button>(dialog, "WebOpenDashboard").IsEnabled);
+        Assert.False(Find<Button>(dialog, "WebCopyAddress").IsEnabled);
+        Assert.Empty(dialog.GetVisualDescendants().OfType<NumericUpDown>());
         dialog.Close();
     }
 
@@ -37,10 +39,13 @@ public sealed class DesktopLifecycleTests
         Invoke(fixture.Window, "OpenWeb", null, new RoutedEventArgs(Button.ClickEvent));
         await Until(() => fixture.Window.OwnedWindows.Any());
         var dialog = fixture.Window.OwnedWindows.Single();
-        var enabled = Find<CheckBox>(dialog, "WebEnabled");
-        var apply = Find<Button>(dialog, "WebApply");
-        Find<NumericUpDown>(dialog, "WebPort").Value = port;
-        enabled.IsChecked = true;
+        Find<Button>(dialog, "WebServerSettings").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => fixture.Window.OwnedWindows.OfType<SettingsWindow>().Any());
+        var settings = fixture.Window.OwnedWindows.OfType<SettingsWindow>().Single();
+        Assert.Equal("Web Server", Find<ListBox>(settings, "SettingsNavigation").SelectedItem);
+        Find<TraceScope.App.Controls.SettingsNumberField>(settings, "SettingsWebPort").Value = port;
+        Find<CheckBox>(settings, "SettingsWebEnabled").IsChecked = true;
+        var apply = Find<Button>(settings, "SettingsApply");
         apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         await Until(() => Field<LocalWebServer?>(fixture.Window, "_webServer") is not null && apply.IsEnabled);
         var server = Field<LocalWebServer>(fixture.Window, "_webServer");
@@ -52,14 +57,14 @@ public sealed class DesktopLifecycleTests
         var saved = await fixture.LoadWorkspace();
         Assert.True(saved.WebEnabled);
         Assert.Equal(port, saved.WebPort);
-        enabled.IsChecked = false;
+        Find<CheckBox>(settings, "SettingsWebEnabled").IsChecked = false;
         apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         await Until(() => Field<LocalWebServer?>(fixture.Window, "_webServer") is null && apply.IsEnabled);
         Assert.False((await fixture.LoadWorkspace()).WebEnabled);
         Assert.Equal(SessionState.Running, session.State);
         await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync(url + "/api/targets"));
         AssertPortReusable(port);
-        dialog.Close();
+        settings.Close();
     }
 
     [AvaloniaFact]

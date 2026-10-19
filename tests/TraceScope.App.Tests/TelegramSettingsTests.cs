@@ -18,7 +18,7 @@ public sealed class TelegramSettingsTests
     {
         var writes = 0;
         var window = Create(new(), _ => { writes++; return Task.CompletedTask; });
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         Find<ComboBox>(window, "SettingsWebhookFormat").SelectedIndex = 2;
         var token = Find<TextBox>(window, "SettingsTelegramBotToken");
         Assert.True(token.IsEffectivelyVisible);
@@ -38,7 +38,7 @@ public sealed class TelegramSettingsTests
             TelegramChatId = "@public_channel", UrlSecretId = "22222222222222222222222222222222", BearerTokenEnvironmentVariable = "GENERIC_TOKEN" };
         SettingsChange? applied = null;
         var window = Create(new() { Actions = new() { Webhook = webhook } }, change => { applied = change; return Task.CompletedTask; });
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         var token = Find<TextBox>(window, "SettingsTelegramBotToken");
         Assert.True(string.IsNullOrEmpty(token.Text));
         Assert.False(token.IsEnabled);
@@ -67,7 +67,7 @@ public sealed class TelegramSettingsTests
             UrlSecretId = "22222222222222222222222222222222" };
         SettingsChange? applied = null;
         var window = Create(new() { Actions = new() { Webhook = webhook } }, change => { applied = change; return Task.CompletedTask; });
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         Click(Find<Button>(window, "SettingsReplaceTelegramToken"));
         Find<ComboBox>(window, "SettingsWebhookFormat").SelectedIndex = 0;
         Click(Find<Button>(window, "SettingsReplaceWebhookUrl"));
@@ -86,7 +86,7 @@ public sealed class TelegramSettingsTests
         var writes = 0;
         var window = Create(new(), _ => { writes++; return Task.CompletedTask; }, config =>
         { tested = config; return Task.FromResult(new NotificationResult(true, "Telegram confirmed delivery.")); });
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         Find<ComboBox>(window, "SettingsWebhookFormat").SelectedIndex = 2;
         Find<TextBox>(window, "SettingsTelegramBotToken").Text = "123456:unsaved_secret";
         Find<TextBox>(window, "SettingsTelegramChatId").Text = "-1001234567890";
@@ -114,7 +114,7 @@ public sealed class TelegramSettingsTests
             saved = change.Configuration.Actions.Webhook with { TelegramBotToken = "", TelegramBotTokenSecretId = "33333333333333333333333333333333" };
             return Task.CompletedTask;
         }, savedWebhook: () => saved);
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         Find<ComboBox>(window, "SettingsWebhookFormat").SelectedIndex = 2;
         var token = Find<TextBox>(window, "SettingsTelegramBotToken");
         token.Text = "123456:replacement_secret";
@@ -134,7 +134,7 @@ public sealed class TelegramSettingsTests
     {
         var writes = 0;
         var window = Create(new(), _ => { writes++; return Task.CompletedTask; });
-        window.Show(); window.SelectPage("Alerts & notifications");
+        window.Show(); window.SelectPage("Notification actions");
         Find<ComboBox>(window, "SettingsWebhookFormat").SelectedIndex = 2;
         Find<CheckBox>(window, "SettingsWebhookEnabled").IsChecked = true;
         Click(Find<Button>(window, "SettingsApply"));

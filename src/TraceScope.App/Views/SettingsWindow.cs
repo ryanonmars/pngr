@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using TraceScope.Core;
+using TraceScope.App.Controls;
 
 namespace TraceScope.App.Views;
 
@@ -14,7 +15,7 @@ public sealed record ProbeSourceChoice(string Label, string? Interface, string? 
 }
 
 public sealed record SettingsChange(WorkspaceConfiguration Configuration, ProbeOptions? SelectedTargetOptions,
-    int? SelectedTcpPort = null, int? SelectedUdpPort = null, bool ReevaluateWebInterface = false);
+    int? SelectedTcpPort = null, int? SelectedUdpPort = null, bool ReevaluateWebInterface = false, bool AlertRulesChanged = false);
 
 /// <summary>Edits a private draft. Only Apply/OK can change running monitoring or saved preferences.</summary>
 public sealed partial class SettingsWindow : Window
@@ -28,40 +29,42 @@ public sealed partial class SettingsWindow : Window
     private readonly Button _okButton = new() { Name = "SettingsOk", Content = "OK", MinWidth = 78, Classes = { "primary" } };
     private readonly Button _cancelButton = new() { Name = "SettingsCancel", Content = "Cancel", MinWidth = 78 };
     private readonly ContentControl _page = new();
+    private readonly AlertSettingsView _alertRules;
+    public AlertSettingsView AlertRulesEditor => _alertRules;
     private readonly ListBox _navigation;
     private readonly Dictionary<string, Control> _pages = new();
     private readonly ComboBox _scope = new() { Name = "ProbeScope", Width = 320 };
     private readonly ComboBox _protocol = new() { Name = "SettingsProtocol", Width = 160, ItemsSource = Enum.GetValues<ProbeProtocol>() };
     private readonly ComboBox _source = new() { Name = "SettingsSource", MinWidth = 310, MaxWidth = 440 };
-    private readonly NumericUpDown _port = Number("SettingsDestinationPort", 1, 65535);
+    private readonly SettingsNumberField _port = Number("SettingsDestinationPort", 1, 65535);
     private readonly ComboBox _udpMode = new() { Name = "SettingsUdpPortMode", Width = 165, ItemsSource = new[] { "Fixed port", "Port range" } };
-    private readonly NumericUpDown _udpEndPort = Number("SettingsUdpEndPort", 1, 65535);
-    private readonly NumericUpDown _udpSize = Number("SettingsUdpPacketSize", 56, 65535);
+    private readonly SettingsNumberField _udpEndPort = Number("SettingsUdpEndPort", 1, 65535);
+    private readonly SettingsNumberField _udpSize = Number("SettingsUdpPacketSize", 56, 65535);
     private readonly CheckBox _udpFragmentation = Toggle("SettingsUdpAllowFragmentation", "Allow UDP IP fragmentation (path MTU may still restrict delivery)");
-    private readonly NumericUpDown _interval = Number("SettingsInterval", .1m, 3600, .1m);
-    private readonly NumericUpDown _timeout = Number("SettingsTimeout", .1m, 30, .1m);
-    private readonly NumericUpDown _hops = Number("SettingsMaxHops", 1, 64);
-    private readonly NumericUpDown _concurrency = Number("SettingsConcurrency", 1, 32);
-    private readonly NumericUpDown _memory = Number("SettingsHistoryLimit", 10, 100000, 100);
+    private readonly SettingsNumberField _interval = Number("SettingsInterval", .1m, 3600, .1m);
+    private readonly SettingsNumberField _timeout = Number("SettingsTimeout", .1m, 30, .1m);
+    private readonly SettingsNumberField _hops = Number("SettingsMaxHops", 1, 64);
+    private readonly SettingsNumberField _concurrency = Number("SettingsConcurrency", 1, 32);
+    private readonly SettingsNumberField _memory = Number("SettingsHistoryLimit", 10, 100000, 100);
     private readonly CheckBox _resolve = Toggle("SettingsResolveHostnames", "Resolve router hostnames");
     private readonly CheckBox _useDefaults = Toggle("SettingsUseDefaults", "Use saved defaults for every new target");
     private readonly CheckBox _restore = Toggle("SettingsRestore", "Restore monitored targets and paused states at startup");
     private readonly CheckBox _toasts = Toggle("SettingsInAppNotifications", "Show alerts inside Pngr");
-    private readonly CheckBox _native = Toggle("SettingsNativeNotifications", "Enable native desktop notifications");
+    private readonly CheckBox _native = Toggle("SettingsNativeNotifications", "Show desktop notifications");
     private readonly CheckBox _recoveries = Toggle("SettingsIncludeRecovery", "Notify when a connection recovers");
-    private readonly NumericUpDown _spacing = Number("SettingsNotificationSpacing", 0, 86400);
-    private readonly NumericUpDown _warning = Number("SettingsWarningLatency", 1, 59999);
-    private readonly NumericUpDown _critical = Number("SettingsCriticalLatency", 2, 60000);
-    private readonly NumericUpDown _maximum = Number("SettingsGraphMaximum", 0, 60000);
+    private readonly SettingsNumberField _spacing = Number("SettingsNotificationSpacing", 0, 86400);
+    private readonly SettingsNumberField _warning = Number("SettingsWarningLatency", 1, 59999, fractional: true);
+    private readonly SettingsNumberField _critical = Number("SettingsCriticalLatency", 2, 60000, fractional: true);
+    private readonly SettingsNumberField _maximum = Number("SettingsGraphMaximum", 0, 60000, fractional: true);
     private readonly CheckBox _jitter = Toggle("SettingsShowJitter", "Show jitter graph");
     private readonly CheckBox _loss = Toggle("SettingsShowPacketLoss", "Show packet-loss bars and scale");
     private readonly CheckBox _events = Toggle("SettingsShowEvents", "Show alert, recovery and route-change markers");
     private readonly ComboBox _range = new() { Name = "SettingsTimeRange", Width = 180,
         ItemsSource = new[] { "1 minute", "5 minutes", "10 minutes", "15 minutes", "1 hour", "6 hours", "1 day", "1 week" } };
-    private readonly NumericUpDown _retention = Number("SettingsRetention", 1, 3650);
-    private readonly NumericUpDown _aggregation = Number("SettingsAggregation", 1, 3600);
+    private readonly SettingsNumberField _retention = Number("SettingsRetention", 1, 3650);
+    private readonly SettingsNumberField _aggregation = Number("SettingsAggregation", 1, 3600);
     private readonly CheckBox _web = Toggle("SettingsWebEnabled", "Enable Web Server");
-    private readonly NumericUpDown _webPort = Number("SettingsWebPort", 1024, 65535);
+    private readonly SettingsNumberField _webPort = Number("SettingsWebPort", 1024, 65535);
     private readonly ComboBox _profiles = new() { Name = "SettingsProfiles", Width = 250 };
     private readonly TextBox _profileName = new() { Name = "SettingsProfileName", Watermark = "Profile name", Width = 220, MaxLength = 80 };
     private List<MonitoringProfile> _profileDraft;
@@ -82,7 +85,10 @@ public sealed partial class SettingsWindow : Window
         Func<WebhookAlertConfiguration>? savedWebhook = null,
         Func<WebhookAlertConfiguration, Task<NotificationResult>>? testWebhook = null,
         Func<WebhookAlertConfiguration, Func<TelegramPairingPrompt, Task>, CancellationToken, Task<TelegramPairingResult>>? pairTelegram = null,
-        Action<string>? openTelegram = null)
+        Action<string>? openTelegram = null,
+        IEnumerable<MonitoringEvent>? alertEvents = null, IEnumerable<string>? alertTargets = null,
+        IEnumerable<string>? alertGroups = null, Func<Guid, string>? eventTarget = null,
+        Func<MonitoringEvent, Task<bool>>? acknowledgeEvent = null)
     {
         _original = configuration;
         _pairTelegram = pairTelegram;
@@ -96,6 +102,7 @@ public sealed partial class SettingsWindow : Window
         _apply = apply; _permission = permission; _openTool = openTool;
         Title = "Pngr Settings"; Width = 830; Height = 650; MinWidth = 760; MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        SettingsUi.Apply(this);
         _source.ItemsSource = sources.ToList();
         _scope.ItemsSource = selectedOptions is null ? new[] { "Defaults for new targets" }
             : new[] { "Defaults for new targets", $"Selected target: {selectedTarget}" };
@@ -106,9 +113,9 @@ public sealed partial class SettingsWindow : Window
         _native.IsChecked = configuration.Actions.NativeNotificationsEnabled;
         _recoveries.IsChecked = configuration.Actions.IncludeRecovery;
         _spacing.Value = configuration.Actions.MinimumNotificationSpacingSeconds;
-        _warning.Value = (decimal)configuration.Display.WarningLatencyMs;
-        _critical.Value = (decimal)configuration.Display.CriticalLatencyMs;
-        _maximum.Value = (decimal)configuration.Display.FixedMaximumMs;
+        _warning.SetDouble(configuration.Display.WarningLatencyMs);
+        _critical.SetDouble(configuration.Display.CriticalLatencyMs);
+        _maximum.SetDouble(configuration.Display.FixedMaximumMs);
         _range.SelectedIndex = Array.IndexOf(TimeRanges, configuration.Display.DefaultTimeRangeMinutes);
         _jitter.IsChecked = configuration.Display.ShowJitter;
         _loss.IsChecked = configuration.Display.ShowPacketLoss;
@@ -119,32 +126,12 @@ public sealed partial class SettingsWindow : Window
         LoadProbe(_defaults); ReloadProfiles();
 
 
-        _pages["General"] = Page("General", "Preferences are saved locally with your workspace.", _restore,
-            Note("Monitoring, storage, alerts and the optional API run inside this desktop application. Closing Pngr stops them."),
-            ToolButton("Apply & manage workspaces…", "workspace"),
-            Heading("Local files"), Note(dataDirectory), Note("Settings: workspace.json   ·   Measurements: tracescope.db"));
-        _pages["Monitoring"] = Page("Monitoring engine", "Edit defaults or the selected target. Existing targets keep their own settings.",
-            _useDefaults, Note("When unchecked, new targets inherit the last-used probing configuration."),
-            Row("Configuration scope", _scope), Row("Packet type", _protocol), Row("Destination / starting port", _port),
-            Row("UDP port mode", _udpMode), Row("UDP ending port (inclusive)", _udpEndPort),
-            Row("UDP packet size (bytes)", _udpSize), _udpFragmentation,
-            Note("Response loss counts failed eligible diagnostic attempts, not proven forwarding loss. Local errors are excluded. Hop counters track router identity and configuration; unanswered probes use the last-known address context."),
-            Note("UDP size includes IP and UDP headers: IPv4 20 + 8 bytes; IPv6 40 + 8 bytes. The remaining bytes are payload. No silent truncation. UDP Port Unreachable establishes destination reachability, not service availability."),
-            Row("Network source", _source), Row("Interval (seconds)", _interval), Row("Timeout (seconds)", _timeout),
-            Row("Maximum hops", _hops), Row("Concurrent hop probes", _concurrency), Row("In-memory samples / hop", _memory), _resolve,
-            Note("Port applies to TCP / UDP. macOS ICMP traceroute uses a minimum one-second timeout. Stored history is independent of the memory limit."),
-            Heading("Saved monitoring profiles"), Row("Load profile", _profiles),
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _profileName, ProfileButton("Save", "SettingsSaveProfile", SaveProfile), ProfileButton("Delete", "SettingsDeleteProfile", DeleteProfile) } },
-            Note("Profiles are staged until Apply or OK. Loading a profile changes only the configuration scope above."));
-        _pages["Display"] = Page("Display and graphs", "Settings affect the integrated hop plot and historical timeline.",
-            Row("Warning latency (ms)", _warning), Row("Critical latency (ms)", _critical),
-            Row("Graph maximum (ms)", _maximum), Note("Use 0 for automatic scaling. Warning must be lower than critical."),
-            Row("Default time range", _range), _jitter, _loss, _events);
-        _pages["History"] = Page("History and storage", "Real measurements are saved automatically to the local SQLite database.",
-            Row("Retention (days)", _retention), Row("Graph aggregation (seconds)", _aggregation),
-            Note("Retention is enforced at startup and every 30 minutes. Aggregation controls historical graph queries; raw retained samples remain available for CSV export."),
-            ToolButton("Apply & open data maintenance…", "workspace"), Heading("Data location"), Note(dataDirectory));
-        var permissionButton = new Button { Name = "SettingsNotificationPermission", Content = "Request OS notification permission…" };
+        _pages["General"] = BuildGeneralPage(dataDirectory);
+        _pages["Monitoring"] = BuildMonitoringPage();
+        _pages["Display"] = BuildDisplayPage(configuration.Display);
+        _pages["History"] = BuildHistoryPage(dataDirectory);
+        UpdateUdpControls();
+        var permissionButton = new Button { Name = "SettingsNotificationPermission", Content = "Request OS notification permission…", VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Left };
         permissionButton.Click += async (_, _) =>
         {
             if (_busy) return;
@@ -152,13 +139,33 @@ public sealed partial class SettingsWindow : Window
             catch (Exception ex) { _status.Text = ex.Message; }
             finally { permissionButton.IsEnabled = true; }
         };
-        _pages["Alerts & notifications"] = Page("Alerts and notifications", "Alerts use measured latency, loss, jitter, reachability and route changes.",
-            _toasts, _native, _recoveries, Row("Notification spacing (seconds)", _spacing), permissionButton,
-            Note("OS permission is requested only when you press the button. Native notifications also require the enable checkbox."),
-            ToolButton("Apply & edit alert rules / history…", "alerts"),
-            BuildWebhookSettings(configuration.Actions.Webhook, savedWebhook, testWebhook),
-            ToolButton("Apply & configure email and scripts…", "actions"),
-            Note("Email and executable actions stay disabled until explicitly configured in the action editor."));
+        var configureNotifications = new Button { Name = "SettingsConfigureNotifications", Content = "Configure Notifications…", HorizontalAlignment = HorizontalAlignment.Left };
+        configureNotifications.Click += (_, _) => SelectPage("Notification actions");
+        var notificationToggles = new WrapPanel { Orientation = Orientation.Horizontal, ItemSpacing = 16, LineSpacing = 4, Children = { _toasts, _native } };
+        var notifications = new StackPanel { Spacing = 7, Children = { new TextBlock { Text = "Notifications", FontSize = 14, FontWeight = FontWeight.SemiBold }, notificationToggles, configureNotifications } };
+        _alertRules = new AlertSettingsView(configuration.Alerts, alertTargets ?? configuration.Targets.Select(t => t.Target),
+            alertGroups ?? configuration.Targets.Select(t => t.Group), notifications, acknowledgeEvent, eventTarget);
+        _alertRules.Margin = new Thickness(0, 0, 8, 0);
+        _alertRules.SetEvents(alertEvents ?? []);
+        if (alertEvents is System.Collections.Specialized.INotifyCollectionChanged changingEvents)
+        {
+            void RefreshEvents(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+                => _alertRules.SetEvents(alertEvents);
+            changingEvents.CollectionChanged += RefreshEvents;
+            Closed += (_, _) => changingEvents.CollectionChanged -= RefreshEvents;
+        }
+        _pages["Alerts & notifications"] = _alertRules;
+        var advancedActions = ToolButton("Apply & configure email and executable actions…", "actions");
+        advancedActions.Name = "SettingsConfigureAdvancedActions";
+        var backToAlerts = new Button { Name = "SettingsBackToAlerts", Content = "Back to alert rules", HorizontalAlignment = HorizontalAlignment.Left };
+        backToAlerts.Click += (_, _) => SelectPage("Alerts & notifications");
+        _pages["Notification actions"] = SettingsUi.Page(
+            SettingsUi.Section("General notifications",
+                SettingsUi.Actions(_recoveries, backToAlerts),
+                SettingsUi.Columns(SettingsUi.Field("Minimum notification spacing", _spacing, "seconds"), permissionButton)),
+            SettingsUi.Divider(), BuildWebhookSettings(configuration.Actions.Webhook, savedWebhook, testWebhook),
+            SettingsUi.Divider(), SettingsUi.Section("Advanced actions", advancedActions));
+        ToolTip.SetTip(_spacing, "Minimum spacing between native desktop notifications. Recovery notification filtering is configured above.");
         _pages["Web Server"] = BuildWebPage();
         var nav = new ListBox { Name = "SettingsNavigation", ItemsSource = _pages.Keys.ToArray(), SelectedIndex = 0, Background = Brushes.Transparent };
         _navigation = nav;
@@ -166,7 +173,7 @@ public sealed partial class SettingsWindow : Window
         _page.Content = _pages["General"];
         var body = new Grid { ColumnDefinitions = new ColumnDefinitions("175,*") };
         body.Children.Add(new Border { Background = Brush.Parse("#22242A"), Padding = new Thickness(7, 12), Child = nav });
-        var content = new ScrollViewer { Content = _page, Margin = new Thickness(22, 16) };
+        var content = new ScrollViewer { Name = "SettingsPageScroll", Content = _page, Margin = new Thickness(22, 16) };
         Grid.SetColumn(content, 1); body.Children.Add(content);
         var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(16, 10) };
         footer.Children.Add(_status);
@@ -183,7 +190,13 @@ public sealed partial class SettingsWindow : Window
         _protocol.SelectionChanged += (_, _) =>
         {
             if (_loading) return;
-            RememberPort();
+            try { RememberPort(); }
+            catch (InvalidDataException error)
+            {
+                _status.Text = error.Message;
+                _loading = true; _protocol.SelectedItem = _portProtocol; _loading = false;
+                return;
+            }
             var ports = _ports[_editingScope];
             var next = (ProbeProtocol)_protocol.SelectedItem!;
             _port.Value = next == ProbeProtocol.Udp ? ports.Udp : next == ProbeProtocol.Tcp ? ports.Tcp : _port.Value;
@@ -212,7 +225,7 @@ public sealed partial class SettingsWindow : Window
     public static int[] TimeRanges { get; } = [1, 5, 10, 15, 60, 360, 1440, 10080];
     public void SelectTelegramSettings()
     {
-        SelectPage("Alerts & notifications");
+        SelectPage("Notification actions");
         _webhookFormat.SelectedIndex = (int)WebhookFormat.Telegram;
     }
     public void SelectPage(string name) => _navigation.SelectedItem = name == "Local web / API" ? "Web Server" : name;
@@ -228,7 +241,7 @@ public sealed partial class SettingsWindow : Window
     private void RememberPort()
     {
         var ports = _ports[_editingScope];
-        var port = (int)(_port.Value ?? 443);
+        var port = (int)Value(_port);
         _ports[_editingScope] = _portProtocol == ProbeProtocol.Tcp ? (port, ports.Udp)
             : _portProtocol == ProbeProtocol.Udp ? (ports.Tcp, port) : ports;
     }
@@ -243,7 +256,7 @@ public sealed partial class SettingsWindow : Window
             UdpPortMode = _udpMode.SelectedIndex == 1 ? UdpPortMode.Range : UdpPortMode.Fixed,
             UdpEndPort = (int)Value(_udpEndPort), UdpPacketSize = (int)Value(_udpSize),
             UdpAllowFragmentation = _udpFragmentation.IsChecked == true, SourceAddress = source?.Address, InterfaceId = source?.Interface,
-            Interval = TimeSpan.FromSeconds((double)Value(_interval)), Timeout = TimeSpan.FromSeconds((double)Value(_timeout)),
+            Interval = _interval.ReadDuration(), Timeout = _timeout.ReadDuration(),
             MaxHops = (int)Value(_hops), Concurrency = (int)Value(_concurrency), HistoryLimit = (int)Value(_memory), ResolveHostnames = _resolve.IsChecked == true
         };
     }
@@ -267,7 +280,7 @@ public sealed partial class SettingsWindow : Window
                 sources.Add(source); _source.ItemsSource = sources;
             }
             _source.SelectedItem = source;
-            _interval.Value = (decimal)options.Interval.TotalSeconds; _timeout.Value = (decimal)options.Timeout.TotalSeconds;
+            _interval.SetDuration(options.Interval); _timeout.SetDuration(options.Timeout);
             _hops.Value = options.MaxHops; _concurrency.Value = options.Concurrency; _memory.Value = options.HistoryLimit; _resolve.IsChecked = options.ResolveHostnames;
         }
         finally { _loading = false; }
@@ -278,6 +291,10 @@ public sealed partial class SettingsWindow : Window
         _port.IsEnabled = _protocol.SelectedItem is not ProbeProtocol.Icmp;
         _udpMode.IsEnabled = _udpSize.IsEnabled = _udpFragmentation.IsEnabled = udp;
         _udpEndPort.IsEnabled = udp && _udpMode.SelectedIndex == 1;
+        if (_portField is not null) _portField.IsVisible = _port.IsEnabled;
+        if (_udpDetails is not null) _udpDetails.IsVisible = udp;
+        if (udp && !_loading) _probeAdvanced.IsExpanded = true;
+        if (_udpRangeField is not null) _udpRangeField.IsVisible = udp && _udpMode.SelectedIndex == 1;
     }
     private async Task<bool> SaveAsync(bool close)
     {
@@ -288,6 +305,7 @@ public sealed partial class SettingsWindow : Window
             ValidateWebDraft();
             var configuration = _original with
             {
+                Alerts = _alertRules.CaptureRules(),
                 DefaultProbeOptions = _defaults, Profiles = _profileDraft.ToArray(), RestoreOnStartup = _restore.IsChecked == true,
                 UseDefaultProbeOptionsForNewTargets = _useDefaults.IsChecked == true,
                 RetentionDays = (int)Value(_retention), AggregationSeconds = (int)Value(_aggregation),
@@ -297,17 +315,20 @@ public sealed partial class SettingsWindow : Window
                 WebHttpAcknowledged = _webAcknowledged.IsChecked == true, WebAccessKeyVerifier = _webVerifier,
                 Actions = _original.Actions with { NativeNotificationsEnabled = _native.IsChecked == true, IncludeRecovery = _recoveries.IsChecked == true,
                     MinimumNotificationSpacingSeconds = (int)Value(_spacing), Webhook = ReadWebhookDraft() },
-                Display = new DisplayConfiguration { WarningLatencyMs = (double)Value(_warning), CriticalLatencyMs = (double)Value(_critical),
-                    FixedMaximumMs = (double)Value(_maximum), DefaultTimeRangeMinutes = TimeRanges[Math.Clamp(_range.SelectedIndex, 0, 7)],
+                Display = new DisplayConfiguration { WarningLatencyMs = _warning.ReadDouble(), CriticalLatencyMs = _critical.ReadDouble(),
+                    FixedMaximumMs = _graphAutomatic.IsChecked == true ? 0 : ReadGraphMaximum(), DefaultTimeRangeMinutes = TimeRanges[Math.Clamp(_range.SelectedIndex, 0, 7)],
                     ShowJitter = _jitter.IsChecked == true, ShowPacketLoss = _loss.IsChecked == true, ShowEventMarkers = _events.IsChecked == true }
             };
             configuration.Validate();
             _busy = true; _applyButton.IsEnabled = _okButton.IsEnabled = _cancelButton.IsEnabled = false;
+            _alertRules.IsEnabled = false;
+            _page.IsEnabled = false;
             UpdateTelegramConnection();
             await _apply(new SettingsChange(configuration, _selected != _initialSelected ? _selected : null,
                 _selected != _initialSelected ? _ports[1].Tcp : null,
                 _selected != _initialSelected ? _ports[1].Udp : null,
-                _webNetworkChanged || _navigation.SelectedItem as string == "Web Server"));
+                _webNetworkChanged || _navigation.SelectedItem as string == "Web Server", _alertRules.RulesChanged));
+            _alertRules.AcceptChanges(configuration.Alerts);
             WebhookSettingsSaved();
             _webNetworkChanged = false;
             if (IsAutomaticWebInterface && _webLan.IsChecked == true && _serverAddress?.Invoke() is { } running)
@@ -323,6 +344,8 @@ public sealed partial class SettingsWindow : Window
         finally
         {
             _busy = false; _cancelButton.IsEnabled = true;
+            _alertRules.IsEnabled = true;
+            _page.IsEnabled = true;
             // Credential fields are cleared while saving. Recompute action availability
             // only after leaving the busy state, using the persisted secret reference.
             UpdateTelegramConnection();
@@ -358,21 +381,13 @@ public sealed partial class SettingsWindow : Window
     }
     private static Button ProfileButton(string text, string name, Action action)
     { var button = new Button { Content = text, Name = name }; button.Click += (_, _) => action(); return button; }
-    private static NumericUpDown Number(string name, decimal minimum, decimal maximum, decimal increment = 1)
-        => new() { Name = name, Minimum = minimum, Maximum = maximum, Increment = increment, Width = 165, FormatString = increment < 1 ? "0.###" : "0" };
-    private static decimal Value(NumericUpDown input) => input.Value ?? throw new InvalidDataException($"A value is required for {input.Name}.");
+    private static SettingsNumberField Number(string name, decimal minimum, decimal maximum, decimal increment = 1, bool fractional = false)
+        => new() { Name = name, Minimum = minimum, Maximum = maximum, WholeNumber = increment >= 1 && !fractional };
+    private static decimal Value(SettingsNumberField input) => input.Read();
     private static CheckBox Toggle(string name, string label) => new() { Name = name, Content = label };
-    private static TextBlock Heading(string text) => new() { Text = text, FontSize = 15, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 2) };
-    private static TextBlock Note(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse("#A8ADB6"), LineHeight = 17 };
+    private static TextBlock Heading(string text) => SettingsUi.Heading(text);
+    private static TextBlock Note(string text) => SettingsUi.Note(text);
     private static StackPanel Page(string title, string description, params Control[] controls)
-    {
-        var panel = new StackPanel { Spacing = 13 }; panel.Children.Add(Heading(title)); panel.Children.Add(Note(description));
-        foreach (var control in controls) panel.Children.Add(control); return panel;
-    }
-    private static Grid Row(string label, Control input)
-    {
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("200,*"), ColumnSpacing = 10 };
-        row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
-        input.HorizontalAlignment = HorizontalAlignment.Left; Grid.SetColumn(input, 1); row.Children.Add(input); return row;
-    }
+        => SettingsUi.Page(SettingsUi.Section(title, controls));
+    private static StackPanel Row(string label, Control input) => SettingsUi.Field(label, input);
 }

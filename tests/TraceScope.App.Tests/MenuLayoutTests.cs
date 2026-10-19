@@ -54,7 +54,7 @@ public sealed class MenuLayoutTests
         {
             ("Settings…", "Pngr Settings"), ("Open History…", "Saved trace sessions"),
             ("Summary", "Pngr · Professional Summaries"),
-            ("Alerts…", "Alert rules and events"), ("Workspace…", "Workspaces and data"),
+            ("Alerts…", "Pngr Settings"), ("Workspace…", "Workspaces and data"),
             ("Network…", "Pngr · Local Network"), ("Local Web / API…", "Local read-only web interface")
         })
         {
@@ -64,6 +64,16 @@ public sealed class MenuLayoutTests
             { if (DateTime.UtcNow > deadline) throw new TimeoutException(header); await Task.Delay(20); }
             var dialog = fixture.Window.OwnedWindows.Single(w => w.Title == title);
             Assert.True(dialog.IsVisible);
+            if (header == "Alerts…")
+            {
+                var settings = Assert.IsType<SettingsWindow>(dialog);
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs(); settings.UpdateLayout();
+                Assert.Equal("Alerts & notifications", settings.GetVisualDescendants().OfType<ListBox>()
+                    .Single(control => control.Name == "SettingsNavigation").SelectedItem);
+                Assert.True(settings.AlertRulesEditor.IsEffectivelyVisible);
+                Assert.NotNull(settings.GetVisualDescendants().OfType<DataGrid>()
+                    .Single(control => control.Name == "AlertRulesTable"));
+            }
             dialog.Close();
         }
         MenuTestSupport.Click(fixture.Window, "All Targets");

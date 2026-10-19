@@ -20,8 +20,8 @@ public sealed class CredentialAccessTests
         await using var fixture = await Fixture.CreateAsync(format);
         var original = fixture.Configuration.Actions.Webhook;
         var settings = fixture.OpenSettings();
-        settings.SelectPage("Alerts & notifications");
-        foreach (var category in new[] { "General", "History", "Alerts & notifications" })
+        settings.SelectPage("Notification actions");
+        foreach (var category in new[] { "General", "History", "Alerts & notifications", "Notification actions" })
             settings.SelectPage(category);
         var selector = Find<ComboBox>(settings, "SettingsWebhookFormat");
         selector.SelectedIndex = 0;
@@ -40,7 +40,7 @@ public sealed class CredentialAccessTests
         Click(Find<Button>(settings, "SettingsCancel"));
         Assert.Equal(original, fixture.Configuration.Actions.Webhook);
         settings = fixture.OpenSettings();
-        settings.SelectPage("Alerts & notifications");
+        settings.SelectPage("Notification actions");
         Assert.Equal((int)format, Find<ComboBox>(settings, "SettingsWebhookFormat").SelectedIndex);
         Assert.Empty(fixture.Secrets.Calls);
         Assert.Equal(original, (await fixture.Store.LoadAsync())!.Actions.Webhook);
@@ -56,31 +56,35 @@ public sealed class CredentialAccessTests
         await using var fixture = await Fixture.CreateAsync(format);
         var original = fixture.Configuration.Actions.Webhook;
         Invoke(fixture.Window, "OpenAlerts", null, new RoutedEventArgs());
-        await Until(() => fixture.Window.OwnedWindows.Any(w => w.Title == "Alert rules and events"));
-        var alerts = fixture.Window.OwnedWindows.Single(w => w.Title == "Alert rules and events");
+        await Until(() => fixture.Window.OwnedWindows.OfType<SettingsWindow>().Any());
+        var alerts = Assert.IsType<SettingsWindow>(fixture.Window.OwnedWindows.Single());
         Assert.Empty(fixture.Secrets.Calls);
-        Click(ContentButton(alerts, "Add rule"));
+        Click(Find<Button>(alerts, "AlertRuleAdd"));
+        Assert.Empty(fixture.Configuration.Alerts);
+        Click(Find<Button>(alerts, "SettingsApply"));
         await Until(async () => File.Exists(fixture.Store.Path) && (await fixture.Store.LoadAsync())!.Alerts.Count == 1);
         Assert.Empty(fixture.Secrets.Calls);
         Assert.Equal(original, (await fixture.Store.LoadAsync())!.Actions.Webhook);
 
-        var grid = alerts.GetVisualDescendants().OfType<DataGrid>()
-            .Single(g => g.ItemsSource is IEnumerable<AlertRule>);
-        grid.SelectedItem = grid.ItemsSource.Cast<AlertRule>().Single();
-        Click(ContentButton(alerts, "Enable / disable selected"));
+        Assert.IsType<AlertRuleRow>(Find<DataGrid>(alerts, "AlertRulesTable").SelectedItem).Enabled = false;
+        Find<TextBox>(alerts, "AlertRuleName").Text = "Edited without credentials";
+        Click(Find<Button>(alerts, "SettingsApply"));
         await Until(async () => !(await fixture.Store.LoadAsync())!.Alerts.Single().Enabled);
         Assert.Empty(fixture.Secrets.Calls);
         Assert.Equal(original, fixture.Configuration.Actions.Webhook);
-        grid.SelectedItem = grid.ItemsSource.Cast<AlertRule>().Single();
-        Click(ContentButton(alerts, "Remove selected"));
+        Click(Find<Button>(alerts, "AlertRuleRemove"));
+        Click(Find<Button>(alerts, "SettingsApply"));
         await Until(async () => (await fixture.Store.LoadAsync())!.Alerts.Count == 0);
         Assert.Empty(fixture.Secrets.Calls);
     }
 
     private static Button ContentButton(Window window, string content) => window.GetVisualDescendants()
         .OfType<Button>().Single(b => Equals(b.Content, content));
-    private static T Find<T>(Window window, string name) where T : Control => window.GetVisualDescendants()
-        .OfType<T>().Single(c => c.Name == name);
+    private static T Find<T>(Window window, string name) where T : Control
+    {
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        return window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+    }
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static object? Invoke(MainWindow window, string method, params object?[] args) => typeof(MainWindow)
         .GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, args);

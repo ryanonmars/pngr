@@ -53,9 +53,10 @@ public sealed class V04AppIntegrationTests
         var notifier = new ObservedNotifier();
         SetField(fixture.Window, "_actions", new AlertActionDispatcher(notifier: notifier));
         Invoke(fixture.Window, "OpenAlerts", null, new RoutedEventArgs(Button.ClickEvent));
-        await Until(() => fixture.Window.OwnedWindows.Any(w => w.Title == "Alert rules and events"));
-        var alerts = fixture.Window.OwnedWindows.Single(w => w.Title == "Alert rules and events");
-        Click(Find<Button>(alerts, "AlertActions"));
+        await Until(() => fixture.Window.OwnedWindows.OfType<SettingsWindow>().Any());
+        var alerts = Assert.IsType<SettingsWindow>(fixture.Window.OwnedWindows.Single());
+        Click(Find<Button>(alerts, "SettingsConfigureNotifications"));
+        Click(Find<Button>(alerts, "SettingsConfigureAdvancedActions"));
         await Until(() => fixture.Window.OwnedWindows.Any(w => w.Title == "Notifications and alert actions"));
         var actions = fixture.Window.OwnedWindows.Single(w => w.Title == "Notifications and alert actions");
         Assert.False(Find<CheckBox>(actions, "NativeNotifications").IsChecked);
@@ -139,10 +140,11 @@ public sealed class V04AppIntegrationTests
         Assert.Null(entry.AcknowledgedAt);
         Assert.Null(Assert.Single(await fixture.Engine.Storage.LoadEventsAsync(session.Id), e => e.Id == entry.Id).AcknowledgedAt);
         Invoke(fixture.Window, "OpenAlerts", null, new RoutedEventArgs(Button.ClickEvent));
-        await Until(() => fixture.Window.OwnedWindows.Any(w => w.Title == "Alert rules and events"));
+        await Until(() => fixture.Window.OwnedWindows.OfType<SettingsWindow>().Any());
         var alerts = fixture.Window.OwnedWindows.Single();
-        var events = alerts.GetVisualDescendants().OfType<DataGrid>().Single(grid =>
-            grid.ItemsSource?.Cast<object>().Any(item => item is MonitoringEvent { } e && e.Id == entry.Id) == true);
+        await Until(() => alerts.GetVisualDescendants().OfType<DataGrid>().Any(grid =>
+            grid.ItemsSource?.Cast<object>().Any(item => item is MonitoringEvent e && e.Id == entry.Id) == true));
+        var events = Find<DataGrid>(alerts, "AlertEventsTable");
         var before = Assert.Single(events.ItemsSource!.Cast<MonitoringEvent>(), e => e.Id == entry.Id);
         Assert.Null(before.AcknowledgedAt);
         Assert.Equal(entry.Timestamp, before.Timestamp);
@@ -162,7 +164,10 @@ public sealed class V04AppIntegrationTests
     }
 
     private static T Find<T>(Window window, string name) where T : Control
-        => window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+    {
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs(); window.UpdateLayout();
+        return window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
+    }
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static void SetField(MainWindow window, string name, object value)
         => typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, value);

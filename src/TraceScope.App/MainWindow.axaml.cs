@@ -142,6 +142,11 @@ public partial class MainWindow : Window
             {
                 OpenSettings(null, new RoutedEventArgs());
                 _settingsWindow?.SelectPage(page);
+                if (_args.Contains("--capture") && _settingsWindow is { } settings)
+                {
+                    if (int.TryParse(ArgumentValue("--capture-width"), out var settingsWidth)) settings.Width = Math.Max(settings.MinWidth, settingsWidth);
+                    if (int.TryParse(ArgumentValue("--capture-height"), out var settingsHeight)) settings.Height = Math.Max(settings.MinHeight, settingsHeight);
+                }
             }
             if (_args.Contains("--probe-configuration")) OpenProbeConfiguration(null, new RoutedEventArgs());
             if (ArgumentValue("--profile-menu") is { } profileOperation)
