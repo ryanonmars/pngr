@@ -189,7 +189,9 @@ public sealed class GroupManagementTests
         var blocked = Path.Combine(fixture.Directory, "blocked"); System.IO.Directory.CreateDirectory(blocked);
         typeof(MainWindow).GetField("_workspaceStore", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(fixture.Window, new WorkspaceStore(blocked));
-        await Assert.ThrowsAnyAsync<IOException>(() => (Task)Invoke(fixture.Window, "CommitGroupsAsync", next, null, null)!);
+        var error = await Record.ExceptionAsync(() => (Task)Invoke(fixture.Window, "CommitGroupsAsync", next, null, null)!);
+        Assert.True(error is IOException or UnauthorizedAccessException,
+            $"Expected a filesystem write failure; got {error?.GetType().Name ?? "no exception"}.");
         Assert.Equal("Default", target.Group); Assert.Equal("Default", target.Session!.Group);
         var unchanged = (WorkspaceConfiguration)Invoke(fixture.Window, "GroupWorkspace")!;
         Assert.DoesNotContain("Fail", unchanged.Groups);
