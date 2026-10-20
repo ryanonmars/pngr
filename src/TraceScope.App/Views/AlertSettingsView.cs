@@ -25,6 +25,7 @@ public sealed class AlertSettingsView : UserControl
     private readonly ComboBox _scope = Choice("AlertRuleScope", "Applies to", ["All targets", "Target", "Group", "Target and group"]);
     private readonly TextBox _target = Input("AlertRuleTarget", "Target");
     private readonly TextBox _group = Input("AlertRuleGroup", "Group");
+    private readonly ComboBox _groupChoice = new() { Name = "AlertGroupChoice", PlaceholderText = "Choose…", MinWidth = 105 };
     private readonly TextBox _threshold = Input("AlertRuleThreshold", "Threshold");
     private readonly TextBox _evaluation = Input("AlertRuleEvaluation", "Evaluation period in seconds");
     private readonly TextBox _cooldown = Input("AlertRuleCooldown", "Cooldown in seconds");
@@ -53,7 +54,7 @@ public sealed class AlertSettingsView : UserControl
     private readonly Button _acknowledge = Action("AcknowledgeEvent", "Acknowledge");
     private readonly Func<MonitoringEvent, Task<bool>>? _acknowledgeEvent;
     private readonly string[] _targets;
-    private readonly string[] _groups;
+    private string[] _groups;
     private AlertRuleRow? _selected;
     private bool _loading;
     private bool _acknowledging;
@@ -69,6 +70,7 @@ public sealed class AlertSettingsView : UserControl
         _target.MaxLength = 253; _group.MaxLength = 80;
         _target.Watermark = _targets.FirstOrDefault() ?? "Hostname or IP address";
         _group.Watermark = _groups.FirstOrDefault() ?? "Group name";
+        _groupChoice.ItemsSource = _groups;
         ToolTip.SetTip(_target, "Matches the monitored target, ignoring letter case. You can enter an inactive target.");
         ToolTip.SetTip(_group, "Matches the group name exactly, including letter case. You can enter an inactive group.");
         _table.ItemsSource = _rules;
@@ -93,7 +95,11 @@ public sealed class AlertSettingsView : UserControl
         _add.Click += (_, _) => AddRule();
         _remove.Click += (_, _) => RemoveRule();
         _thresholdField = Field(_thresholdLabel, _threshold);
-        _targetField = Field("Target", _target); _groupField = Field("Group", _group);
+        _targetField = Field("Target", _target);
+        var groupInputs = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 6 };
+        groupInputs.Children.Add(_group); Grid.SetColumn(_groupChoice, 1); groupInputs.Children.Add(_groupChoice);
+        _groupChoice.SelectionChanged += (_, _) => { if (_groupChoice.SelectedItem is string group) { _group.Text = group; _groupChoice.SelectedIndex = -1; } };
+        _groupField = Field("Group", groupInputs);
         _evaluationField = Field(_evaluationLabel, _evaluation);
         _recoveryField = Field("Recovery (seconds)", _recovery);
         _editor.Children.Add(Columns(Field("Rule name", _name), Field("Applies to", _scope)));
@@ -146,6 +152,45 @@ public sealed class AlertSettingsView : UserControl
         SetEvents([]);
         _table.SelectedItem = _rules.FirstOrDefault();
         LoadEditor();
+    }
+
+    internal IReadOnlyList<AlertRule> GroupReferences(string name)
+    {
+        TryCaptureEditor();
+        var references = _rules.Select(r => r.Rule).Where(r => r.Group == name);
+        // Include an invalid, unsaved editor draft in the deletion warning as well.
+        if (_selected is not null && _group.Text == name)
+            references = references.Append(_selected.Rule with { Group = name });
+        return references.DistinctBy(r => r.Id).ToArray();
+    }
+
+    internal void RefreshGroups(IEnumerable<string> groups, string? oldName, string? newName)
+    {
+        // TextChanged can still be queued when another window saves a group.
+        // Capture valid pending edits, and retain the editor text if it is invalid.
+        if (oldName is not null) TryCaptureEditor();
+        var selected = _selected;
+        _groups = groups.ToArray();
+        _group.Watermark = _groups.FirstOrDefault() ?? "Group name";
+        _groupChoice.ItemsSource = _groups;
+        if (oldName is null) return;
+        _loading = true;
+        foreach (var row in _rules.Where(r => r.Rule.Group == oldName || newName is null && ReferenceEquals(r, selected) && _group.Text == oldName).ToArray())
+            if (newName is null) _rules.Remove(row);
+            else row.Rule = row.Rule with { Group = newName };
+        _original = _original.Where(r => newName is not null || r.Group != oldName)
+            .Select(r => r.Group == oldName ? r with { Group = newName } : r).ToArray();
+        if (selected is not null && _rules.Contains(selected))
+        {
+            if (_group.Text == oldName && newName is not null) _group.Text = newName;
+            _loading = false;
+        }
+        else
+        {
+            _loading = false;
+            _table.SelectedItem = _rules.FirstOrDefault();
+            LoadEditor();
+        }
     }
 
     public bool RulesChanged => !CaptureRules().SequenceEqual(_original);

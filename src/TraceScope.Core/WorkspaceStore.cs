@@ -47,6 +47,8 @@ public sealed record WorkspaceConfiguration
     public MainWindowLayout? WindowLayout { get; init; }
     public HistoryLayoutPreferences HistoryLayout { get; init; } = new();
     public IReadOnlyList<WorkspaceTarget> Targets { get; init; } = [];
+    // Optional additive catalog; legacy workspaces derive groups from their targets.
+    public IReadOnlyList<string> Groups { get; init; } = [];
     public IReadOnlyList<MonitoringProfile> Profiles { get; init; } = [];
     public IReadOnlyList<AlertRule> Alerts { get; init; } = [];
     public IReadOnlyList<SummaryDefinition> SummaryViews { get; init; } = [];
@@ -72,6 +74,9 @@ public sealed record WorkspaceConfiguration
         Display.Validate();
         if (HistoryLayout is null) throw new InvalidDataException("History layout is required.");
         HistoryLayout.Validate();
+        if (Groups is null || Groups.Any(g => string.IsNullOrWhiteSpace(g) || g.Length > 80 || g.Any(char.IsControl))
+            || Groups.Distinct(StringComparer.Ordinal).Count() != Groups.Count)
+            throw new InvalidDataException("Invalid group catalog.");
         if (Targets is null || Profiles is null || Alerts is null || SummaryViews is null || Actions is null)
             throw new InvalidDataException("Targets, profiles and alerts must be lists.");
         if (Targets.Count > 500 || Profiles.Count > 100 || Alerts.Count > 200)

@@ -14,6 +14,7 @@ namespace TraceScope.App.Views;
 public sealed class SummaryWindow : Window
 {
     private readonly Func<IReadOnlyList<TargetItem>> _targets;
+    private readonly Func<IReadOnlyList<string>>? _groups;
     private readonly Action<TargetItem> _activate;
     private readonly Action<IReadOnlyList<SummaryDefinition>>? _definitionsChanged;
     private readonly List<SummaryDefinition> _definitions;
@@ -32,9 +33,9 @@ public sealed class SummaryWindow : Window
 
     public SummaryWindow(Func<IReadOnlyList<TargetItem>> targets, Action<TargetItem> activate,
         IReadOnlyList<SummaryDefinition>? savedDefinitions = null,
-        Action<IReadOnlyList<SummaryDefinition>>? definitionsChanged = null)
+        Action<IReadOnlyList<SummaryDefinition>>? definitionsChanged = null, Func<IReadOnlyList<string>>? groups = null)
     {
-        _targets = targets;
+        _targets = targets; _groups = groups;
         _activate = activate;
         _definitionsChanged = definitionsChanged;
         _definitions = (savedDefinitions ?? []).ToList();
@@ -231,7 +232,7 @@ public sealed class SummaryWindow : Window
         try
         {
             var items = _targets();
-            var groups = new[] { "All groups" }.Concat(items.Select(i => i.Group).Distinct().Order()).ToArray();
+            var groups = new[] { "All groups" }.Concat((_groups?.Invoke() ?? items.Select(i => i.Group).ToArray()).Distinct().Order()).ToArray();
             var previousGroup = _group.SelectedItem as string ?? "All groups";
             if (!(_group.ItemsSource?.Cast<string>().SequenceEqual(groups) ?? false))
             { _group.ItemsSource = groups; _group.SelectedItem = groups.Contains(previousGroup) ? previousGroup : "All groups"; }

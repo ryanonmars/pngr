@@ -69,6 +69,7 @@ public partial class MainWindow
             if (_settingOptions || _selected?.Session is not { } session) return;
             _selected.Group = string.IsNullOrWhiteSpace(GroupInput.Text) ? "Default" : GroupInput.Text.Trim();
             session.Group = _selected.Group;
+            _configuration = _configuration with { Groups = TargetGroupCatalog.List(GroupWorkspace()) };
             _selected.Refresh();
             AssignAlerts(_selected); ScheduleWorkspaceSave();
         };
@@ -108,7 +109,7 @@ public partial class MainWindow
             var saved = await _workspaceStore.LoadAsync();
             if (saved is not null)
             {
-                _configuration = saved;
+                _configuration = saved with { Groups = TargetGroupCatalog.List(saved) };
                 RestoreMainWindowLayout(saved.WindowLayout);
                 ApplyHistoryPanelFraction(saved.HistoryLayout.PanelFraction);
                 ApplyPreferenceControls();
@@ -126,6 +127,7 @@ public partial class MainWindow
 
     private WorkspaceConfiguration CaptureWorkspace() => _configuration with
     {
+        Groups = TargetGroupCatalog.List(GroupWorkspace()),
         HistoryLayout = CaptureHistoryLayout(),
         WindowLayout = CaptureMainWindowLayout(),
         Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
@@ -165,7 +167,7 @@ public partial class MainWindow
             foreach (var item in _targets.ToArray()) if (item.Session is not null)
             { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
             _targets.Clear(); TargetList.SelectedItem = null; TargetCount.Text = "0";
-            _configuration = workspace; RestoreMainWindowLayout(workspace.WindowLayout); _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
+            _configuration = workspace with { Groups = TargetGroupCatalog.List(workspace) }; RestoreMainWindowLayout(workspace.WindowLayout); _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
             foreach (var target in workspace.Targets)
             {
                 try
@@ -260,19 +262,24 @@ public partial class MainWindow
     {
         var summary = new SummaryWindow(() => _targets.ToArray(), item => TargetList.SelectedItem = item,
             _configuration.SummaryViews, definitions =>
-            { _configuration = _configuration with { SummaryViews = definitions }; ScheduleWorkspaceSave(); });
+            { _configuration = _configuration with { SummaryViews = definitions }; ScheduleWorkspaceSave(); },
+            () => TargetGroupCatalog.List(GroupWorkspace()));
         summary.Show(this);
     }
 
     private async void OpenNetwork(object? sender, RoutedEventArgs e)
         => await new NetworkInfoWindow(target => AddTarget(target)).ShowDialog(this);
 
+    private Window? _workspaceWindow;
+
     private async void OpenWorkspace(object? sender, RoutedEventArgs e)
     {
-        var dialog = ToolWindow("Workspaces and data", 570, 380);
-        var restore = new CheckBox { Content = "Restore active targets on startup", IsChecked = _configuration.RestoreOnStartup };
-        var retention = new NumericUpDown { Minimum = 1, Maximum = 3650, Value = _configuration.RetentionDays, Width = 120 };
-        var aggregation = new NumericUpDown { Minimum = 1, Maximum = 3600, Value = _configuration.AggregationSeconds, Width = 120 };
+        if (_closing) return;
+        if (_workspaceWindow is { IsVisible: true }) { _workspaceWindow.Activate(); return; }
+        var dialog = ToolWindow("Workspaces and Data", 510, 400);
+        _workspaceWindow = dialog;
+        dialog.MinWidth = 450; dialog.MinHeight = 400;
+        SettingsUi.Apply(dialog);
         var save = new Button { Content = "Save workspace and preferences" };
         var compact = new Button { Content = "Compact database…" };
         var export = new Button { Content = "Export configuration…" };
@@ -282,8 +289,6 @@ public partial class MainWindow
         {
             try
             {
-                _configuration = _configuration with { RestoreOnStartup = restore.IsChecked == true,
-                    RetentionDays = (int)(retention.Value ?? 30), AggregationSeconds = (int)(aggregation.Value ?? 5) };
                 await SaveWorkspaceNowAsync();
                 var deleted = await Task.Run(() => _engine.Storage.RetainAsync(TimeSpan.FromDays(_configuration.RetentionDays)));
                 CurrentHistoryView.LoadedKey = null;
@@ -335,9 +340,23 @@ public partial class MainWindow
             catch (Exception ex) { status.Text = ex.Message; }
             finally { compact.IsEnabled = true; }
         };
-        dialog.Content = ToolPanel(restore, FormRow("Retain data (days)", retention), FormRow("Graph aggregation (seconds)", aggregation),
-            save, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { export, import, compact } }, status);
+        save.Name = "WorkspaceSave"; export.Name = "WorkspaceExport"; import.Name = "WorkspaceImport";
+        compact.Name = "WorkspaceCompact"; status.Name = "WorkspaceStatus";
+        save.HorizontalAlignment = compact.HorizontalAlignment = HorizontalAlignment.Left;
+        var preferences = new Button { Name = "WorkspaceSettings", Content = "Startup & history settings…", HorizontalAlignment = HorizontalAlignment.Left };
+        preferences.Click += (_, _) => { dialog.Close(); OpenSettings(null, e); _settingsWindow?.SelectPage("History"); };
+        var close = new Button { Name = "WorkspaceClose", Content = "Close", HorizontalAlignment = HorizontalAlignment.Right };
+        close.Click += (_, _) => dialog.Close();
+        var body = SettingsUi.Page(
+            SettingsUi.Section("Workspace", save, SettingsUi.Actions(export, import)), SettingsUi.Divider(),
+            SettingsUi.Section("History & storage", compact), SettingsUi.Divider(),
+            SettingsUi.Section("Preferences", SettingsUi.Note("Startup restoration is in General. Retention and graph aggregation are in History."), preferences));
+        var layout = new Grid { Margin = new Thickness(20, 16), RowDefinitions = new RowDefinitions("*,Auto,Auto"), RowSpacing = 10 };
+        layout.Children.Add(new ScrollViewer { Content = body });
+        Grid.SetRow(status, 1); layout.Children.Add(status); Grid.SetRow(close, 2); layout.Children.Add(close);
+        dialog.Content = layout;
         await dialog.ShowDialog(this);
+        if (ReferenceEquals(_workspaceWindow, dialog)) _workspaceWindow = null;
     }
 
     private void OpenAlerts(object? sender, RoutedEventArgs e)

@@ -40,7 +40,7 @@ public partial class MainWindow
                 var timeout = _configuration.Actions.ActionTimeoutSeconds;
                 return await Task.Run(() => actions.SendTestWebhookAsync(webhook, timeout, _applicationCancellation.Token));
             }, alertEvents: _monitoringEvents,
-            alertTargets: _targets.Select(t => t.Target), alertGroups: _targets.Select(t => t.Group),
+            alertTargets: _targets.Select(t => t.Target), alertGroups: TargetGroupCatalog.List(GroupWorkspace()),
             eventTarget: id => _alertSessionTargets.GetValueOrDefault(id) ?? _targets.FirstOrDefault(t => t.Id == id)?.Target ?? "Previous session",
             acknowledgeEvent: AcknowledgeSettingsEventAsync);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -103,6 +103,7 @@ public partial class MainWindow
             case "Web": case "Local Web / API…": OpenWeb(null, args); break;
             case "Alerts": case "Alerts…": OpenAlerts(null, args); break;
             case "Workspace": case "Workspace…": OpenWorkspace(null, args); break;
+            case "Manage Groups…": OpenManageGroups(null, args); break;
             case "Load Profile…": OpenLoadProfileMenu(); break;
             case "Save Current Configuration…": OpenSaveCurrentProfileMenu(); break;
             case "Manage/Delete Profiles…": OpenManageProfilesMenu(); break;

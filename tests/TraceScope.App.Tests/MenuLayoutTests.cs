@@ -21,7 +21,7 @@ public sealed class MenuLayoutTests
         Assert.Equal(new[] { "File", "Window", "Tools" }, menu.Items.OfType<NativeMenuItem>().Select(i => i.Header));
         Assert.Equal(new[] { "Open History…", "Export CSV…", "Workspace…", "Check for Updates…" }, Headers(menu, "File"));
         Assert.Equal(new[] { "All Targets", "Summary" }, Headers(menu, "Window"));
-        Assert.Equal(new[] { "Settings…", "Alerts…", "Network…", "Local Web / API…", "Profiles" }, Headers(menu, "Tools"));
+        Assert.Equal(new[] { "Settings…", "Alerts…", "Manage Groups…", "Network…", "Local Web / API…", "Profiles" }, Headers(menu, "Tools"));
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Control), MenuTestSupport.Item(fixture.Window, "Settings…").Gesture);
         foreach (var name in new[] { "SettingsButton", "SummaryButton", "AlertsButton", "WorkspaceButton", "NetworkButton", "WebButton", "HistoryButton", "ExportButton" })
             Assert.Null(fixture.Window.FindControl<Button>(name));
@@ -54,7 +54,7 @@ public sealed class MenuLayoutTests
         {
             ("Settings…", "Pngr Settings"), ("Open History…", "Saved trace sessions"),
             ("Summary", "Pngr · Professional Summaries"),
-            ("Alerts…", "Pngr Settings"), ("Workspace…", "Workspaces and data"),
+            ("Alerts…", "Pngr Settings"), ("Workspace…", "Workspaces and Data"), ("Manage Groups…", "Manage Groups"),
             ("Network…", "Pngr · Local Network"), ("Local Web / API…", "Local read-only web interface")
         })
         {

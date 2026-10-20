@@ -23,9 +23,10 @@ public sealed class ProfessionalIntegrationTests
         var menu = new MenuItem { DataContext = first };
         Invoke(fixture.Window, "OpenTargetGroup", menu, new Avalonia.Interactivity.RoutedEventArgs());
         var dialog = fixture.Window.OwnedWindows.Single(w => w.Title == "Assign group");
-        ((TextBox)((Panel)dialog.Content!).Children[1]).Text = "Office";
-        var buttons = (Panel)((Panel)dialog.Content!).Children[2];
-        ((Button)buttons.Children[1]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        var controls = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(dialog).OfType<Control>().ToArray();
+        controls.OfType<TextBox>().Single(c => c.Name == "TargetGroupName").Text = "Office";
+        controls.OfType<Button>().Single(c => c.Name == "SaveTargetGroup").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        await Until(() => !dialog.IsVisible);
         Assert.Equal("Office", first.Group);
         Assert.Equal("Office", first.Session!.Group);
         Assert.Equal("Default", targets[1].Group);

@@ -148,6 +148,22 @@ public partial class MainWindow : Window
                     if (int.TryParse(ArgumentValue("--capture-height"), out var settingsHeight)) settings.Height = Math.Max(settings.MinHeight, settingsHeight);
                 }
             }
+            if (_args.Contains("--manage-groups")) OpenManageGroups(null, new RoutedEventArgs());
+            if (_args.Contains("--workspace")) OpenWorkspace(null, new RoutedEventArgs());
+            if (_args.Contains("--capture") && (_groupWindow ?? _workspaceWindow) is { } toolWindow)
+            {
+                if (int.TryParse(ArgumentValue("--capture-dialog-width"), out var dialogWidth)) toolWindow.Width = Math.Max(toolWindow.MinWidth, dialogWidth);
+                if (int.TryParse(ArgumentValue("--capture-dialog-height"), out var dialogHeight)) toolWindow.Height = Math.Max(toolWindow.MinHeight, dialogHeight);
+            }
+            if (_args.Contains("--capture") && _args.Contains("--capture-select-group-members") && _groupWindow is { } groupCapture)
+            {
+                var members = groupCapture.GetVisualDescendants().OfType<DataGrid>().Single(table => table.Name == "GroupMembers");
+                foreach (var member in members.ItemsSource!.Cast<object>()) members.SelectedItems.Add(member);
+                // Capture the confirmation only; this flag never confirms removal.
+                if (_args.Contains("--capture-remove-targets"))
+                    groupCapture.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "RemoveGroupTargets")
+                        .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
             if (_args.Contains("--probe-configuration")) OpenProbeConfiguration(null, new RoutedEventArgs());
             if (ArgumentValue("--profile-menu") is { } profileOperation)
             {
@@ -176,7 +192,7 @@ public partial class MainWindow : Window
                         await Task.Delay(150, _applicationCancellation.Token);
                     }
                 }
-                var visual = (Control)(_profileWindow?.Content ?? _probeConfigurationWindow?.Content ?? _settingsWindow?.Content ?? Content!);
+                var visual = (Control?)(_groupWindow?.OwnedWindows.FirstOrDefault() ?? _groupWindow) ?? _workspaceWindow ?? (Control)(_profileWindow?.Content ?? _probeConfigurationWindow?.Content ?? _settingsWindow?.Content ?? Content!);
                 var size = visual.Bounds.Size;
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height), new Vector(96, 96));
                 bitmap.Render(visual);
@@ -192,7 +208,15 @@ public partial class MainWindow : Window
                 }
                 var details = new { Targets = _targets.Select(x => new { x.Target, x.StateLabel, x.Summary, Round = x.Snapshot?.Round, HopCount = x.Snapshot?.Hops.Count }), Rows = _rows.Count, Title = TargetTitle.Text, SettingsWindowOpen = _settingsWindow?.IsVisible == true };
                 await File.WriteAllTextAsync(Path.ChangeExtension(capture, ".json"), System.Text.Json.JsonSerializer.Serialize(details));
-                if (_args.Contains("--exit-after-capture")) { _profileWindow?.Close(); _probeConfigurationWindow?.Close(); Close(); }
+                if (_args.Contains("--exit-after-capture"))
+                {
+                    if (_groupWindow is { } capturedGroups && capturedGroups.OwnedWindows.Any())
+                    {
+                        foreach (var child in capturedGroups.OwnedWindows.ToArray()) child.Close();
+                        await Task.Delay(50, _applicationCancellation.Token);
+                    }
+                    _groupWindow?.Close(); _workspaceWindow?.Close(); _profileWindow?.Close(); _probeConfigurationWindow?.Close(); Close();
+                }
             }
         }
         catch (Exception ex) { StatusText.Text = ex.Message; }
@@ -278,6 +302,7 @@ public partial class MainWindow : Window
                 AssignAlerts(item);
                 if (paused) _engine.Pause(session.Id);
                 _targets.Add(item);
+                _configuration = _configuration with { Groups = TargetGroupCatalog.List(GroupWorkspace()) };
                 TargetList.SelectedItem = item;
                 if (session.LatestSnapshot is { } snapshot) ReceiveSnapshot(snapshot);
                 StatusText.Text = $"Tracing {target} · {session.Options.Protocol} · interval {session.Options.Interval.TotalSeconds:g} s";

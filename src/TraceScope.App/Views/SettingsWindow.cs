@@ -144,7 +144,7 @@ public sealed partial class SettingsWindow : Window
         var notificationToggles = new WrapPanel { Orientation = Orientation.Horizontal, ItemSpacing = 16, LineSpacing = 4, Children = { _toasts, _native } };
         var notifications = new StackPanel { Spacing = 7, Children = { new TextBlock { Text = "Notifications", FontSize = 14, FontWeight = FontWeight.SemiBold }, notificationToggles, configureNotifications } };
         _alertRules = new AlertSettingsView(configuration.Alerts, alertTargets ?? configuration.Targets.Select(t => t.Target),
-            alertGroups ?? configuration.Targets.Select(t => t.Group), notifications, acknowledgeEvent, eventTarget);
+            alertGroups ?? TargetGroupCatalog.List(configuration), notifications, acknowledgeEvent, eventTarget);
         _alertRules.Margin = new Thickness(0, 0, 8, 0);
         _alertRules.SetEvents(alertEvents ?? []);
         if (alertEvents is System.Collections.Specialized.INotifyCollectionChanged changingEvents)
@@ -221,6 +221,10 @@ public sealed partial class SettingsWindow : Window
         }
         KeyDown += (_, e) => { if (e.Key == Key.Escape && !_busy && !_testingWebhook) { Close(); e.Handled = true; } };
     }
+
+    internal IReadOnlyList<AlertRule> GroupReferences(string name) => _alertRules.GroupReferences(name);
+    internal void RefreshGroups(IEnumerable<string> groups, string? oldName, string? newName)
+        => _alertRules.RefreshGroups(groups, oldName, newName);
 
     public static int[] TimeRanges { get; } = [1, 5, 10, 15, 60, 360, 1440, 10080];
     public void SelectTelegramSettings()

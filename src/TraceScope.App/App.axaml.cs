@@ -36,8 +36,8 @@ public partial class App : Application
             : ["Open History…", "Export CSV…", "Workspace…"]);
         AddSubmenu("Window", "All Targets", "Summary");
         AddSubmenu("Tools", windows
-            ? ["Settings…", "Alerts…", "Network…", "Local Web / API…"]
-            : ["Alerts…", "Network…", "Local Web / API…"]);
+            ? ["Settings…", "Alerts…", "Manage Groups…", "Network…", "Local Web / API…"]
+            : ["Alerts…", "Manage Groups…", "Network…", "Local Web / API…"]);
         var tools = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Tools").Menu!;
         var profiles = new NativeMenu();
         foreach (var command in new[] { "Load Profile…", "Save Current Configuration…", "Manage/Delete Profiles…" })
