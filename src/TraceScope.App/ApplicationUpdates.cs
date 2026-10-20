@@ -26,10 +26,10 @@ public partial class MainWindow
     {
         if (_closing) return;
         _automaticUpdateTimer.Start();
-        _ = CheckForUpdatesAsync(false);
+        _ = CheckForUpdatesAsync(false, bypassThrottle: true);
     }
 
-    private async Task CheckForUpdatesAsync(bool manual)
+    private async Task CheckForUpdatesAsync(bool manual, bool bypassThrottle = false)
     {
         if (_closing || _updates is null || _updateWindow?.IsBusy == true) return;
         if (manual)
@@ -38,7 +38,8 @@ public partial class MainWindow
             _updateWindow!.ShowChecking();
         }
         // A manual check joins an automatic request already in flight instead of being ignored.
-        var check = _updateCheck ??= RunUpdateCheckAsync(manual);
+        // Startup always refreshes availability, without opening the manual-check dialog.
+        var check = _updateCheck ??= RunUpdateCheckAsync(manual || bypassThrottle);
         try
         {
             var result = await check;
@@ -63,9 +64,9 @@ public partial class MainWindow
         finally { if (ReferenceEquals(_updateCheck, check)) _updateCheck = null; }
     }
 
-    private async Task<UpdateCheckResult> RunUpdateCheckAsync(bool manual)
+    private async Task<UpdateCheckResult> RunUpdateCheckAsync(bool bypassThrottle)
     {
-        try { return await _updates!.CheckAsync(manual, _applicationCancellation.Token); }
+        try { return await _updates!.CheckAsync(bypassThrottle, _applicationCancellation.Token); }
         catch (OperationCanceledException) when (_applicationCancellation.IsCancellationRequested) { throw; }
         catch (Exception error) when (error is not OutOfMemoryException)
         { return new(UpdateCheckStatus.Failed, Message: "Could not check for updates. Please try again later."); }

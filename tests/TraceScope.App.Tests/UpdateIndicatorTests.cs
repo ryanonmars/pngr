@@ -28,6 +28,7 @@ public sealed class UpdateIndicatorTests
         fixture.Updates.Check = (_, _) => pending.Task;
         fixture.Window.Show();
         await Until(() => fixture.Updates.Checks == 1);
+        Assert.True(fixture.Updates.LastManual); // Startup bypasses the persisted throttle.
         Assert.True(fixture.Window.IsVisible);
         Assert.True(Find<TextBox>(fixture.Window, "TargetInput").IsEffectivelyEnabled);
         Assert.Empty(fixture.Window.OwnedWindows);
@@ -38,10 +39,37 @@ public sealed class UpdateIndicatorTests
         fixture.Updates.Check = (_, _) => Task.FromResult(new UpdateCheckResult(UpdateCheckStatus.Current));
         timer.Interval = TimeSpan.FromMilliseconds(20); timer.Stop(); timer.Start();
         await Until(() => fixture.Updates.Checks >= 2);
+        Assert.False(fixture.Updates.LastManual); // Periodic checks keep the normal throttle.
         Assert.False(Indicator(fixture).IsVisible);
         fixture.Window.Close(); await Until(() => !fixture.Window.IsVisible);
         Assert.False(timer.IsEnabled);
         var count = fixture.Updates.Checks; await Task.Delay(60); Assert.Equal(count, fixture.Updates.Checks);
+    }
+
+    [AvaloniaFact]
+    public async Task StartupDiscoversNewReleaseEvenAfterRecentSuccessfulOrFailedCheck()
+    {
+        foreach (var previousCheckFailed in new[] { false, true })
+        {
+            await using var fixture = new Fixture(runtime: true);
+            var handler = new StartupHttp { Fail = previousCheckFailed };
+            using var client = new HttpClient(handler);
+            var now = DateTimeOffset.UtcNow;
+            var previous = new UpdateService(fixture.DirectoryPath, new Version(0, 8, 1), client, () => now);
+            Assert.Equal(previousCheckFailed ? UpdateCheckStatus.Failed : UpdateCheckStatus.Current,
+                (await previous.CheckAsync(false)).Status);
+            handler.Fail = false;
+            handler.Version = "0.8.2";
+            var restarted = new UpdateService(fixture.DirectoryPath, new Version(0, 8, 1), client, () => now);
+            Assert.Equal(UpdateCheckStatus.Skipped, (await restarted.CheckAsync(false)).Status);
+            typeof(MainWindow).GetField("_updates", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(fixture.Window, restarted);
+
+            fixture.Window.Show();
+            await Until(() => Indicator(fixture).IsVisible);
+            Assert.Equal(2, handler.Calls);
+            Assert.Equal("Update available: v0.8.2", Indicator(fixture).Content);
+            Assert.Empty(fixture.Window.OwnedWindows);
+        }
     }
 
     [AvaloniaFact]
@@ -172,7 +200,7 @@ public sealed class UpdateIndicatorTests
 
     private static async Task Check(Fixture f, UpdateCheckResult result)
     { f.Updates.Check = (_, _) => Task.FromResult(result); await InvokeCheck(f.Window, false); }
-    private static Task InvokeCheck(MainWindow w, bool manual) => (Task)typeof(MainWindow).GetMethod("CheckForUpdatesAsync", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(w, [manual])!;
+    private static Task InvokeCheck(MainWindow w, bool manual) => (Task)typeof(MainWindow).GetMethod("CheckForUpdatesAsync", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(w, [manual, false])!;
     private static T Field<T>(MainWindow w, string name) => (T)typeof(MainWindow).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(w)!;
     private static T Find<T>(Window w, string name) where T : Control => w.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
     private static Button Indicator(Fixture f) => Find<Button>(f.Window, "UpdateIndicator");
@@ -182,6 +210,7 @@ public sealed class UpdateIndicatorTests
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "pngr-update-indicator", Guid.NewGuid().ToString("N"));
+        public string DirectoryPath => _directory;
         private readonly TraceEngine _engine;
         public readonly MainWindow Window;
         public readonly FakeUpdates Updates = new();
@@ -198,6 +227,23 @@ public sealed class UpdateIndicatorTests
             Window.Close(); await Until(() => !Window.IsVisible);
             await _engine.DisposeAsync(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+        }
+    }
+    private sealed class StartupHttp : HttpMessageHandler
+    {
+        public bool Fail;
+        public string Version = "0.8.1";
+        public int Calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (Fail) throw new HttpRequestException("offline");
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent($$"""
+                    {"draft":false,"prerelease":false,"tag_name":"v{{Version}}","html_url":"https://github.com/ryanonmars/pngr/releases/tag/v{{Version}}","body":"Update notes."}
+                    """)
+            });
         }
     }
     private sealed class FakeUpdates : IAppUpdateService
