@@ -228,7 +228,7 @@ public sealed class GroupManagementTests
     }
 
     [AvaloniaFact]
-    public async Task DuplicateAddressesKeepIndependentSessionGroupsAndOnlyActiveTargetsPersist()
+    public async Task DuplicateAddressesKeepIndependentSavedIdsAndStoppedTargetsPersist()
     {
         await using var fixture = new Fixture();
         var stopped = await fixture.Add("127.0.0.1");
@@ -245,13 +245,15 @@ public sealed class GroupManagementTests
         Select(dialog, "Default");
         var members = Get<DataGrid>(dialog, "GroupMembers");
         var row = Assert.Single(members.ItemsSource!.Cast<ManageGroupsWindow.MemberRow>());
-        Assert.Equal(running.Id, row.Id); members.SelectedItem = row;
+        Assert.Equal(running.SavedTargetId, row.Id); members.SelectedItem = row;
         Get<ComboBox>(dialog, "MoveGroupChoice").SelectedItem = "Other"; Click(dialog, "MoveGroupTargets");
         await Until(() => running.Group == "Other");
         Assert.Equal("Work", stopped.Group); Assert.Equal(SessionState.Stopped, stopped.Session!.State);
         Assert.Equal(SessionState.Running, running.Session!.State);
         var saved = (await new WorkspaceStore(Path.Combine(fixture.Directory, "workspace.json")).LoadAsync())!;
-        Assert.Equal("Other", Assert.Single(saved.Targets).Group);
+        Assert.Equal(2, saved.Targets.Count);
+        Assert.Equal("Other", saved.Targets.Single(t => t.Id == running.SavedTargetId).Group);
+        Assert.True(saved.Targets.Single(t => t.Id == stopped.SavedTargetId).Stopped);
         dialog.Close();
     }
 
@@ -341,12 +343,12 @@ public sealed class GroupManagementTests
         await (Task)Invoke(fixture.Window, "CommitGroupsAsync", workspace, null, null)!;
         var dialog = OpenGroups(fixture);
         var members = Get<DataGrid>(dialog, "GroupMembers");
-        members.SelectedItem = members.ItemsSource!.Cast<ManageGroupsWindow.MemberRow>().Single(row => row.Id == stopped.Id);
+        members.SelectedItem = members.ItemsSource!.Cast<ManageGroupsWindow.MemberRow>().Single(row => row.Id == stopped.SavedTargetId);
         Click(dialog, "RemoveGroupTargets"); Click(Assert.Single(dialog.OwnedWindows), "ConfirmRemoveGroupTargets");
         await Until(() => Get<TextBlock>(dialog, "GroupStatus").Text?.StartsWith("Target removed.") == true);
         Assert.Same(running.Session, Assert.Single(fixture.Engine.Sessions)); Assert.Equal(SessionState.Running, running.Session!.State);
         Assert.Same(running, Assert.Single(fixture.Window.FindControl<ListBox>("TargetList")!.ItemsSource!.Cast<TargetItem>()));
-        Assert.Equal(running.Id, Assert.Single(members.ItemsSource!.Cast<ManageGroupsWindow.MemberRow>()).Id);
+        Assert.Equal(running.SavedTargetId, Assert.Single(members.ItemsSource!.Cast<ManageGroupsWindow.MemberRow>()).Id);
         var rules = (System.Collections.Concurrent.ConcurrentDictionary<Guid, IReadOnlyList<AlertRule>>)typeof(TraceEngine).GetField("_alertRules", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fixture.Engine)!;
         Assert.Equal(workspace.Alerts, rules[running.Id]);
         var saved = (await new WorkspaceStore(Path.Combine(fixture.Directory, "workspace.json")).LoadAsync())!;

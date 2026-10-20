@@ -14,7 +14,7 @@ public partial class MainWindow
     private void InitializeAllTargets()
     {
         AllTargetsPane.TargetSelected = PreviewOverviewTarget;
-        AllTargetsPane.TargetOpened = item => TargetList.SelectedItem = item;
+        AllTargetsPane.TargetOpened = SelectOpenTarget;
         _targets.CollectionChanged += (_, _) =>
         {
             if (_allTargetsVisible && _selected is not null && !_targets.Contains(_selected))
@@ -59,7 +59,8 @@ public partial class MainWindow
         _previewingOverviewTarget = true;
         try
         {
-            TargetList.SelectedItem = item;
+            if (_visibleTargets.Contains(item)) TargetList.SelectedItem = item;
+            else { _selected = item; ActivateHistoryView(); UpdateProfessionalSelection(); RefreshSelected(); }
             _clearingOverviewTab = true;
             try { TargetList.SelectedItem = null; }
             finally { _clearingOverviewTab = false; }

@@ -86,6 +86,12 @@ public partial class MainWindow
 
     private async Task RestartTargetAsync(TargetItem item)
     {
+        try { await RestartTargetCoreAsync(item); }
+        catch (Exception ex) { StatusText.Text = $"Could not restart {item.Target}: {ex.Message}"; }
+    }
+
+    private async Task RestartTargetCoreAsync(TargetItem item)
+    {
         if (item.Session is null || _closing || _closingTargets.Contains(item.Id) || !_monitoringOperations.Add(item.Id)) return;
         UpdateButtons();
         try
@@ -95,7 +101,7 @@ public partial class MainWindow
             var session = await _engine.StartTargetAsync(item.Target, options, _applicationCancellation.Token);
             if (_closing) { await _engine.StopAsync(session.Id); return; }
             var replacement = new TargetItem(session)
-            { Group = item.Group, TcpPort = item.TcpPort, UdpPort = item.UdpPort, ProfileName = item.ProfileName };
+            { SavedTargetId = item.SavedTargetId, DisplayName = item.DisplayName, Group = item.Group, TcpPort = item.TcpPort, UdpPort = item.UdpPort, ProfileName = item.ProfileName };
             session.Group = item.Group;
             AssignAlerts(replacement);
             var index = _targets.IndexOf(item);
@@ -110,7 +116,6 @@ public partial class MainWindow
             if (session.LatestSnapshot is { } snapshot) ReceiveSnapshot(snapshot);
             ScheduleWorkspaceSave();
         }
-        catch (Exception ex) { StatusText.Text = $"Could not restart {item.Target}: {ex.Message}"; }
         finally { _monitoringOperations.Remove(item.Id); UpdateButtons(); }
     }
 

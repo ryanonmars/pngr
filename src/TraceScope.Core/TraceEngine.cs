@@ -77,6 +77,24 @@ public sealed class TraceEngine : IAsyncDisposable
         if (_sessions.TryGetValue(sessionId, out var session) && session.State == SessionState.Running)
         { session.State = SessionState.Paused; SessionChanged?.Invoke(this, session); }
     }
+
+    // Reopen a stopped tab without resolving DNS, scheduling a worker, or sending probes.
+    public async Task<TargetSession> OpenStoppedTargetAsync(WorkspaceTarget target, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        target.Options.Validate();
+        var id = target.SessionId ?? Guid.NewGuid();
+        var session = new TargetSession(id, target.Target, target.ResolvedAddress ?? "", target.Options)
+            { State = SessionState.Stopped, Group = target.Group };
+        if (target.SessionId is null)
+        {
+            await Storage.InitializeProfessionalAsync(cancellationToken);
+            await Storage.AddSessionAsync(session, cancellationToken);
+        }
+        if (!_sessions.TryAdd(id, session)) throw new InvalidOperationException("This session is already open.");
+        SessionChanged?.Invoke(this, session);
+        return session;
+    }
     public void Resume(Guid sessionId)
     {
         if (_sessions.TryGetValue(sessionId, out var session) && session.State == SessionState.Paused)
@@ -88,7 +106,8 @@ public sealed class TraceEngine : IAsyncDisposable
         if (_sessions.TryGetValue(sessionId, out var session))
         {
             session.Options = options;
-            session.Capability = ProtocolCapabilities.Get(options.Protocol, IPAddress.Parse(session.ResolvedAddress).AddressFamily);
+            if (IPAddress.TryParse(session.ResolvedAddress, out var address))
+                session.Capability = ProtocolCapabilities.Get(options.Protocol, address.AddressFamily);
         }
     }
 

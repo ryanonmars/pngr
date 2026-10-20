@@ -70,7 +70,7 @@ public partial class MainWindow
             _selected.Group = string.IsNullOrWhiteSpace(GroupInput.Text) ? "Default" : GroupInput.Text.Trim();
             session.Group = _selected.Group;
             _configuration = _configuration with { Groups = TargetGroupCatalog.List(GroupWorkspace()) };
-            _selected.Refresh();
+            _selected.Refresh(); RefreshTargetLibraryUi();
             AssignAlerts(_selected); ScheduleWorkspaceSave();
         };
         _workspaceSaveTimer.Tick += async (_, _) =>
@@ -109,7 +109,8 @@ public partial class MainWindow
             var saved = await _workspaceStore.LoadAsync();
             if (saved is not null)
             {
-                _configuration = saved with { Groups = TargetGroupCatalog.List(saved) };
+                _configuration = saved with { Groups = TargetGroupCatalog.List(saved), Targets = EnsureSavedIds(saved.Targets) };
+                RefreshTargetLibraryUi();
                 RestoreMainWindowLayout(saved.WindowLayout);
                 ApplyHistoryPanelFraction(saved.HistoryLayout.PanelFraction);
                 ApplyPreferenceControls();
@@ -130,8 +131,7 @@ public partial class MainWindow
         Groups = TargetGroupCatalog.List(GroupWorkspace()),
         HistoryLayout = CaptureHistoryLayout(),
         WindowLayout = CaptureMainWindowLayout(),
-        Targets = _targets.Where(x => x.Session?.State is SessionState.Running or SessionState.Paused)
-            .Select(x => new WorkspaceTarget(x.Target, x.Session!.Options, x.Group, x.Session.State == SessionState.Paused, x.TcpPort, x.UdpPort, x.ProfileName)).ToArray()
+        Targets = CaptureSavedTargets()
     };
     private async Task SaveWorkspaceNowAsync()
     {
@@ -159,6 +159,8 @@ public partial class MainWindow
 
     private async Task ApplyWorkspaceAsync(WorkspaceConfiguration workspace)
     {
+        if (_bulkMonitoring || _addingTarget || _openingSavedTargets.Count > 0 || _monitoringOperations.Count > 0 || _closingTargets.Count > 0)
+            throw new InvalidOperationException("Wait for the monitoring action to finish before loading a workspace.");
         _applicationCancellation.Token.ThrowIfCancellationRequested();
         workspace.Validate();
         _restoringWorkspace = true;
@@ -167,27 +169,17 @@ public partial class MainWindow
             foreach (var item in _targets.ToArray()) if (item.Session is not null)
             { await _engine.StopAsync(item.Id); _engine.ForgetSession(item.Id); }
             _targets.Clear(); TargetList.SelectedItem = null; TargetCount.Text = "0";
-            _configuration = workspace with { Groups = TargetGroupCatalog.List(workspace) }; RestoreMainWindowLayout(workspace.WindowLayout); _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
-            foreach (var target in workspace.Targets)
+            _configuration = workspace with { Groups = TargetGroupCatalog.List(workspace), Targets = EnsureSavedIds(workspace.Targets) }; RestoreMainWindowLayout(workspace.WindowLayout); _historyViews.Clear(); ApplyHistoryPanelFraction(workspace.HistoryLayout.PanelFraction); ApplyPreferenceControls(); ReloadProfiles();
+            foreach (var target in _configuration.Targets.Where(t => !t.Closed).ToArray())
             {
                 try
                 {
-                    var previousCount = _targets.Count;
-                    await AddTarget(target.Target, target.Options, target.Group, target.Paused);
-                    var restored = _targets.Count > previousCount ? _targets.Last()
-                        : _targets.FirstOrDefault(t => t.Target.Equals(target.Target, StringComparison.OrdinalIgnoreCase));
-                    if (restored is not null)
-                    {
-                        restored.TcpPort = target.TcpPort; restored.UdpPort = target.UdpPort;
-                        restored.ProfileName = target.ProfileName;
-                        RememberTargetPort(restored, target.Options);
-                        if (ReferenceEquals(restored, _selected)) UpdateProfessionalSelection();
-                    }
+                    await OpenSavedTargetAsync(target, restore: true);
                 }
                 catch (Exception ex) { StatusText.Text = $"Could not restore {target.Target}: {ex.Message}"; }
             }
         }
-        finally { _restoringWorkspace = false; }
+        finally { _restoringWorkspace = false; RefreshTargetLibraryUi(); }
         if (_closing) return;
         await StopWebAsync();
         if (_configuration.WebEnabled && _runtimeFeatures) await EnableWebAsync();

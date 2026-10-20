@@ -40,7 +40,7 @@ public partial class MainWindow
                 var timeout = _configuration.Actions.ActionTimeoutSeconds;
                 return await Task.Run(() => actions.SendTestWebhookAsync(webhook, timeout, _applicationCancellation.Token));
             }, alertEvents: _monitoringEvents,
-            alertTargets: _targets.Select(t => t.Target), alertGroups: TargetGroupCatalog.List(GroupWorkspace()),
+            alertTargets: GroupWorkspace().Targets.Select(t => t.Target), alertGroups: TargetGroupCatalog.List(GroupWorkspace()),
             eventTarget: id => _alertSessionTargets.GetValueOrDefault(id) ?? _targets.FirstOrDefault(t => t.Id == id)?.Target ?? "Previous session",
             acknowledgeEvent: AcknowledgeSettingsEventAsync);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -193,10 +193,10 @@ public partial class MainWindow
                 LastUdpPort = options?.Protocol == ProbeProtocol.Udp ? options.DestinationPort : configuration.LastUdpPort,
                 Targets = CaptureWorkspace().Targets.Select(t => t with
                 {
-                    Options = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target) ? options : t.Options,
-                    TcpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target)
+                    Options = options is not null && _targets.Any(x => x.Id == sessionId && x.SavedTargetId == t.Id) ? options : t.Options,
+                    TcpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.SavedTargetId == t.Id)
                         ? tcpPort ?? (options.Protocol == ProbeProtocol.Tcp ? options.DestinationPort : t.TcpPort) : t.TcpPort,
-                    UdpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.Target == t.Target)
+                    UdpPort = options is not null && _targets.Any(x => x.Id == sessionId && x.SavedTargetId == t.Id)
                         ? udpPort ?? (options.Protocol == ProbeProtocol.Udp ? options.DestinationPort : t.UdpPort) : t.UdpPort
                 }).ToArray()
             };

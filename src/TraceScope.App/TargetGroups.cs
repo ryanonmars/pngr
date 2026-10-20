@@ -13,31 +13,30 @@ public partial class MainWindow
     private Window? _groupWindow;
     private TargetItem[] GroupTargets() => _targets.Where(t => t.Session is not null && !t.IsHistorical).ToArray();
 
-    private WorkspaceConfiguration GroupWorkspace() => _configuration with
-    {
-        Targets = GroupTargets()
-            .Select(t => new WorkspaceTarget(t.Target, t.Session!.Options, t.Group,
-                t.Session.State == SessionState.Paused, t.TcpPort, t.UdpPort, t.ProfileName)).ToArray()
-    };
+    private WorkspaceConfiguration GroupWorkspace() => _configuration with { Targets = CaptureSavedTargets() };
 
     private async Task CommitGroupsAsync(WorkspaceConfiguration next, string? oldName, string? newName)
     {
+        if (_bulkMonitoring || _addingTarget || _openingSavedTargets.Count > 0 || _monitoringOperations.Count > 0)
+            throw new InvalidOperationException("Wait for the monitoring action to finish before editing groups.");
         next.Validate();
         _workspaceSaveTimer.Stop();
         // Persist first; a failed write must leave the running sessions and rules unchanged.
         var items = GroupTargets();
-        if (next.Targets.Count != items.Length || next.Targets.Where((target, index) => target.Target != items[index].Target).Any())
-            throw new InvalidOperationException("The target list changed. Reopen group management and try again.");
-        var saved = await _workspaceStore.SaveAsync(next with { Targets = next.Targets.Where((_, index) => items[index].Session!.State is SessionState.Running or SessionState.Paused).ToArray(),
+        var currentIds = GroupWorkspace().Targets.Select(t => t.Id).ToHashSet();
+        if (!currentIds.IsSubsetOf(next.Targets.Select(t => t.Id)))
+            throw new InvalidOperationException("The target list changed. Refresh group management and try again.");
+        var saved = await _workspaceStore.SaveAsync(next with {
             HistoryLayout = CaptureHistoryLayout(), WindowLayout = CaptureMainWindowLayout() });
         _configuration = saved;
-        for (var index = 0; index < items.Length; index++)
+        foreach (var item in items)
         {
-            var item = items[index];
-            if (!_targets.Contains(item)) continue;
-            item.Group = next.Targets[index].Group; item.Session!.Group = item.Group; item.Refresh();
+            var target = next.Targets.FirstOrDefault(t => t.Id == item.SavedTargetId);
+            if (target is null || !_targets.Contains(item)) continue;
+            item.Group = target.Group; item.Session!.Group = item.Group; item.Refresh();
             AssignAlerts(item);
         }
+        RefreshTargetLibraryUi(oldName, newName);
         if (_selected is not null)
         {
             _settingOptions = true;
@@ -53,48 +52,43 @@ public partial class MainWindow
     {
         if (!TargetGroupCatalog.List(workspace).Contains(group, StringComparer.Ordinal))
             throw new InvalidDataException("Select an existing group.");
-        var items = GroupTargets();
-        if (workspace.Targets.Count != items.Length) throw new InvalidOperationException("The target list changed. Try again.");
-        var selected = sessions.ToHashSet();
-        if (selected.Any(id => items.All(item => item.Id != id)))
-            throw new InvalidOperationException("A selected target is no longer available. Reopen group management.");
+        var selected = sessions.Select(id => _targets.FirstOrDefault(t => t.Id == id)?.SavedTargetId ?? id).ToHashSet();
+        if (!selected.IsSubsetOf(workspace.Targets.Select(t => t.Id)))
+            throw new InvalidOperationException("A selected target is no longer saved. Refresh group management.");
         return workspace with { Groups = TargetGroupCatalog.List(workspace), Targets = workspace.Targets
-            .Select((target, index) => selected.Contains(items[index].Id) ? target with { Group = group } : target).ToArray() };
+            .Select(target => selected.Contains(target.Id) ? target with { Group = group } : target).ToArray() };
     }
 
     private async Task RemoveGroupTargetsAsync(IReadOnlyList<Guid> sessions)
     {
-        var selected = sessions.ToHashSet();
-        var items = GroupTargets().Where(item => selected.Contains(item.Id)).ToArray();
-        if (items.Length != selected.Count)
-            throw new InvalidOperationException("A selected target is no longer available. Refresh the group and try again.");
-        if (items.Any(item => _monitoringOperations.Contains(item.Id) || _closingTargets.Contains(item.Id)))
-            throw new InvalidOperationException("A selected target is busy. Wait for its current operation and try again.");
-        // Retain even the final member's group, and use the tab's exact close pathway.
-        _configuration = _configuration with { Groups = TargetGroupCatalog.List(GroupWorkspace()) };
+        if (_bulkMonitoring) throw new InvalidOperationException("Wait for the monitoring action to finish before removing targets.");
+        var selected = sessions.Select(id => _targets.FirstOrDefault(t => t.Id == id)?.SavedTargetId ?? id).ToHashSet();
+        var workspace = GroupWorkspace();
+        if (!selected.IsSubsetOf(workspace.Targets.Select(t => t.Id)))
+            throw new InvalidOperationException("A selected target is no longer saved. Refresh group management.");
+        _configuration = workspace with { Groups = TargetGroupCatalog.List(workspace) };
         _workspaceSaveTimer.Stop();
         try
         {
-            foreach (var item in items)
+            foreach (var id in selected)
             {
-                await CloseTargetAsync(item);
-                _workspaceSaveTimer.Stop();
-                if (_targets.Contains(item))
-                    throw new InvalidOperationException($"Could not remove {item.Target}. {StatusText.Text}");
+                var item = _targets.FirstOrDefault(t => t.Session is not null && t.SavedTargetId == id);
+                if (item is not null)
+                {
+                    await CloseTargetAsync(item);
+                    _workspaceSaveTimer.Stop();
+                    if (_targets.Contains(item)) throw new InvalidOperationException($"Could not remove {item.Target}. {StatusText.Text}");
+                }
+                _configuration = _configuration with { Targets = _configuration.Targets.Where(t => t.Id != id).ToArray() };
             }
         }
         finally
         {
-            // Persist completed removals even if a later target could not close.
             try { await SaveWorkspaceNowAsync(); }
-            catch (Exception error)
-            {
-                ScheduleWorkspaceSave();
-                throw new InvalidOperationException("Targets were closed, but the workspace could not be saved. Retry Save in Workspaces and Data. " + error.Message, error);
-            }
+            catch (Exception error) { ScheduleWorkspaceSave(); throw new InvalidOperationException("The workspace could not be saved. Retry Save in Workspaces and Data. " + error.Message, error); }
             _settingsWindow?.RefreshGroups(TargetGroupCatalog.List(GroupWorkspace()), null, null);
             foreach (var summary in OwnedWindows.OfType<SummaryWindow>()) summary.RefreshRows();
-            RefreshAllTargets();
+            RefreshTargetLibraryUi(); RefreshAllTargets();
         }
     }
 
@@ -103,12 +97,14 @@ public partial class MainWindow
         if (_closing) return;
         if (_groupWindow is { IsVisible: true }) { _groupWindow.Activate(); return; }
         var dialog = new ManageGroupsWindow(GroupWorkspace,
-            index => GroupTargets()[index].Session?.ResolvedAddress ?? "—",
+            index => GroupWorkspace().Targets[index].Target,
             CommitGroupsAsync, ArgumentValue("--group-selection") ?? _selected?.Group, group => _configuration.Alerts.Where(r => r.Group == group)
                 .Concat(_settingsWindow?.GroupReferences(group) ?? []).DistinctBy(r => r.Id).ToArray(),
-            index => GroupTargets()[index].Id,
+            index => GroupWorkspace().Targets[index].Id,
             (sessions, group) => CommitGroupsAsync(MoveGroupSessions(GroupWorkspace(), sessions, group), null, null),
-            RemoveGroupTargetsAsync);
+            RemoveGroupTargetsAsync, AddSavedTargetAsync,
+            index => SavedTargetState(GroupWorkspace().Targets[index].Id), OpenLibraryTargetAsync, NewTargetOptions,
+            SourceInput.ItemsSource!.Cast<SourceChoice>().Select(s => new ProbeSourceChoice(s.Label, s.Interface, s.Source)).ToArray());
         _groupWindow = dialog;
         await dialog.ShowDialog(this);
         if (ReferenceEquals(_groupWindow, dialog)) _groupWindow = null;

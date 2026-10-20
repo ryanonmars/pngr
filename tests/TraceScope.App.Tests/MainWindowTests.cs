@@ -144,7 +144,7 @@ public sealed class MainWindowTests
         var timeline = Control<LatencyTimeline>(window, "Timeline");
         var plot = Control<HopLatencyPlot>(window, "RoutePlot");
 
-        Assert.Equal("Running", Control<TextBlock>(window, "TargetTitle").Text);
+        Assert.Equal("Monitoring", Control<TextBlock>(window, "TargetTitle").Text);
         Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(window, "TargetList").SelectedItem).Target);
         Assert.Equal("1", Control<TextBlock>(window, "TargetCount").Text);
         var rows = table.ItemsSource!.Cast<HopItem>().ToArray();
@@ -221,7 +221,7 @@ public sealed class MainWindowTests
         Assert.Equal(SessionState.Paused, items[1].Session!.State);
         Assert.Equal(SessionState.Running, items[0].Session!.State);
         list.SelectedItem = items[0];
-        Assert.Equal("Running", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
+        Assert.Equal("Monitoring", Control<TextBlock>(fixture.Window, "TargetTitle").Text);
         Assert.Equal("127.0.0.1", Assert.IsType<TargetItem>(Control<ListBox>(fixture.Window, "TargetList").SelectedItem).Target);
         Assert.Equal("Ⅱ", Control<Button>(fixture.Window, "StartButton").Content);
         Assert.All(timeline.Samples, sample => Assert.Equal(12d, sample.Latency));

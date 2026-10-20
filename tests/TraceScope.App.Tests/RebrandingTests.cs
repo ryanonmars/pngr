@@ -48,7 +48,8 @@ public sealed class RebrandingTests
             Assert.Contains(await engine.Storage.LoadSessionsAsync(), s => s.Id == sessionId);
             var restored = (WorkspaceConfiguration)typeof(MainWindow).GetField("_configuration", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
             Assert.Equal(workspace.Profiles, restored.Profiles);
-            Assert.Equal(workspace.Targets, restored.Targets);
+            Assert.All(restored.Targets, target => Assert.NotEqual(Guid.Empty, target.Id));
+            Assert.Equal(workspace.Targets, restored.Targets.Select(target => target with { Id = Guid.Empty }));
             Assert.Equal(options, restored.LastUsedProbeOptions);
             Assert.False(File.Exists(Path.Combine(directory, "pngr.db")));
             Assert.True(AssetLoader.Exists(new Uri("avares://pngr/Assets/Icons/pngr.png")));

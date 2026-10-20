@@ -56,9 +56,11 @@ public partial class MainWindow : Window
         {
             var item = _targets.FirstOrDefault(t => t.Id == session.Id);
             item?.Refresh();
+            (_groupWindow as Views.ManageGroupsWindow)?.Refresh();
             if (_selected?.Id == session.Id) { UpdateButtons(); RefreshSelected(); }
         });
-        TargetList.ItemsSource = _targets;
+        TargetList.ItemsSource = _visibleTargets;
+        _targets.CollectionChanged += (_, _) => RefreshTargetLibraryUi();
         HopTable.ItemsSource = _rows;
         HopTable.LayoutUpdated += (_, _) => SynchronizeRouteScroll();
         if (OperatingSystem.IsMacOS())
@@ -89,6 +91,7 @@ public partial class MainWindow : Window
         };
         InitializeProfessional(dataDirectory, engine is null);
         InitializeUpdates();
+        InitializeTargetLibrary();
         InitializeAllTargets();
         InitializeHistoricalAnalysis();
         InitializeMainWindowLayout();
@@ -148,6 +151,7 @@ public partial class MainWindow : Window
                     if (int.TryParse(ArgumentValue("--capture-height"), out var settingsHeight)) settings.Height = Math.Max(settings.MinHeight, settingsHeight);
                 }
             }
+            if (ArgumentValue("--visible-group") is { } visibleGroup) TargetGroupFilter.SelectedItem = visibleGroup;
             if (_args.Contains("--manage-groups")) OpenManageGroups(null, new RoutedEventArgs());
             if (_args.Contains("--workspace")) OpenWorkspace(null, new RoutedEventArgs());
             if (_args.Contains("--capture") && (_groupWindow ?? _workspaceWindow) is { } toolWindow)
@@ -164,6 +168,14 @@ public partial class MainWindow : Window
                     groupCapture.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "RemoveGroupTargets")
                         .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             }
+            if (_args.Contains("--capture") && _args.Contains("--capture-select-first-group-target") && _groupWindow is { } selectedGroupCapture)
+            {
+                var members = selectedGroupCapture.GetVisualDescendants().OfType<DataGrid>().Single(c => c.Name == "GroupMembers");
+                members.SelectedItem = members.ItemsSource!.Cast<object>().FirstOrDefault();
+                if (_args.Contains("--capture-open-saved-target"))
+                    selectedGroupCapture.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "OpenGroupTarget").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+            if (_args.Contains("--capture") && _args.Contains("--capture-close-tabs")) _ = CloseTargetTabsAsync(_visibleGroup);
             if (_args.Contains("--probe-configuration")) OpenProbeConfiguration(null, new RoutedEventArgs());
             if (ArgumentValue("--profile-menu") is { } profileOperation)
             {
@@ -192,7 +204,20 @@ public partial class MainWindow : Window
                         await Task.Delay(150, _applicationCancellation.Token);
                     }
                 }
-                var visual = (Control?)(_groupWindow?.OwnedWindows.FirstOrDefault() ?? _groupWindow) ?? _workspaceWindow ?? (Control)(_profileWindow?.Content ?? _probeConfigurationWindow?.Content ?? _settingsWindow?.Content ?? Content!);
+                if (_args.Contains("--capture-tab-scroll-start") || _args.Contains("--capture-tab-scroll-end"))
+                {
+                    var scroll = TargetList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+                    if (scroll is not null) scroll.Offset = scroll.Offset.WithX(_args.Contains("--capture-tab-scroll-start") ? 0 : Math.Max(0, scroll.Extent.Width - scroll.Viewport.Width));
+                    await Task.Delay(100, _applicationCancellation.Token);
+                }
+                Control? menuCapture = null;
+                if (_args.Contains("--capture-bulk-menu"))
+                {
+                    var menu = (MenuFlyout)MonitoringMenuButton.Flyout!; menu.ShowAt(MonitoringMenuButton);
+                    await Task.Delay(150, _applicationCancellation.Token);
+                    menuCapture = menu.Items.OfType<MenuItem>().First(item => item.IsVisible).GetVisualRoot() as Control;
+                }
+                var visual = _bulkCloseWindow ?? menuCapture ?? (Control?)(_groupWindow?.OwnedWindows.FirstOrDefault() ?? _groupWindow) ?? _workspaceWindow ?? (Control)(_profileWindow?.Content ?? _probeConfigurationWindow?.Content ?? _settingsWindow?.Content ?? Content!);
                 var size = visual.Bounds.Size;
                 using var bitmap = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height), new Vector(96, 96));
                 bitmap.Render(visual);
@@ -210,6 +235,7 @@ public partial class MainWindow : Window
                 await File.WriteAllTextAsync(Path.ChangeExtension(capture, ".json"), System.Text.Json.JsonSerializer.Serialize(details));
                 if (_args.Contains("--exit-after-capture"))
                 {
+                    _bulkCloseWindow?.Close(false);
                     if (_groupWindow is { } capturedGroups && capturedGroups.OwnedWindows.Any())
                     {
                         foreach (var child in capturedGroups.OwnedWindows.ToArray()) child.Close();
@@ -279,7 +305,7 @@ public partial class MainWindow : Window
 
     private async Task AddTarget(string text, ProbeOptions? options = null, string? group = null, bool paused = false)
     {
-        if (_closing || _addingTarget) return;
+        if (_closing || _addingTarget || _bulkMonitoring) return;
         if (string.IsNullOrWhiteSpace(text)) { StatusText.Text = "Enter a hostname or IP address."; return; }
         var returnToAllTargets = _allTargetsVisible;
         var newOptions = options ?? (_configuration.UseDefaultProbeOptionsForNewTargets && !_newTargetOverride
@@ -292,7 +318,8 @@ public partial class MainWindow : Window
             foreach (var target in text.Split([',', ';', ' ', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
             {
                 var existing = _targets.FirstOrDefault(x => x.Target.Equals(target, StringComparison.OrdinalIgnoreCase) && x.Session?.State is SessionState.Running or SessionState.Paused);
-                if (existing is not null) { TargetList.SelectedItem = existing; continue; }
+                if (existing is not null) { if (_visibleTargets.Contains(existing)) TargetList.SelectedItem = existing; continue; }
+                if (CaptureSavedTargets().Count >= 500) throw new InvalidOperationException("The workspace supports up to 500 saved targets.");
                 StatusText.Text = $"Resolving {target}…";
                 var session = await _engine.StartTargetAsync(target, newOptions, _applicationCancellation.Token);
                 if (_closing) { await _engine.StopAsync(session.Id); return; }
@@ -303,7 +330,7 @@ public partial class MainWindow : Window
                 if (paused) _engine.Pause(session.Id);
                 _targets.Add(item);
                 _configuration = _configuration with { Groups = TargetGroupCatalog.List(GroupWorkspace()) };
-                TargetList.SelectedItem = item;
+                if (_visibleTargets.Contains(item)) TargetList.SelectedItem = item;
                 if (session.LatestSnapshot is { } snapshot) ReceiveSnapshot(snapshot);
                 StatusText.Text = $"Tracing {target} · {session.Options.Protocol} · interval {session.Options.Interval.TotalSeconds:g} s";
             }
@@ -387,6 +414,7 @@ public partial class MainWindow : Window
             FooterCount.Text = FooterAverage.Text = FooterMinimum.Text = FooterCurrent.Text = "—";
             Timeline.Markers = [];
             LossValue.Foreground = Brush.Parse("#D5D8DE");
+            RefreshHistoryGraphs();
             UpdateButtons();
             return;
         }
@@ -525,18 +553,21 @@ public partial class MainWindow : Window
         if (_engine is null) return;
         UpdateProbeSummary();
         var state = _selected?.Session?.State;
-        var busy = _addingTarget || (_selected is not null && (_monitoringOperations.Contains(_selected.Id) || _closingTargets.Contains(_selected.Id)));
+        var busy = _bulkMonitoring || _addingTarget || (_selected is not null && (_monitoringOperations.Contains(_selected.Id) || _closingTargets.Contains(_selected.Id)));
         var adding = _creatingTarget || !string.IsNullOrWhiteSpace(TargetInput.Text) || _selected is null;
         StartButton.IsEnabled = !busy && !_closing && (adding || _selected?.Session is not null);
         StartButton.Content = busy ? "…" : !adding && state == SessionState.Running ? "Ⅱ" : "▶";
-        var label = busy ? "Updating monitoring…" : adding ? "Add new target" : state == SessionState.Running ? "Pause monitoring" : "Start monitoring";
+        var label = busy ? "Updating monitoring…" : adding ? "Add new target" : state == SessionState.Running ? "Pause monitoring"
+            : state == SessionState.Paused ? "Resume monitoring" : "Start monitoring in a new session";
         ToolTip.SetTip(StartButton, label);
         Avalonia.Automation.AutomationProperties.SetName(StartButton, label);
         StopTraceAction.IsEnabled = !busy && state is SessionState.Running or SessionState.Paused;
         RestartTraceAction.IsEnabled = !busy && _selected?.Session is not null;
         ResetStatisticsAction.IsEnabled = !busy && _selected?.Session is not null;
         CloseTargetAction.IsEnabled = !busy && _selected is not null;
-        NewTargetAction.IsEnabled = !_addingTarget && !_closing;
+        NewTargetAction.IsEnabled = !_bulkMonitoring && !_addingTarget && !_closing;
+        SelectedTargetActions.IsEnabled = !busy && _selected is not null;
+        UpdateBulkMonitoringActions();
         if (_exportMenuAction is not null) _exportMenuAction.IsEnabled = _selected?.Snapshot is not null;
     }
 
@@ -550,12 +581,9 @@ public partial class MainWindow : Window
 
     private async void StopTrace(object? sender, RoutedEventArgs e)
     {
-        var item = _selected;
-        if (item?.Session is null || !_monitoringOperations.Add(item.Id)) return;
-        UpdateButtons();
-        try { await _engine.StopAsync(item.Id); item.Refresh(); ScheduleWorkspaceSave(); }
+        if (_selected is not { Session: not null } item) return;
+        try { await StopTargetAsync(item); }
         catch (Exception ex) { StatusText.Text = ex.Message; }
-        finally { _monitoringOperations.Remove(item.Id); RefreshSelected(); }
     }
 
     private async void CloseSelectedTarget(object? sender, RoutedEventArgs e)
@@ -566,6 +594,7 @@ public partial class MainWindow : Window
     private async void CloseTarget(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
+        if (_bulkMonitoring) return;
         if (sender is Button { DataContext: TargetItem item }) await CloseTargetAsync(item);
     }
 
@@ -579,9 +608,10 @@ public partial class MainWindow : Window
             var index = _targets.IndexOf(item);
             if (index < 0) return;
             var selected = TargetList.SelectedItem as TargetItem;
+            RememberSavedTarget(item, closed: true);
             _targets.RemoveAt(index);
             TargetList.SelectedItem = ReferenceEquals(selected, item)
-                ? (_targets.Count > 0 ? _targets[Math.Min(index, _targets.Count - 1)] : null)
+                ? _visibleTargets.FirstOrDefault()
                 : selected;
             TargetCount.Text = _targets.Count.ToString(CultureInfo.InvariantCulture);
             StatusText.Text = $"Closed {item.Target} · saved history is available in Open history";
@@ -715,12 +745,15 @@ public partial class MainWindow : Window
 
 public sealed class TargetItem : INotifyPropertyChanged
 {
-    public TargetItem(TargetSession session) { Session = session; Id = session.Id; Target = session.Target; Address = session.ResolvedAddress; }
+    public TargetItem(TargetSession session) { Session = session; Id = session.Id; Target = session.Target; Address = string.IsNullOrWhiteSpace(session.ResolvedAddress) ? session.Target : session.ResolvedAddress; }
     public TargetItem(StoredSession session) { Id = session.Id; Target = session.Target; Address = session.DestinationAddress; }
     public Guid Id { get; }
     public string Target { get; }
     public string Address { get; }
     public TargetSession? Session { get; }
+    public Guid SavedTargetId { get; set; } = Guid.NewGuid();
+    public string? DisplayName { get; set; }
+    public string Label => string.IsNullOrWhiteSpace(DisplayName) ? Target : DisplayName;
     public string Group { get; set; } = "Default";
     public int TcpPort { get; set; } = 443;
     public int UdpPort { get; set; } = 33434;
@@ -728,14 +761,14 @@ public sealed class TargetItem : INotifyPropertyChanged
     public bool IsHistorical => Session is null;
     public bool HistoricalConfigurationUnknown { get; set; }
     public RoundSnapshot? Snapshot { get; set; }
-    public string StateLabel => IsHistorical ? "Saved session" : Session!.State.ToString();
+    public string StateLabel => IsHistorical ? "Saved session" : Session!.State == SessionState.Running ? "Monitoring" : Session.State.ToString();
     public IBrush StatusBrush => Brush.Parse(IsHistorical ? "#8C95A4" : Session!.State == SessionState.Paused ? "#DCB75D"
         : Session.State != SessionState.Running ? "#9E7474" : Snapshot is null || Snapshot.Destination.Sent == 0 || Snapshot.Destination.Status == ProbeStatus.Error ? "#8C95A4"
         : Snapshot?.Destination.Sent > 0 && Snapshot.Destination.LastMs is null ? "#D65B5B"
         : Snapshot?.Destination.LossPercent > 5 ? "#DCB75D" : "#3CC659");
     public string Summary => Snapshot is null ? "Waiting for first round" : $"{MainWindow.Number(Snapshot.Destination.LastMs, " ms")}  ·  {Snapshot.Destination.LossPercent:0.#}% response loss";
     public event PropertyChangedEventHandler? PropertyChanged;
-    public void Refresh() { PropertyChanged?.Invoke(this, new(nameof(StateLabel))); PropertyChanged?.Invoke(this, new(nameof(Summary))); PropertyChanged?.Invoke(this, new(nameof(StatusBrush))); }
+    public void Refresh() { PropertyChanged?.Invoke(this, new(nameof(Label))); PropertyChanged?.Invoke(this, new(nameof(StateLabel))); PropertyChanged?.Invoke(this, new(nameof(Summary))); PropertyChanged?.Invoke(this, new(nameof(StatusBrush))); }
 }
 
 public sealed class HopItem(HopSnapshot hop) : INotifyPropertyChanged

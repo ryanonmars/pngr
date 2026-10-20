@@ -7,7 +7,9 @@ using System.Text;
 namespace TraceScope.Core;
 
 public sealed record WorkspaceTarget(string Target, ProbeOptions Options, string Group = "Default", bool Paused = false,
-    int TcpPort = 443, int UdpPort = 33434, string? ProfileName = null);
+    int TcpPort = 443, int UdpPort = 33434, string? ProfileName = null,
+    Guid Id = default, bool Closed = false, bool Stopped = false, string? DisplayName = null,
+    Guid? SessionId = null, string? ResolvedAddress = null);
 public sealed record MonitoringProfile(string Name, ProbeOptions Options);
 /// <summary>Desktop layout only: dimensions in DIPs, position in physical pixels.</summary>
 public sealed record MainWindowLayout
@@ -81,10 +83,15 @@ public sealed record WorkspaceConfiguration
             throw new InvalidDataException("Targets, profiles and alerts must be lists.");
         if (Targets.Count > 500 || Profiles.Count > 100 || Alerts.Count > 200)
             throw new InvalidDataException("Configuration exceeds the supported target/profile/alert count.");
+        if (Targets.Where(t => t is not null && t.Id != Guid.Empty).Select(t => t.Id).Distinct().Count()
+            != Targets.Count(t => t is not null && t.Id != Guid.Empty))
+            throw new InvalidDataException("Saved target identifiers must be unique.");
         foreach (var target in Targets)
         {
             if (target is null || target.Options is null || target.Group is null || string.IsNullOrWhiteSpace(target.Target) || target.Target.Length > 253 || target.Group.Length > 80)
                 throw new InvalidDataException("Invalid target or group.");
+            if (target.DisplayName?.Length > 80 || target.DisplayName?.Any(char.IsControl) == true)
+                throw new InvalidDataException("Invalid target display name.");
             target.Options.Validate();
             if (target.TcpPort is < 1 or > 65535 || target.UdpPort is < 1 or > 65535)
                 throw new InvalidDataException("Invalid target destination port.");

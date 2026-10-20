@@ -6,7 +6,7 @@
   </Window.Styles>
   <DockPanel>
     <NativeMenuBar x:Name="ApplicationMenuBar" DockPanel.Dock="Top" IsVisible="False"/>
-  <Grid RowDefinitions="28,28,38,*,24" Background="#191A1D">
+  <Grid RowDefinitions="28,36,38,*,24" Background="#191A1D">
     <Border Background="#23252A" BorderBrush="#36383E" BorderThickness="0,0,0,1" Padding="7,0">
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
         <Image x:Name="BrandWordmark" Source="{StaticResource PngrWordmark}" Width="50" Height="18" Stretch="Uniform" VerticalAlignment="Center" AutomationProperties.Name="Pngr"/>
@@ -15,14 +15,20 @@
       </Grid>
     </Border>
     <Border Grid.Row="1" Background="#1D1F23" BorderBrush="#36383E" BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,*">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="5">
         <StackPanel Orientation="Horizontal" Spacing="5" Margin="8,0,10,0" VerticalAlignment="Center"><Button x:Name="AllTargetsButton" Content="All Targets" Click="OpenAllTargets" ToolTip.Tip="Show every target together"/><Button Content="+" Click="NewTargetFromOverview" ToolTip.Tip="Add a target"/><TextBlock x:Name="TargetCount" Text="0" FontSize="10" Foreground="#747A84"/></StackPanel>
-        <ListBox Grid.Column="1" x:Name="TargetList" Background="Transparent" SelectionChanged="TargetChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+        <ComboBox Grid.Column="1" x:Name="TargetGroupFilter" Width="132" Height="26" MinHeight="26" ToolTip.Tip="Filter open tabs by group. Monitoring continues in hidden groups." AutomationProperties.Name="Visible target group"/>
+        <Grid Grid.Column="2"><TextBlock x:Name="TargetFilterEmpty" Margin="8,0" Foreground="#898F9A" FontSize="11" VerticalAlignment="Center" IsHitTestVisible="False"/>
+        <ListBox x:Name="TargetList" Background="Transparent" SelectionChanged="TargetChanged" ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled">
           <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ListBox.ItemsPanel>
           <ListBox.ItemTemplate><DataTemplate>
-            <StackPanel Orientation="Horizontal" Spacing="6"><StackPanel.ContextMenu><ContextMenu><MenuItem Header="Assign group…" Click="OpenTargetGroup"/></ContextMenu></StackPanel.ContextMenu><TextBlock Text="●" Foreground="{Binding StatusBrush}" FontSize="8" VerticalAlignment="Center"/><TextBlock Text="{Binding Target}" FontSize="11" VerticalAlignment="Center"/><TextBlock Text="{Binding StateLabel}" FontSize="9" Foreground="#898F9A" VerticalAlignment="Center"/><Button Classes="close-target" Content="×" Click="CloseTarget" ToolTip.Tip="Close target (saved history is kept)" AutomationProperties.Name="Close target"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" MinWidth="155"><StackPanel.ContextMenu><ContextMenu><MenuItem Header="Assign group…" Click="OpenTargetGroup"/></ContextMenu></StackPanel.ContextMenu><TextBlock Text="●" Foreground="{Binding StatusBrush}" FontSize="8" VerticalAlignment="Center"/><TextBlock Text="{Binding Label}" MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Target}" FontSize="11" VerticalAlignment="Center"/><TextBlock Text="{Binding StateLabel}" FontSize="9" Foreground="#898F9A" VerticalAlignment="Center"/><Button Classes="close-target" Content="×" Click="CloseTarget" ToolTip.Tip="Close target (saved target and history are kept)" AutomationProperties.Name="Close target"/></StackPanel>
           </DataTemplate></ListBox.ItemTemplate>
-        </ListBox>
+        </ListBox></Grid>
+        <Button Grid.Column="3" Name="ScrollTargetsLeft" Content="‹" Width="24" Click="ScrollTargetTabs" Tag="Left" ToolTip.Tip="Scroll targets left"/>
+        <Button Grid.Column="4" Name="ScrollTargetsRight" Content="›" Width="24" Click="ScrollTargetTabs" Tag="Right" ToolTip.Tip="Scroll targets right"/>
+        <Button Grid.Column="5" Name="TargetOverflow" Content="▾" Width="26" Click="OpenTargetOverflow" ToolTip.Tip="Find an open target" AutomationProperties.Name="Find an open target"/>
+
       </Grid>
     </Border>
     <Border Grid.Row="2" Background="#26282D" BorderBrush="#41444A" BorderThickness="0,0,0,1" Padding="6,5">
@@ -31,12 +37,24 @@
         <Button Grid.Column="1" Classes="primary" x:Name="StartButton" Content="▶" Width="42" Click="StartTrace" AutomationProperties.Name="Start monitoring"/>
         <Button Grid.Column="2" x:Name="MonitoringMenuButton" Content="▾" Width="28" ToolTip.Tip="Monitoring actions">
           <Button.Flyout><MenuFlyout>
-            <MenuItem x:Name="NewTargetAction" Header="New Target" Click="NewTargetFromOverview"/>
-            <MenuItem x:Name="StopTraceAction" Header="Stop Trace" Click="StopTrace"/>
-            <MenuItem x:Name="RestartTraceAction" Header="Restart Trace" Click="RestartTrace"/>
-            <MenuItem x:Name="ResetStatisticsAction" Header="Reset Statistics" Click="ResetStatistics"/>
+            <MenuItem x:Name="BulkGroupActions" Header="Current Group" IsEnabled="False"/>
+            <MenuItem x:Name="StartGroupAction" Header="Start / Resume Group" Tag="Group:Start" Click="BulkMonitoringAction"/>
+            <MenuItem x:Name="PauseGroupAction" Header="Pause Group" Tag="Group:Pause" Click="BulkMonitoringAction"/>
+            <MenuItem x:Name="CloseGroupTabsAction" Header="Close All Group Tabs…" Tag="Group:Close" Click="BulkMonitoringAction"/>
+            <Separator x:Name="GroupActionsSeparator"/>
+            <MenuItem Header="All Targets" IsEnabled="False"/>
+            <MenuItem x:Name="StartAllAction" Header="Start / Resume All" Tag="All:Start" Click="BulkMonitoringAction"/>
+            <MenuItem x:Name="PauseAllAction" Header="Pause All" Tag="All:Pause" Click="BulkMonitoringAction"/>
+            <MenuItem x:Name="CloseAllTabsAction" Header="Close All Tabs…" Tag="All:Close" Click="BulkMonitoringAction"/>
             <Separator/>
-            <MenuItem x:Name="CloseTargetAction" Header="Close Target" Click="CloseSelectedTarget"/>
+            <MenuItem x:Name="SelectedTargetActions" Header="Selected Target">
+              <MenuItem x:Name="StopTraceAction" Header="Stop Trace" Click="StopTrace" ToolTip.Tip="End this trace. Its tab, current statistics and saved history remain. Starting again begins a new trace."/>
+              <MenuItem x:Name="RestartTraceAction" Header="Restart Trace" Click="RestartTrace" ToolTip.Tip="Start a fresh trace using the same settings. Previous history is preserved."/>
+              <MenuItem x:Name="ResetStatisticsAction" Header="Reset Statistics" Click="ResetStatistics"/>
+              <Separator/>
+              <MenuItem x:Name="CloseTargetAction" Header="Close Target" Click="CloseSelectedTarget" ToolTip.Tip="Stop monitoring and close this tab. Its saved target and history remain."/>
+            </MenuItem>
+            <MenuItem x:Name="NewTargetAction" Header="New Target" Click="NewTargetFromOverview"/>
           </MenuFlyout></Button.Flyout>
         </Button>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4"><TextBlock Text="Interval" VerticalAlignment="Center"/><ComboBox x:Name="IntervalInput" Width="112" SelectedIndex="2"><ComboBoxItem Content="500 ms"/><ComboBoxItem Content="1 second"/><ComboBoxItem Content="2.5 seconds"/><ComboBoxItem Content="5 seconds"/><ComboBoxItem Content="10 seconds"/></ComboBox></StackPanel>
